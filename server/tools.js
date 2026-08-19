@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { execFile, spawn } from 'child_process'
+import { searchSessions } from './config.js'
 
 const MAX_OUTPUT = 40_000
 
@@ -96,6 +97,11 @@ export const TOOL_DEFS = [
     name: 'job_kill',
     description: 'Stop a background job.',
     input_schema: { type: 'object', properties: { id: { type: 'string', description: 'The job id' } }, required: ['id'] }
+  },
+  {
+    name: 'search_sessions',
+    description: 'Search the user\'s past Radiant sessions (their previous conversations with you) by keyword. Use it to recall earlier decisions or work — e.g. "what did we decide about auth". Returns matching session titles and snippets.',
+    input_schema: { type: 'object', properties: { query: { type: 'string', description: 'Keywords to search for' } }, required: ['query'] }
   },
   {
     name: 'todo_write',
@@ -200,6 +206,11 @@ export async function runTool (name, input, cwd) {
         if (!job) return `No job ${input.id}.`
         if (job.proc) { try { job.proc.kill('SIGKILL') } catch {} }
         return `Killed ${input.id}.`
+      }
+      case 'search_sessions': {
+        const hits = searchSessions(input.query, 15)
+        if (!hits.length) return `No past sessions match "${input.query}".`
+        return hits.map(h => `• ${h.title} (${h.messageCount} msgs, ${h.updatedAt?.slice(0, 10)})\n  …${h.snippet}…`).join('\n')
       }
       default:
         return `Error: unknown tool ${name}`

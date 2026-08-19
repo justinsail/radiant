@@ -120,6 +120,30 @@ export function listSessions () {
     .sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt || '').localeCompare(a.updatedAt || ''))
 }
 
+// Full-text search across all past sessions (title + message text).
+export function searchSessions (query, limit = 30) {
+  ensureDirs()
+  const q = String(query || '').toLowerCase().trim()
+  if (!q) return []
+  const out = []
+  for (const f of fs.readdirSync(SESSIONS_DIR)) {
+    if (!f.endsWith('.json')) continue
+    let s
+    try { s = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, f), 'utf8')) } catch { continue }
+    const texts = []
+    for (const m of s.messages || []) {
+      if (m.text) texts.push(m.text)
+      for (const p of m.parts || []) if (p.type === 'text' && p.text) texts.push(p.text)
+    }
+    const hay = ((s.title || '') + '\n' + texts.join('\n')).toLowerCase()
+    const idx = hay.indexOf(q)
+    if (idx === -1) continue
+    const snippet = hay.slice(Math.max(0, idx - 40), idx + 80).replace(/\s+/g, ' ').trim()
+    out.push({ id: s.id, title: s.title || 'Untitled', snippet, updatedAt: s.updatedAt, messageCount: (s.messages || []).length })
+  }
+  return out.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).slice(0, limit)
+}
+
 export function loadSession (id) {
   if (!/^[a-z0-9-]+$/.test(id)) return null
   try {

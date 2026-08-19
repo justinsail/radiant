@@ -51,6 +51,7 @@ export const api = {
   removeProvider: id => json('DELETE', `/api/providers/${id}`),
   getModels: () => json('GET', '/api/models'),
   listSessions: () => json('GET', '/api/sessions'),
+  searchSessions: q => json('GET', `/api/sessions-search?q=${encodeURIComponent(q)}`),
   createSession: body => json('POST', '/api/sessions', body || {}),
   getSession: id => json('GET', `/api/sessions/${id}`),
   patchSession: (id, body) => json('PATCH', `/api/sessions/${id}`, body),

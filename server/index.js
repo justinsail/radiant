@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
 import { execSync, spawn } from 'child_process'
-import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
+import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession, searchSessions } from './config.js'
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken, startDevice, pollDevice } from './oauth.js'
 import { checkForUpdate } from './updater.js'
@@ -796,6 +796,8 @@ app.post('/api/sessions', (req, res) => {
   saveSession(session)
   res.json(session)
 })
+
+app.get('/api/sessions-search', (req, res) => res.json(searchSessions(req.query.q, 30)))
 
 app.get('/api/sessions/:id', (req, res) => {
   const s = loadSession(req.params.id)

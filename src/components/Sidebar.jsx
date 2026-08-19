@@ -86,6 +86,16 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
   const [collapsed, setCollapsed] = useState({})
   const toggleGroup = id => setCollapsed(c => ({ ...c, [id]: !c[id] }))
 
+  const [search, setSearch] = useState('')
+  const [results, setResults] = useState(null)
+  useEffect(() => {
+    const q = search.trim()
+    if (!q) { setResults(null); return }
+    setResults(null)
+    const t = setTimeout(() => api.searchSessions(q).then(setResults).catch(() => setResults([])), 200)
+    return () => clearTimeout(t)
+  }, [search])
+
   const SessionRow = ({ s, showAgent = true }) => {
     const ag = agentOf(s.agentId)
     return (
@@ -119,11 +129,28 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         <button className={view === 'bots' ? 'on' : ''} onClick={() => setView('bots')}>Agents</button>
       </div>
       <button className='new-session' onClick={() => onNew()}>+ New session</button>
+      {view === 'chats' && (
+        <input className='session-search' placeholder='Search all sessions…' value={search}
+          onChange={e => setSearch(e.target.value)} />
+      )}
 
       {view === 'chats' ? (
         <div className='session-list'>
-          {sessions.map(s => <SessionRow key={s.id} s={s} />)}
-          {!sessions.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
+          {search.trim() ? (
+            results === null
+              ? <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>Searching…</div>
+              : results.length
+                ? results.map(r => (
+                    <div key={r.id} className='search-result' onClick={() => onOpen(r.id)}>
+                      <div className='search-result-title'>{r.title}</div>
+                      <div className='search-result-snippet'>…{r.snippet}…</div>
+                    </div>
+                  ))
+                : <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No matches.</div>
+          ) : <>
+            {sessions.map(s => <SessionRow key={s.id} s={s} />)}
+            {!sessions.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
+          </>}
         </div>
       ) : (
         <div className='session-list'>
