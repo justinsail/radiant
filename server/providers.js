@@ -237,14 +237,18 @@ async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, too
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, computerControl, skills, persona, emit, requestApproval, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, computerControl, skills, persona, mcpTools, callMcp, emit, requestApproval, signal }) {
   const cwd = session.cwd || os.homedir()
   const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona)
   const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
 
   const accessToken = getAccessToken ? await getAccessToken() : null
-  const toolDefs = computerControl ? [...TOOL_DEFS, ...COMPUTER_TOOL_DEFS] : TOOL_DEFS
+  const toolDefs = [
+    ...TOOL_DEFS,
+    ...(computerControl ? COMPUTER_TOOL_DEFS : []),
+    ...(mcpTools || [])
+  ]
 
   let toolsEnabled = useTools
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -286,12 +290,15 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, sessio
       assistant.parts.push(part)
       emit({ type: 'tool_start', id: call.id, name: call.name, args: call.args })
       const isComputer = COMPUTER_TOOL_NAMES.has(call.name)
-      const needsApproval = requestApproval && (call.name === 'run_command' || (isComputer && !COMPUTER_SAFE.has(call.name)))
+      const isMcp = call.name.startsWith('mcp__')
+      const needsApproval = requestApproval && (call.name === 'run_command' || isMcp || (isComputer && !COMPUTER_SAFE.has(call.name)))
       const approved = needsApproval ? await requestApproval(call) : true
       if (signal.aborted) return
       if (!approved) {
         part.denied = true
         part.result = 'The user declined this action. Ask them how they would like to proceed, or try a different approach.'
+      } else if (isMcp) {
+        part.result = callMcp ? await callMcp(call.name, call.args) : 'MCP tool unavailable.'
       } else if (isComputer) {
         const r = await runComputerTool(call.name, call.args)
         part.result = r.content

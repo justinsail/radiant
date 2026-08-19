@@ -47,7 +47,11 @@ export const api = {
   deleteSkill: id => json('DELETE', `/api/skills/${id}`),
   addAgent: agent => json('POST', '/api/agents', agent),
   updateAgent: (id, patch) => json('PATCH', `/api/agents/${id}`, patch),
-  deleteAgent: id => json('DELETE', `/api/agents/${id}`)
+  deleteAgent: id => json('DELETE', `/api/agents/${id}`),
+  mcpStatus: () => json('GET', '/api/mcp/status'),
+  addMcp: server => json('POST', '/api/mcp', server),
+  updateMcp: (id, patch) => json('PATCH', `/api/mcp/${id}`, patch),
+  deleteMcp: id => json('DELETE', `/api/mcp/${id}`)
 }
 
 // POST /api/quantize streams progress lines back on the response body.

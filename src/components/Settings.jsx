@@ -421,6 +421,69 @@ function ModelsPane ({ onModelsChanged }) {
   )
 }
 
+// ---------- MCP ----------
+
+function McpPane ({ config, onConfigChange }) {
+  const servers = config.mcpServers || []
+  const [status, setStatus] = useState([])
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [command, setCommand] = useState('')
+
+  const loadStatus = () => api.mcpStatus().then(r => setStatus(r.servers || [])).catch(() => {})
+  useEffect(() => { loadStatus() }, [servers.length])
+
+  const add = async () => {
+    if (!name.trim() || !command.trim()) return
+    const [cmd, ...args] = command.trim().split(/\s+/)
+    const cfg = await api.addMcp({ name: name.trim(), command: cmd, args })
+    setName(''); setCommand(''); setAdding(false)
+    onConfigChange(cfg); setTimeout(loadStatus, 500)
+  }
+  const toggle = async (id, enabled) => { onConfigChange(await api.updateMcp(id, { enabled })); setTimeout(loadStatus, 500) }
+  const remove = async id => { if (window.confirm('Remove this MCP server?')) onConfigChange(await api.deleteMcp(id)) }
+
+  const st = id => status.find(s => s.id === id)
+  return (
+    <div className='set-section'>
+      <h3>MCP servers</h3>
+      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
+        Model Context Protocol servers give agents extra tools — databases, APIs, file systems, and more.
+        Add a server by its launch command; its tools become available to the agent (each call asks approval).
+      </p>
+
+      {servers.map(s => {
+        const info = st(s.id)
+        return (
+          <div key={s.id} className='mcp-row'>
+            <label className='skill-toggle'><input type='checkbox' checked={s.enabled !== false} onChange={e => toggle(s.id, e.target.checked)} /></label>
+            <div className='skill-main'>
+              <div className='skill-name'>{s.name} {info && (info.connected ? <span className='key-ok'>✓ {info.toolCount} tools</span> : <span className='fit-badge fit-no'>{info.error ? 'error' : 'off'}</span>)}</div>
+              <div className='skill-body mono'>{s.url || `${s.command} ${(s.args || []).join(' ')}`}</div>
+              {info?.error && <div className='error-note' style={{ fontSize: 11 }}>{info.error}</div>}
+              {info?.connected && info.tools?.length > 0 && <div className='skill-body'>Tools: {info.tools.slice(0, 8).join(', ')}{info.tools.length > 8 ? '…' : ''}</div>}
+            </div>
+            <button className='small-btn danger' onClick={() => remove(s.id)}>✕</button>
+          </div>
+        )
+      })}
+      {!servers.length && <div className='activity-empty' style={{ marginTop: 8 }}>No MCP servers yet.</div>}
+
+      {adding
+        ? <div className='skill-add'>
+            <input className='text-input' style={{ fontFamily: 'inherit', marginBottom: 8 }} placeholder='Name (e.g. Filesystem)' value={name} onChange={e => setName(e.target.value)} />
+            <input className='text-input' style={{ marginBottom: 4 }} placeholder='Launch command (e.g. npx -y @modelcontextprotocol/server-filesystem ~/Projects)' value={command} onChange={e => setCommand(e.target.value)} />
+            <div className='oauth-note'>Runs as a local process. Only add servers you trust.</div>
+            <div className='row' style={{ marginTop: 8 }}>
+              <button className='small-btn primary' onClick={add} disabled={!name.trim() || !command.trim()}>Add server</button>
+              <button className='small-btn' onClick={() => setAdding(false)}>Cancel</button>
+            </div>
+          </div>
+        : <button className='small-btn' style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ Add MCP server</button>}
+    </div>
+  )
+}
+
 // ---------- Agents ----------
 
 function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
@@ -862,6 +925,7 @@ const TABS = [
   { id: 'models', label: 'Models' },
   { id: 'agents', label: 'Agents' },
   { id: 'skills', label: 'Skills' },
+  { id: 'mcp', label: 'MCP' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'agent', label: 'Automation' },
   { id: 'about', label: 'About' }
@@ -888,6 +952,7 @@ export default function Settings ({ config, initialTab = 'providers', embedded =
           {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
           {tab === 'agents' && <AgentsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'skills' && <SkillsPane config={config} onConfigChange={onConfigChange} />}
+          {tab === 'mcp' && <McpPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
           {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
           {tab === 'about' && <AboutPane config={config} onSettings={onSettings} />}

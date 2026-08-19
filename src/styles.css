@@ -725,6 +725,10 @@ input[type='range']::-webkit-slider-thumb {
 }
 .accent-picker-text { display: flex; flex-direction: column; gap: 2px; }
 
+/* mcp */
+.mcp-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.mcp-row .skill-name { display: flex; align-items: center; gap: 8px; }
+
 /* agents */
 .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .agent-card {

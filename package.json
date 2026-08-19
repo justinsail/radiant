@@ -69,6 +69,7 @@
     }
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "dompurify": "^3.4.13",
     "electron-updater": "^6.8.9",
     "express": "^4.21.2",

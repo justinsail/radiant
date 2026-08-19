@@ -103,6 +103,46 @@ app.post('/api/quantize', async (req, res) => {
   }
 })
 
+// ---------- MCP servers ----------
+app.get('/api/mcp/status', async (req, res) => {
+  try {
+    const { mcpStatus } = await import('./mcp.js')
+    res.json({ servers: await mcpStatus(config.mcpServers || []) })
+  } catch (e) {
+    res.json({ servers: [], error: e.message })
+  }
+})
+
+app.post('/api/mcp', (req, res) => {
+  const { name, transport, command, args, env, url } = req.body
+  if (!name || (!command && !url)) return res.status(400).json({ error: 'name and a command or url required' })
+  config.mcpServers = config.mcpServers || []
+  config.mcpServers.push({
+    id: 'mcp-' + crypto.randomBytes(4).toString('hex'),
+    name, transport: transport || (url ? 'http' : 'stdio'),
+    command: command || null, args: Array.isArray(args) ? args : (args ? String(args).split(' ').filter(Boolean) : []),
+    env: env || {}, url: url || null, enabled: true
+  })
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+app.patch('/api/mcp/:id', async (req, res) => {
+  const s = (config.mcpServers || []).find(x => x.id === req.params.id)
+  if (!s) return res.status(404).json({ error: 'not found' })
+  for (const k of ['name', 'command', 'args', 'env', 'url', 'enabled']) if (k in req.body) s[k] = req.body[k]
+  try { const { disconnect } = await import('./mcp.js'); await disconnect(s.id) } catch {}
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+app.delete('/api/mcp/:id', async (req, res) => {
+  try { const { disconnect } = await import('./mcp.js'); await disconnect(req.params.id) } catch {}
+  config.mcpServers = (config.mcpServers || []).filter(x => x.id !== req.params.id)
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
 // ---------- workspace file search (for @-mentions) ----------
 const FILE_SKIP = new Set(['node_modules', '.git', 'dist', 'release', '.next', 'build', '.cache', 'vendor', '__pycache__'])
 app.get('/api/files', (req, res) => {
@@ -491,6 +531,17 @@ app.post('/api/chat', async (req, res) => {
   const agentSkillIds = new Set(agent?.skills || [])
   const mergedSkills = allSkills.filter(s => s.enabled || agentSkillIds.has(s.id))
 
+  // MCP tools from enabled servers, bridged into the tool set
+  let mcpTools = []
+  let callMcp = null
+  if ((config.mcpServers || []).some(s => s.enabled)) {
+    try {
+      const mcp = await import('./mcp.js')
+      mcpTools = await mcp.mcpToolDefs(config.mcpServers)
+      callMcp = (name, args) => mcp.callMcpTool(name, args, config.mcpServers)
+    } catch (e) { console.error('[mcp]', e.message) }
+  }
+
   res.writeHead(200, {
     'content-type': 'text/event-stream',
     'cache-control': 'no-cache',
@@ -534,6 +585,8 @@ app.post('/api/chat', async (req, res) => {
       computerControl: Boolean(session.computerControl),
       persona: agent?.persona || '',
       skills: mergedSkills,
+      mcpTools,
+      callMcp,
       emit,
       requestApproval,
       signal: controller.signal
