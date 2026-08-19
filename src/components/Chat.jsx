@@ -137,6 +137,38 @@ function ModelPicker ({ session, models, onPick, onRefresh }) {
   )
 }
 
+const SLASH_COMMANDS = [
+  { cmd: '/explain', desc: 'Explain how the code works', prompt: 'Explain how this code works, starting from the entry point. Read the files you need.' },
+  { cmd: '/review', desc: 'Review for bugs & improvements', prompt: 'Review the code in this workspace for bugs, edge cases, and improvements. Be specific and cite files.' },
+  { cmd: '/fix', desc: 'Find and fix a bug', prompt: 'Find and fix the bug: ' },
+  { cmd: '/test', desc: 'Write and run tests', prompt: 'Write tests for the recent changes and run them.' },
+  { cmd: '/refactor', desc: 'Refactor for clarity', prompt: 'Refactor this code for clarity without changing behavior: ' },
+  { cmd: '/commit', desc: 'Commit current changes', prompt: 'Stage and commit the current changes with a clear, conventional commit message.' },
+  { cmd: '/doc', desc: 'Document the code', prompt: 'Add clear documentation and comments to: ' }
+]
+
+function exportSessionMarkdown (session) {
+  const lines = [`# ${session.title}`, '', `_${session.model || 'model'} · exported from Radiant_`, '']
+  for (const m of session.messages) {
+    if (m.role === 'user') {
+      lines.push('## You', '', m.text || '', '')
+    } else {
+      lines.push(`## Radiant${m.model ? ` (${m.model})` : ''}`, '')
+      for (const p of m.parts || []) {
+        if (p.type === 'text') lines.push(p.text, '')
+        else if (p.type === 'tool') lines.push(`> 🔧 \`${p.name}\` ${p.args?.command || p.args?.path || ''}`.trim(), '')
+      }
+    }
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = (session.title || 'session').replace(/[^\w-]+/g, '-').slice(0, 40) + '.md'
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 
 function readFileAsAttachment (file) {
@@ -162,8 +194,16 @@ export default function Chat ({ session, live, approval, usage, error, models, o
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
+  const textareaRef = useRef(null)
   const scrollRef = useRef(null)
   const streaming = Boolean(live?.streaming)
+
+  const slashQuery = /^\/[\w-]*$/.test(draft) ? draft : null
+  const slashMatches = slashQuery ? SLASH_COMMANDS.filter(c => c.cmd.startsWith(slashQuery)) : []
+  const applySlash = c => {
+    setDraft(c.prompt)
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
 
   useEffect(() => {
     const el = scrollRef.current
@@ -220,6 +260,7 @@ export default function Chat ({ session, live, approval, usage, error, models, o
         >
           {session.cwd?.replace(/^\/Users\/[^/]+/, '~')}
         </button>
+        <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export conversation as Markdown'>⭳</button>
         <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Toggle side panel'>▤</button>
       </div>
 
@@ -285,14 +326,28 @@ export default function Chat ({ session, live, approval, usage, error, models, o
               ))}
             </div>
           )}
+          {slashMatches.length > 0 && (
+            <div className='slash-menu'>
+              {slashMatches.map(c => (
+                <button key={c.cmd} className='slash-item' onMouseDown={e => { e.preventDefault(); applySlash(c) }}>
+                  <span className='slash-cmd'>{c.cmd}</span>
+                  <span className='slash-desc'>{c.desc}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <textarea
+            ref={textareaRef}
             rows={2}
-            placeholder={dragOver ? 'Drop files to attach…' : toolsOn ? 'Ask the agent to build, fix, or explain something…' : 'Chat (tools off)…'}
+            placeholder={dragOver ? 'Drop files to attach…' : toolsOn ? 'Ask the agent to build, fix, or explain something…  (type / for commands)' : 'Chat (tools off)…'}
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onPaste={e => { const files = [...e.clipboardData.files]; if (files.length) { e.preventDefault(); addFiles(files) } }}
             onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() }
+              if (e.key === 'Enter' && !e.shiftKey) {
+                if (slashMatches.length) { e.preventDefault(); applySlash(slashMatches[0]); return }
+                e.preventDefault(); submit()
+              }
             }}
           />
           <div className='composer-row'>

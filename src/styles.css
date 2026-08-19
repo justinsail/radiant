@@ -359,11 +359,21 @@ code, pre, .mono { font-family: var(--font-mono); }
 .md h1, .md h2, .md h3 { font-weight: 600; letter-spacing: -0.015em; margin: 18px 0 8px; }
 .md h1 { font-size: 19px; } .md h2 { font-size: 16px; } .md h3 { font-size: 14px; }
 .md pre {
+  position: relative;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 10px; padding: 12px 14px;
   overflow-x: auto; font-size: 12px; line-height: 1.55;
 }
+.code-copy {
+  position: absolute; top: 6px; right: 6px;
+  padding: 3px 9px; font-size: 11px; font-family: var(--font-body);
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-panel); color: var(--text-muted);
+  opacity: 0; transition: opacity 0.12s;
+}
+.md pre:hover .code-copy { opacity: 1; }
+.code-copy:hover { color: var(--text); border-color: var(--border-strong); }
 .md code { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; font-size: 12px; }
 .md pre code { background: none; border: none; padding: 0; }
 .md a { color: var(--accent); }
@@ -414,6 +424,20 @@ code, pre, .mono { font-family: var(--font-mono); }
 
 /* drop-up menu anchor inside the prompt bar */
 .composer-box .model-menu { position: absolute; bottom: calc(100% + 8px); left: 8px; }
+
+/* slash-command menu */
+.slash-menu {
+  position: absolute; bottom: calc(100% + 8px); left: 8px; right: 8px;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow-menu); overflow: hidden; z-index: 40;
+}
+.slash-item {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  padding: 8px 12px; border: none; background: transparent; color: var(--text);
+}
+.slash-item:hover { background: var(--bg-hover); }
+.slash-cmd { font-family: var(--font-mono); font-size: 12.5px; color: var(--accent); min-width: 84px; }
+.slash-desc { font-size: 12.5px; color: var(--text-muted); }
 
 /* ---------- right panel ---------- */
 .right-panel {
