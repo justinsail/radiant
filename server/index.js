@@ -10,7 +10,7 @@ import pty from 'node-pty'
 import { execSync, spawn } from 'child_process'
 import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
 import { runTurn, listModels } from './providers.js'
-import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken } from './oauth.js'
+import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken, startDevice, pollDevice } from './oauth.js'
 import { checkForUpdate } from './updater.js'
 import { ollamaBin, SPAWN_ENV } from './ollama.js'
 
@@ -425,6 +425,26 @@ app.post('/api/oauth/:id/complete', async (req, res) => {
     config.oauth[req.params.id] = tok
     saveConfig(config)
     res.json(publicConfig(config))
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
+// device-code sign-in (Nous): start returns a code + URL to open
+app.post('/api/oauth/:id/device/start', async (req, res) => {
+  try {
+    res.json(await startDevice(req.params.id))
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
+// device-code sign-in: poll until the user approves on the Portal
+app.post('/api/oauth/:id/device/poll', async (req, res) => {
+  try {
+    const r = await pollDevice(req.params.id)
+    if (r.done) { config.oauth[req.params.id] = r.token; saveConfig(config) }
+    res.json({ done: r.done, config: r.done ? publicConfig(config) : undefined })
   } catch (e) {
     res.status(400).json({ error: e.message })
   }

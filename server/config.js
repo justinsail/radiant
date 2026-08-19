@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = {
     { id: 'ollama', name: 'Ollama (local)', type: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', auth: 'none', removable: false },
     { id: 'lmstudio', name: 'LM Studio (local)', type: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', auth: 'none', removable: false },
     { id: 'openrouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1', auth: 'key', removable: false },
-    { id: 'nousresearch', name: 'Nous Portal', type: 'openai', baseUrl: 'https://inference-api.nousresearch.com/v1', auth: 'key', removable: false, hint: 'Nous Portal has no browser sign-in — a subscription unlocks API access through a key you generate at portal.nousresearch.com → API Keys. That key IS your subscription login; paste it here.' }
+    { id: 'nousresearch', name: 'Nous Portal', type: 'openai', baseUrl: 'https://inference-api.nousresearch.com/v1', auth: 'key', removable: false, hint: 'Sign in with your Nous Portal subscription below — or paste an API key from portal.nousresearch.com → API Keys.' }
   ],
   keys: {},
   oauth: {},

@@ -996,6 +996,8 @@ button.hf-head:hover { background: var(--bg-hover); }
 }
 .oauth-paste input:focus { border-color: var(--accent); }
 .oauth-note { font-size: 11px; color: var(--text-faint); }
+.oauth-device { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); }
+.device-code { font-family: var(--font-mono); font-size: 14px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); background: var(--bg-input); padding: 2px 8px; border-radius: 6px; user-select: all; }
 
 /* composer attachments */
 .composer-box.drag-over { border-color: var(--accent); background: var(--accent-wash); }

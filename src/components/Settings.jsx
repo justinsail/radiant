@@ -12,6 +12,7 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
   const [signingIn, setSigningIn] = useState(false)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
+  const [device, setDevice] = useState(null) // { userCode, verificationUrl } for device-code sign-in
   const pollRef = useRef(null)
 
   const save = async () => {
@@ -27,6 +28,20 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
   const startSignIn = async () => {
     setBusy(true)
     try {
+      if (oauthInfo.mode === 'device') {
+        const d = await api.oauthDeviceStart(provider.id)
+        setDevice(d)
+        window.open(d.verificationUrl, '_blank', 'noopener')
+        const started = Date.now()
+        pollRef.current = setInterval(async () => {
+          try {
+            const r = await api.oauthDevicePoll(provider.id)
+            if (r.done) { clearInterval(pollRef.current); onConfig(r.config); setDevice(null); setBusy(false) }
+            else if (Date.now() - started > (d.expiresIn || 600) * 1000) { clearInterval(pollRef.current); setDevice(null); setBusy(false); window.alert('Sign-in timed out — try again.') }
+          } catch (e) { clearInterval(pollRef.current); setDevice(null); setBusy(false); window.alert('Sign-in failed: ' + e.message) }
+        }, (d.interval || 5) * 1000)
+        return
+      }
       const { url, mode } = await api.oauthStart(provider.id)
       window.open(url, '_blank', 'noopener')
       if (mode === 'paste') {
@@ -86,15 +101,22 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
       {provider.hint && !provider.hasKey && !provider.signedIn && <div className='provider-hint'>{provider.hint}</div>}
       {oauthInfo && !provider.signedIn && !provider.hasKey && (
         <div className='provider-oauth'>
-          {!signingIn
-            ? <button className='small-btn subscribe' onClick={startSignIn} disabled={busy}>
-                {busy ? 'Waiting for browser…' : `Sign in with ${oauthInfo.label} subscription`}
-              </button>
-            : <span className='oauth-paste'>
-                <input placeholder='Paste the code from the page' value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && finishSignIn()} />
-                <button className='small-btn primary' onClick={finishSignIn} disabled={!code.trim()}>Finish</button>
-                <button className='small-btn' onClick={() => { setSigningIn(false); setBusy(false) }}>Cancel</button>
-              </span>}
+          {device
+            ? <span className='oauth-device'>
+                <span>Enter code <code className='device-code'>{device.userCode}</code> at the page that opened, then approve.</span>
+                <button className='small-btn' onClick={() => window.open(device.verificationUrl, '_blank', 'noopener')}>Reopen page</button>
+                <span className='v-meta'>Waiting for you to approve…</span>
+                <button className='small-btn' onClick={() => { clearInterval(pollRef.current); setDevice(null); setBusy(false) }}>Cancel</button>
+              </span>
+            : !signingIn
+              ? <button className='small-btn subscribe' onClick={startSignIn} disabled={busy}>
+                  {busy ? 'Waiting…' : `Sign in with ${oauthInfo.label} subscription`}
+                </button>
+              : <span className='oauth-paste'>
+                  <input placeholder='Paste the code from the page' value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && finishSignIn()} />
+                  <button className='small-btn primary' onClick={finishSignIn} disabled={!code.trim()}>Finish</button>
+                  <button className='small-btn' onClick={() => { setSigningIn(false); setBusy(false) }}>Cancel</button>
+                </span>}
           <span className='oauth-note'>Uses your paid plan — unofficial, may break, small account risk.</span>
         </div>
       )}

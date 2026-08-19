@@ -27,6 +27,14 @@ export const OAUTH_PROVIDERS = {
     redirectPath: '/auth/callback',
     get redirectUri () { return `http://localhost:${this.redirectPort}${this.redirectPath}` },
     scope: 'openid profile email offline_access'
+  },
+  nousresearch: {
+    label: 'Nous Portal',
+    mode: 'device', // device-authorization grant: user enters a code on the Portal
+    deviceCodeUrl: 'https://portal.nousresearch.com/api/oauth/device/code',
+    tokenUrl: 'https://portal.nousresearch.com/api/oauth/token',
+    clientId: 'hermes-cli',
+    scope: 'inference:invoke'
   }
 }
 
@@ -143,12 +151,67 @@ export async function refreshToken (providerId, tok) {
   }
 }
 
+// ---------- device-authorization grant (Nous Portal) ----------
+// The user opens a URL and enters a short code; we poll the token endpoint.
+export async function startDevice (providerId) {
+  const p = OAUTH_PROVIDERS[providerId]
+  if (!p || p.mode !== 'device') throw new Error('not a device-code provider')
+  const res = await fetch(p.deviceCodeUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: p.clientId, scope: p.scope })
+  })
+  if (!res.ok) throw new Error(`couldn't start sign-in (${res.status})`)
+  const j = await res.json()
+  pending.set(providerId, { deviceCode: j.device_code })
+  return {
+    userCode: j.user_code,
+    verificationUrl: j.verification_uri_complete || j.verification_uri,
+    interval: j.interval || 5,
+    expiresIn: j.expires_in || 600
+  }
+}
+
+// poll once; returns { done:false } while pending, { done:true } once signed in
+export async function pollDevice (providerId) {
+  const p = OAUTH_PROVIDERS[providerId]
+  const flow = pending.get(providerId)
+  if (!flow?.deviceCode) throw new Error('no sign-in in progress — start again')
+  const res = await fetch(p.tokenUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: p.clientId, device_code: flow.deviceCode })
+  })
+  const j = await res.json().catch(() => ({}))
+  if (res.ok && j.access_token) {
+    pending.delete(providerId)
+    return { done: true, token: { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + (j.expires_in ? j.expires_in * 1000 : 300_000) } }
+  }
+  if (j.error === 'authorization_pending' || j.error === 'slow_down') return { done: false }
+  throw new Error(j.error_description || j.error || `sign-in failed (${res.status})`)
+}
+
+// Nous rotates a single-use refresh token and passes it in a custom header.
+async function refreshNous (tok) {
+  const p = OAUTH_PROVIDERS.nousresearch
+  const res = await fetch(p.tokenUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-nous-refresh-token': tok.refresh },
+    body: new URLSearchParams({ grant_type: 'refresh_token', client_id: p.clientId })
+  })
+  if (!res.ok) throw new Error(`Nous session expired — sign in again (${res.status})`)
+  const j = await res.json()
+  return { access: j.access_token, refresh: j.refresh_token || tok.refresh, expires: Date.now() + (j.expires_in ? j.expires_in * 1000 : 300_000) }
+}
+
 // returns a valid access token, refreshing in-place on config if near expiry
 export async function validAccessToken (providerId, config, saveConfig) {
   const tok = config.oauth?.[providerId]
   if (!tok) return null
-  if (tok.expires - Date.now() > 60_000) return tok.access
-  const fresh = await refreshToken(providerId, tok)
+  // Nous invoke JWTs are short-lived; refresh with a wider skew and its own flow.
+  const skew = providerId === 'nousresearch' ? 130_000 : 60_000
+  if (tok.expires - Date.now() > skew) return tok.access
+  const fresh = providerId === 'nousresearch' ? await refreshNous(tok) : await refreshToken(providerId, tok)
   config.oauth[providerId] = fresh
   saveConfig(config)
   return fresh.access
