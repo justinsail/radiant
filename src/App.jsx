@@ -7,6 +7,7 @@ import RightPanel from './components/RightPanel.jsx'
 import Settings from './components/Settings.jsx'
 import MotionBackground from './components/MotionBackground.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
+import ComparePanel from './components/ComparePanel.jsx'
 
 export default function App () {
   const [config, setConfig] = useState(null)
@@ -24,6 +25,7 @@ export default function App () {
   const [rightTab, setRightTab] = useState('activity')
   const [updateInfo, setUpdateInfo] = useState(null) // {latest, dmgUrl} when an update exists
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
@@ -274,6 +276,7 @@ export default function App () {
             newSession,
             openSettings,
             openSession,
+            compare: () => setCompareOpen(true),
             toggleRight: () => setRightOpen(o => !o),
             toggleMode: () => {
               const order = ['light', 'medium', 'dark']
@@ -283,6 +286,7 @@ export default function App () {
           }}
         />
       )}
+      {compareOpen && <ComparePanel models={models} onClose={() => setCompareOpen(false)} />}
       {settingsOpen && (
         <Settings
           config={config}

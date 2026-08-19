@@ -13,6 +13,7 @@ export default function CommandPalette ({ sessions, agents, models, session, act
     const cmds = [
       { id: 'new', group: 'Actions', label: 'New session', hint: '⌘N', run: () => actions.newSession() },
       { id: 'settings', group: 'Actions', label: 'Open settings', hint: '⌘,', run: () => actions.openSettings() },
+      { id: 'compare', group: 'Actions', label: 'Compare two models', run: () => actions.compare() },
       { id: 'panel', group: 'Actions', label: 'Toggle activity & terminal panel', run: () => actions.toggleRight() },
       { id: 'mode', group: 'Actions', label: 'Cycle appearance (light / medium / dark)', run: () => actions.toggleMode() }
     ]
