@@ -1,4 +1,5 @@
 import os from 'os'
+import crypto from 'crypto'
 import { TOOL_DEFS, runTool } from './tools.js'
 import { COMPUTER_TOOL_DEFS, COMPUTER_TOOL_NAMES, COMPUTER_SAFE, runComputerTool } from './computer-tools.js'
 
@@ -250,18 +251,113 @@ async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, too
   return { parts, stopOnTools: finish === 'tool_calls' || calls.filter(Boolean).length > 0 }
 }
 
+// ---------- ChatGPT subscription: OpenAI Responses API via the Codex backend ----------
+// A ChatGPT (Plus/Pro) OAuth token can't call api.openai.com/v1/chat/completions
+// (401 "missing scope: model.request"). The Codex CLI routes subscription traffic
+// to chatgpt.com/backend-api/codex/responses using the Responses API shape plus a
+// ChatGPT-Account-ID header. We mirror that. (Unofficial — same client as Codex.)
+const CHATGPT_BASE = 'https://chatgpt.com/backend-api/codex'
+
+function toResponsesInput (messages) {
+  const input = []
+  for (const m of messages) {
+    if (m.role === 'user') {
+      const content = [{ type: 'input_text', text: userText(m) }]
+      for (const a of imageAttachments(m)) content.push({ type: 'input_image', image_url: `data:${a.mime};base64,${a.dataB64}` })
+      input.push({ type: 'message', role: 'user', content })
+      continue
+    }
+    for (const p of m.parts) {
+      if (p.type === 'text' && p.text) input.push({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: p.text }] })
+      else if (p.type === 'tool') {
+        input.push({ type: 'function_call', call_id: p.id, name: p.name, arguments: JSON.stringify(p.args || {}) })
+        input.push({ type: 'function_call_output', call_id: p.id, output: String(p.result ?? '') })
+      }
+    }
+  }
+  return input
+}
+
+async function chatgptRound ({ accessToken, accountId, model, messages, system, tools, toolDefs, emit, signal }) {
+  const body = { model, instructions: system, input: toResponsesInput(messages), store: false, stream: true }
+  if (tools) body.tools = (toolDefs || TOOL_DEFS).map(t => ({ type: 'function', name: t.name, description: t.description, parameters: t.input_schema, strict: false }))
+  const headers = {
+    'content-type': 'application/json',
+    authorization: `Bearer ${accessToken}`,
+    'chatgpt-account-id': accountId || '',
+    'openai-beta': 'responses=experimental',
+    originator: 'codex_cli_rs',
+    session_id: crypto.randomUUID(),
+    accept: 'text/event-stream'
+  }
+  const res = await fetch(`${CHATGPT_BASE}/responses`, { method: 'POST', headers, body: JSON.stringify(body), signal })
+  if (!res.ok) throw await httpErr(res)
+
+  let text = ''
+  const byItem = {} // output_item id -> { id: call_id, name, args }
+  for await (const ev of sseEvents(res)) {
+    switch (ev.type) {
+      case 'response.output_text.delta': text += ev.delta || ''; emit({ type: 'text_delta', text: ev.delta || '' }); break
+      case 'response.reasoning_summary_text.delta':
+      case 'response.reasoning_text.delta': emit({ type: 'thinking_delta', text: ev.delta || '' }); break
+      case 'response.output_item.added':
+        if (ev.item?.type === 'function_call') byItem[ev.item.id] = { id: ev.item.call_id, name: ev.item.name || '', args: ev.item.arguments || '' }
+        break
+      case 'response.function_call_arguments.delta': {
+        const c = byItem[ev.item_id]; if (c) c.args += ev.delta || ''; break
+      }
+      case 'response.output_item.done':
+        if (ev.item?.type === 'function_call') byItem[ev.item.id] = { id: ev.item.call_id, name: ev.item.name, args: ev.item.arguments || byItem[ev.item.id]?.args || '' }
+        break
+      case 'response.completed': {
+        const u = ev.response?.usage; if (u) emit({ type: 'usage', input: u.input_tokens, output: u.output_tokens }); break
+      }
+      case 'response.failed': throw new Error(ev.response?.error?.message || 'ChatGPT response failed')
+    }
+  }
+  const parts = []
+  if (text) parts.push({ type: 'text', text })
+  const calls = Object.values(byItem)
+  for (const c of calls) {
+    let args = {}; try { args = c.args ? JSON.parse(c.args) : {} } catch {}
+    parts.push({ type: 'tool', id: c.id, name: c.name, args })
+  }
+  return { parts, stopOnTools: calls.length > 0 }
+}
+
+// Tool that lets one agent consult another. Injected only when peers exist.
+function askAgentToolDef (peers) {
+  return {
+    name: 'ask_agent',
+    description: `Consult another Radiant agent and get their answer back as text. Use it for a second opinion or to delegate a sub-question to a specialist, then incorporate their reply. Available agents:\n${peers.map(p => `- ${p.name}: ${p.blurb}`).join('\n')}`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        agent: { type: 'string', description: 'Name of the agent to consult (one of the listed agents)' },
+        question: { type: 'string', description: 'The question or task to hand that agent — include the context they need, they cannot see this conversation.' }
+      },
+      required: ['agent', 'question']
+    }
+  }
+}
+
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, computerControl, skills, persona, mcpTools, callMcp, emit, requestApproval, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, mcpTools, callMcp, askAgent, peerAgents, emit, requestApproval, signal }) {
   const cwd = session.cwd || os.homedir()
   const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona)
   const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
 
   const accessToken = getAccessToken ? await getAccessToken() : null
+  const accountId = getAccountId ? await getAccountId() : null
+  // ChatGPT subscription (OAuth, no API key) must use the Responses/Codex backend
+  const useChatgpt = provider.id === 'openai' && accessToken && !apiKey
+  const canAskAgents = askAgent && peerAgents && peerAgents.length
   const toolDefs = [
     ...TOOL_DEFS,
     ...(computerControl ? COMPUTER_TOOL_DEFS : []),
-    ...(mcpTools || [])
+    ...(mcpTools || []),
+    ...(canAskAgents ? [askAgentToolDef(peerAgents)] : [])
   ]
 
   let toolsEnabled = useTools
@@ -282,7 +378,9 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, sessio
     try {
       result = provider.type === 'anthropic'
         ? await anthropicRound({ ...args, messages: toAnthropic(session.messages) })
-        : await openaiRound({ ...args, messages: toOpenAI(session.messages, system) })
+        : useChatgpt
+          ? await chatgptRound({ ...args, accountId, messages: session.messages })
+          : await openaiRound({ ...args, messages: toOpenAI(session.messages, system) })
     } catch (e) {
       // Model doesn't support tools (common with local models) -> retry once without them.
       if (toolsEnabled && round === 0 && /tool/i.test(e.message) && /support|invalid|unknown|400/i.test(e.message)) {
@@ -311,6 +409,9 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, sessio
       if (!approved) {
         part.denied = true
         part.result = 'The user declined this action. Ask them how they would like to proceed, or try a different approach.'
+      } else if (call.name === 'ask_agent') {
+        emit({ type: 'notice', text: `Consulting ${call.args?.agent || 'another agent'}…` })
+        part.result = await askAgent(call.args?.agent, call.args?.question)
       } else if (isMcp) {
         part.result = callMcp ? await callMcp(call.name, call.args) : 'MCP tool unavailable.'
       } else if (isComputer) {
@@ -331,7 +432,9 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, sessio
 // reachable with an OAuth token (e.g. ChatGPT). Keeps the picker usable.
 const SUBSCRIPTION_MODELS = {
   anthropic: ['claude-opus-4-1', 'claude-sonnet-4-5', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
-  openai: ['gpt-5', 'gpt-5-codex', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'o4-mini']
+  // ChatGPT-subscription traffic goes through the Codex backend, which only serves
+  // the gpt-5 family — gpt-4* models 404 there.
+  openai: ['gpt-5-codex', 'gpt-5', 'gpt-5.1']
 }
 
 // ---------- model listing ----------

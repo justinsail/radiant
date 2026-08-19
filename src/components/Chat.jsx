@@ -4,6 +4,22 @@ import { Icon } from './Icons.jsx'
 import { AgentGlyph } from './AgentIcons.jsx'
 import { api } from '../api.js'
 
+// short one-line blurb shown under an agent on the splash screen
+const AGENT_BLURBS = {
+  'agent-radiant': 'General-purpose coding assistant',
+  'agent-reviewer': 'Finds bugs, edge cases & security issues',
+  'agent-architect': 'Designs the structure before writing code',
+  'agent-explainer': 'Explains code in plain language',
+  'agent-pair': 'Writes and ships working code'
+}
+function agentBlurb (a) {
+  if (AGENT_BLURBS[a.id]) return AGENT_BLURBS[a.id]
+  const p = (a.persona || '').trim()
+  if (!p) return 'General assistant'
+  const first = p.split(/(?<=[.!?])\s/)[0]
+  return first.length > 64 ? first.slice(0, 61).trimEnd() + '…' : first
+}
+
 const TOOL_ICONS = {
   run_command: '⌘',
   read_file: '≡',
@@ -247,7 +263,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
     return (
       <main className='main'>
         <div className='float-toggle'>
-          <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel'><Icon.panel /></button>
+          <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel'} data-tip-below><Icon.panel /></button>
         </div>
         <div className='chat-scroll'>
           <div className='welcome'>
@@ -262,6 +278,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
                       <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 258 }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
                         <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={21} /></span>
                         <span className='welcome-agent-name'>{a.name}</span>
+                        <span className='welcome-agent-desc'>{agentBlurb(a)}</span>
                       </button>
                     ))}
                   </div>
@@ -292,8 +309,8 @@ export default function Chat ({ session, live, approval, usage, error, models, a
           <Icon.folder size={13} />
           {session.cwd?.replace(/^\/Users\/[^/]+/, '~')}
         </button>
-        <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export this conversation as a Markdown file'><Icon.download /></button>
-        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel'><Icon.panel /></button>
+        <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export this conversation as a Markdown file' data-tip='Export chat as Markdown' data-tip-below><Icon.download /></button>
+        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel\n(tool runs, output, terminal)'} data-tip-below><Icon.panel /></button>
       </div>
 
       <div className='chat-scroll' ref={scrollRef}>
@@ -398,12 +415,12 @@ export default function Chat ({ session, live, approval, usage, error, models, a
               ref={fileInputRef} type='file' multiple hidden
               onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
             />
-            <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images'><Icon.plus size={17} /></button>
+            <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images' data-tip='Attach files or images'><Icon.plus size={17} /></button>
             <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
             <button
               className={'pill-toggle' + (toolsOn ? ' on' : '')}
               onClick={onToggleTools}
-              title='When on, the model can read/write files and run commands in the workspace'
+              data-tip={'Agent tools: read/write files and run\ncommands in the workspace folder.\nClick to turn ' + (toolsOn ? 'off' : 'on') + '.'}
             >
               <span className='logo-mark' aria-hidden />
               tools {toolsOn ? 'on' : 'off'}
@@ -411,7 +428,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
             <button
               className={'pill-toggle' + (session.computerControl ? ' on' : '')}
               onClick={onToggleComputer}
-              title='When on, the model can control the browser and desktop (needs a vision model and macOS permissions)'
+              data-tip={'Computer control: let the model drive the\nbrowser & desktop (needs a vision model +\nmacOS permissions). Click to turn ' + (session.computerControl ? 'off' : 'on') + '.'}
             >
               🖥 computer {session.computerControl ? 'on' : 'off'}
             </button>

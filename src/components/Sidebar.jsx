@@ -15,13 +15,24 @@ function UsageChip () {
   const credits = items?.find(i => i.kind === 'credits')
   const subs = (items || []).filter(i => i.kind === 'subscription')
   if (!items || (!credits && !subs.length)) return null
+  const fmtReset = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) }
+  const subTitle = s => {
+    if (!s.windows?.length) return `${s.label}: signed in (usage not reported)`
+    return `${s.label}:\n` + s.windows.map(w => `  ${w.name}: ${w.usedPct != null ? w.usedPct + '% used' : 'active'}${w.resetAt ? ` · resets ${fmtReset(w.resetAt)}` : ''}`).join('\n')
+  }
   return (
-    <div className='usage-chip' title={
-      (credits ? `${credits.label}: $${credits.remaining} left of $${credits.total} ($${credits.used} used)\n` : '') +
-      (subs.length ? subs.map(s => `${s.label}: subscription (usage limits not exposed)`).join('\n') : '')
-    }>
+    <div className='usage-chip' title={credits ? `${credits.label}: $${credits.remaining} left of $${credits.total} ($${credits.used} used)` : ''}>
       {credits && <span className='usage-line'><span className='usage-dot' /> ${credits.remaining} <span className='usage-sub'>OpenRouter</span></span>}
-      {subs.map(s => <span key={s.provider} className='usage-line'><span className='usage-dot ok' /> {s.label} <span className='usage-sub'>plan</span></span>)}
+      {subs.map(s => {
+        const primary = s.windows?.[0]
+        const pct = primary?.usedPct
+        return (
+          <span key={s.provider} className='usage-line' title={subTitle(s)}>
+            <span className={'usage-dot' + (pct != null && pct >= 90 ? ' warn' : ' ok')} /> {s.label}
+            <span className='usage-sub'>{pct != null ? `${pct}% used` : 'plan'}</span>
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -63,6 +74,8 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
   }
 
   const [view, setView] = useState('chats')
+  const [collapsed, setCollapsed] = useState({})
+  const toggleGroup = id => setCollapsed(c => ({ ...c, [id]: !c[id] }))
 
   const SessionRow = ({ s, showAgent = true }) => {
     const ag = agentOf(s.agentId)
@@ -107,15 +120,19 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         <div className='session-list'>
           {agents.map(a => {
             const own = sessions.filter(s => s.agentId === a.id)
+            const isCollapsed = collapsed[a.id]
             return (
               <div key={a.id} className='bot-group'>
                 <div className='bot-head'>
-                  <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={16} /></span>
-                  <span className='bot-head-name'>{a.name}</span>
-                  <span className='bot-head-count'>{own.length}</span>
+                  <button className='bot-head-toggle' onClick={() => toggleGroup(a.id)} title={isCollapsed ? 'Show sessions' : 'Hide sessions'}>
+                    <span className='bot-head-caret'>{own.length ? (isCollapsed ? '▸' : '▾') : ''}</span>
+                    <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={16} /></span>
+                    <span className='bot-head-name'>{a.name}</span>
+                    <span className='bot-head-count'>{own.length}</span>
+                  </button>
                   <button className='bot-new' title={`New session with ${a.name}`} onClick={() => onNew(a.id)}>+</button>
                 </div>
-                {own.map(s => <SessionRow key={s.id} s={s} showAgent={false} />)}
+                {!isCollapsed && own.map(s => <SessionRow key={s.id} s={s} showAgent={false} />)}
               </div>
             )
           })}
@@ -135,7 +152,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
       <UsageChip />
       <div className='sidebar-foot'>
         <button className='icon-btn' onClick={onSettings} title='Open settings'><Icon.settings /> Settings</button>
-        <button className='icon-btn' onClick={onToggleMode} title={`Appearance: ${mode} — click to cycle light / medium / dark`}>
+        <button className='icon-btn' onClick={onToggleMode} title={`Appearance: ${mode}`} data-tip={`Theme: ${mode} — click to cycle\nlight / medium / dark`}>
           {mode === 'light' ? <Icon.sun /> : mode === 'medium' ? <Icon.contrast /> : <Icon.moon />}
         </button>
       </div>

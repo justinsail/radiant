@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { api, streamDownload, streamQuantize } from '../api.js'
+import { api, startDownload, getDownloads, cancelDownload, streamQuantize } from '../api.js'
 import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
 import { MOTIONS } from './MotionBackground.jsx'
 import { Icon } from './Icons.jsx'
@@ -83,6 +83,7 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
                 </>}
         {provider.removable && <button className='small-btn danger' onClick={remove}>✕</button>}
       </div>
+      {provider.hint && !provider.hasKey && !provider.signedIn && <div className='provider-hint'>{provider.hint}</div>}
       {oauthInfo && !provider.signedIn && !provider.hasKey && (
         <div className='provider-oauth'>
           {!signingIn
@@ -288,9 +289,8 @@ function ModelsPane ({ onModelsChanged }) {
   const [sort, setSort] = useState('downloads')
   const [hfResults, setHfResults] = useState(null)
   const [hfError, setHfError] = useState(null)
-  const [pulls, setPulls] = useState({}) // tag -> {status, completed, total}
-  const pullsRef = useRef({})
-  const ctrlRef = useRef({}) // tag -> AbortController for in-flight downloads
+  const [pulls, setPulls] = useState({}) // model -> {status, completed, total, error, done}
+  const seenDone = useRef(new Set())
   const hfTimer = useRef(null)
 
   useEffect(() => {
@@ -309,41 +309,42 @@ function ModelsPane ({ onModelsChanged }) {
     refreshLocal()
   }, [])
 
+  // Downloads run detached on the server — poll their status so leaving and
+  // re-opening this screen never interrupts an in-flight download.
+  useEffect(() => {
+    let alive = true
+    const tick = async () => {
+      const list = await getDownloads().catch(() => [])
+      if (!alive) return
+      const map = {}
+      for (const d of list) {
+        map[d.model] = d
+        // when a download finishes, refresh the installed list once
+        if ((d.done || d.error) && !seenDone.current.has(d.model)) {
+          seenDone.current.add(d.model)
+          if (d.error) window.alert(`Download failed: ${d.error}`)
+          refreshLocal(); onModelsChanged()
+        }
+        if (!d.done && !d.error) seenDone.current.delete(d.model)
+      }
+      setPulls(map)
+    }
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => { alive = false; clearInterval(t) }
+  }, [])
+
   const installedSet = new Set(local.models.map(m => m.name.replace(/:latest$/, '')))
   const isInstalled = tag => installedSet.has(tag) || installedSet.has(tag.replace(/:latest$/, ''))
 
   // item: { repo, files, model } — download exact GGUF file(s) from HF, import via Ollama
   const startPull = async item => {
-    const key = item.model
-    const controller = new AbortController()
-    ctrlRef.current[key] = controller
-    pullsRef.current = { ...pullsRef.current, [key]: { status: 'starting' } }
-    setPulls({ ...pullsRef.current })
-    try {
-      await streamDownload(item, ev => {
-        if (ev.error) {
-          pullsRef.current = { ...pullsRef.current, [key]: undefined }
-          window.alert(`Download failed: ${ev.error}`)
-        } else {
-          pullsRef.current = { ...pullsRef.current, [key]: ev.status === 'done' ? undefined : ev }
-        }
-        setPulls({ ...pullsRef.current })
-      }, controller.signal)
-    } catch (e) {
-      // user-cancelled aborts throw AbortError — not a failure, don't alert
-      if (e.name !== 'AbortError') window.alert(`Download failed: ${e.message}`)
-    } finally {
-      delete ctrlRef.current[key]
-      pullsRef.current = { ...pullsRef.current, [key]: undefined }
-      setPulls({ ...pullsRef.current })
-      refreshLocal()
-      onModelsChanged()
-    }
+    seenDone.current.delete(item.model)
+    setPulls(p => ({ ...p, [item.model]: { status: 'starting', completed: 0, total: 0 } }))
+    try { await startDownload(item) } catch (e) { window.alert(`Couldn't start download: ${e.message}`) }
   }
 
-  const cancelPull = tag => {
-    ctrlRef.current[tag]?.abort()
-  }
+  const cancelPull = model => { cancelDownload(model); setPulls(p => { const n = { ...p }; delete n[model]; return n }) }
 
   const remove = async tag => {
     if (!window.confirm(`Remove ${tag} from disk?`)) return

@@ -103,29 +103,22 @@ export async function streamPull (model, onEvent, signal) {
   }
 }
 
-// POST /api/download streams SSE progress for a direct HF file download + import.
-export async function streamDownload ({ repo, files, model }, onEvent, signal) {
+// Downloads run detached on the server; start one, then poll getDownloads().
+export async function startDownload ({ repo, files, model }) {
   const res = await fetch('/api/download', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ repo, files, model }),
-    signal
+    body: JSON.stringify({ repo, files, model })
   })
-  if (!res.ok) throw new Error(`${res.status}`)
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop()
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue
-      try { onEvent(JSON.parse(line.slice(5))) } catch {}
-    }
-  }
+  if (!res.ok) { let m = `${res.status}`; try { m = (await res.json()).error || m } catch {}; throw new Error(m) }
+  return res.json()
+}
+export async function getDownloads () {
+  const res = await fetch('/api/downloads')
+  return res.ok ? res.json() : []
+}
+export async function cancelDownload (model) {
+  await fetch('/api/download/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model }) })
 }
 
 // POST /api/chat streams SSE back on the response body.

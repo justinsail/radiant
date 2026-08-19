@@ -137,6 +137,32 @@ code, pre, .mono { font-family: var(--font-mono); }
 }
 .back-link:hover { color: var(--accent); }
 
+.provider-hint { font-size: 11.5px; color: var(--text-muted); padding: 4px 2px 0; line-height: 1.4; }
+.usage-dot.warn { background: var(--danger); }
+
+/* Instant, reliable tooltips (Electron's native title tooltips are slow/flaky). */
+[data-tip] { position: relative; }
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; z-index: 200;
+  bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+  background: var(--bg-tooltip, oklch(0.22 0.02 260)); color: oklch(0.97 0 0);
+  padding: 5px 9px; border-radius: 7px; border: 1px solid var(--border);
+  font-size: 11.5px; font-weight: 500; line-height: 1.35; white-space: pre-line;
+  width: max-content; max-width: 240px; text-align: center;
+  box-shadow: 0 6px 20px oklch(0 0 0 / 0.35);
+  pointer-events: none; animation: tip-in 0.12s ease both;
+}
+[data-tip]:hover::before {
+  content: ''; position: absolute; z-index: 200;
+  bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--border);
+  pointer-events: none;
+}
+[data-tip-below]:hover::after { bottom: auto; top: calc(100% + 7px); }
+[data-tip-below]:hover::before { bottom: auto; top: calc(100% + 2px); border-top-color: transparent; border-bottom-color: var(--border); }
+@keyframes tip-in { from { opacity: 0; transform: translateX(-50%) translateY(3px); } to { opacity: 1; } }
+
 /* ---------- app frame ---------- */
 .app { display: flex; height: 100%; position: relative; }
 
@@ -254,9 +280,12 @@ code, pre, .mono { font-family: var(--font-mono); }
 .sidebar-switch button.on { background: var(--bg-raised); color: var(--text); box-shadow: var(--shadow-sm); }
 
 .bot-group { margin-bottom: 8px; }
-.bot-head { display: flex; align-items: center; gap: 7px; padding: 6px 10px 4px; }
+.bot-head { display: flex; align-items: center; gap: 4px; padding: 6px 10px 4px; }
+.bot-head-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; background: none; border: none; padding: 2px 0; cursor: pointer; }
+.bot-head-toggle:hover .bot-head-name { color: var(--accent); }
+.bot-head-caret { width: 10px; font-size: 9px; color: var(--text-faint); display: inline-flex; justify-content: center; }
 .bot-head-icon { display: inline-flex; }
-.bot-head-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bot-head-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
 .bot-head-count { font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); }
 .bot-new { border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); width: 20px; height: 20px; border-radius: 6px; font-size: 14px; line-height: 1; display: grid; place-items: center; }
 .bot-new:hover { border-color: var(--accent-dim); color: var(--accent); }
@@ -598,8 +627,7 @@ code, pre, .mono { font-family: var(--font-mono); }
 .right-tab {
   padding: 5px 11px; border: 1px solid transparent; background: none;
   color: var(--text-faint); border-radius: 999px;
-  font-weight: 500; font-size: 12px;
-  text-transform: uppercase; letter-spacing: 0.06em;
+  font-weight: 500; font-size: 12.5px;
 }
 .right-tab:hover { color: var(--text-muted); }
 .right-tab.active { color: var(--text); background: var(--bg-raised); border-color: var(--border); }
@@ -794,14 +822,16 @@ input[type='range']::-webkit-slider-thumb {
 .agent-skill-chk input { accent-color: var(--accent); }
 
 /* welcome-screen agent gallery */
-.welcome-agents { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 560px; margin: 20px auto 0; }
+.welcome-agents { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 740px; margin: 20px auto 0; }
 .welcome-agent {
-  display: flex; flex-direction: column; align-items: center; gap: 5px; width: 96px;
-  padding: 12px 8px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-panel);
+  display: flex; flex-direction: column; align-items: center; gap: 5px; width: 132px;
+  padding: 14px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-panel);
+  text-align: center;
 }
 .welcome-agent:hover { border-color: oklch(0.62 0.15 var(--ah, 258)); background: var(--bg-hover); }
 .welcome-agent .agent-avatar { width: 40px; height: 40px; font-size: 21px; }
-.welcome-agent-name { font-size: 12px; font-weight: 500; }
+.welcome-agent-name { font-size: 12.5px; font-weight: 600; }
+.welcome-agent-desc { font-size: 10.5px; line-height: 1.3; color: var(--text-faint); }
 
 /* skills */
 .skill-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 20px; margin-bottom: 14px; border: 1.5px dashed var(--border-strong); border-radius: 12px; color: var(--text-muted); cursor: pointer; }

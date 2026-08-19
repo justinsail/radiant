@@ -220,12 +220,57 @@ app.get('/api/usage', async (req, res) => {
       }
     } catch {}
   }
-  // subscription sign-ins: limits aren't exposed via a stable API, note them
+  // subscription sign-ins expose usage via their CLIs' private endpoints
   for (const id of ['anthropic', 'openai']) {
-    if (config.oauth[id]) out.push({ provider: id, label: id === 'anthropic' ? 'Claude' : 'ChatGPT', kind: 'subscription' })
+    if (!config.oauth[id]) continue
+    const label = id === 'anthropic' ? 'Claude' : 'ChatGPT'
+    let windows = null
+    try {
+      const token = await validAccessToken(id, config, saveConfig)
+      windows = id === 'anthropic' ? await claudeUsage(token) : await chatgptUsage(token)
+    } catch {}
+    out.push({ provider: id, label, kind: 'subscription', windows })
   }
   res.json({ items: out })
 })
+
+// Normalize a vendor's rate-limit "window" objects into {name, usedPct, resetAt}.
+function normWindows (pairs) {
+  const windows = []
+  for (const [name, w] of pairs) {
+    if (!w || typeof w !== 'object') continue
+    const used = w.used ?? w.used_tokens ?? w.usage
+    const limit = w.limit ?? w.limit_tokens ?? w.max ?? w.quota
+    let pct = null
+    if (typeof w.used_percent === 'number') pct = w.used_percent
+    else if (typeof w.utilization === 'number') pct = w.utilization <= 1 ? w.utilization * 100 : w.utilization
+    else if (typeof w.percent_used === 'number') pct = w.percent_used
+    else if (typeof used === 'number' && typeof limit === 'number' && limit > 0) pct = (used / limit) * 100
+    let resetAt = w.resets_at || w.reset_at || w.resets || w.reset
+    if (!resetAt && w.resets_in_seconds) resetAt = new Date(Date.now() + w.resets_in_seconds * 1000).toISOString()
+    if (pct != null || resetAt) windows.push({ name, usedPct: pct != null ? Math.round(pct) : null, resetAt: resetAt || null })
+  }
+  return windows.length ? windows : null
+}
+
+async function chatgptUsage (token) {
+  const r = await fetch('https://chatgpt.com/backend-api/wham/usage', {
+    headers: { authorization: `Bearer ${token}`, accept: 'application/json' }, signal: AbortSignal.timeout(6000)
+  })
+  if (!r.ok) return null
+  const d = await r.json()
+  const rl = d.rate_limit || d
+  return normWindows([['5h', rl.primary_window], ['weekly', rl.secondary_window]])
+}
+
+async function claudeUsage (token) {
+  const r = await fetch('https://api.anthropic.com/api/oauth/usage', {
+    headers: { authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20', accept: 'application/json' }, signal: AbortSignal.timeout(6000)
+  })
+  if (!r.ok) return null
+  const d = await r.json()
+  return normWindows([['5h', d.five_hour], ['weekly', d.seven_day]])
+}
 
 // ---------- skills ----------
 app.post('/api/skills', (req, res) => {
@@ -536,32 +581,30 @@ app.post('/api/pull', async (req, res) => {
 const DL_DIR = path.join(os.homedir(), '.radiant', 'downloads')
 const hfUrl = (repo, file) => `https://huggingface.co/${repo}/resolve/main/${encodeURIComponent(file)}?download=true`
 
-app.post('/api/download', async (req, res) => {
-  const { repo, files, model } = req.body || {}
-  if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '')) return res.status(400).json({ error: 'bad repo' })
-  if (!Array.isArray(files) || !files.length || !files.every(f => /^[A-Za-z0-9._-]+\.gguf$/i.test(f))) return res.status(400).json({ error: 'bad files' })
-  if (!/^[a-z0-9][a-z0-9._-]*(:[a-z0-9._-]+)?$/i.test(model || '')) return res.status(400).json({ error: 'bad model name' })
-  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
-  const emit = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`)
+// Downloads run detached from the request that starts them and are tracked here,
+// so navigating away from (or closing) the Models screen never stops a download.
+// key = model name -> { repo, files, model, status, completed, total, error, done }
+const downloads = new Map()
+
+async function runDownload (entry) {
   const controller = new AbortController()
-  let child = null
-  let aborted = false
-  res.on('close', () => { if (!res.writableEnded) { aborted = true; controller.abort(); child?.kill('SIGKILL') } })
+  entry._abort = () => controller.abort()
   const dir = path.join(DL_DIR, crypto.randomUUID())
+  let child = null
+  entry._kill = () => { controller.abort(); child?.kill('SIGKILL') }
   try {
     fs.mkdirSync(dir, { recursive: true })
-    // authoritative sizes from the HF model API (LFS content-length can be flaky)
     let sizeByFile = {}
     try {
-      const meta = await fetch(`https://huggingface.co/api/models/${repo}?blobs=true`, { signal: controller.signal })
+      const meta = await fetch(`https://huggingface.co/api/models/${entry.repo}?blobs=true`, { signal: controller.signal })
       if (meta.ok) for (const s of (await meta.json()).siblings || []) sizeByFile[s.rfilename] = s.size || 0
     } catch {}
-    const total = files.reduce((a, f) => a + (sizeByFile[f] || 0), 0)
+    entry.total = entry.files.reduce((a, f) => a + (sizeByFile[f] || 0), 0)
     let done = 0
-    let lastEmit = 0
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i]
-      const r = await fetch(hfUrl(repo, f), { redirect: 'follow', signal: controller.signal })
+    for (let i = 0; i < entry.files.length; i++) {
+      const f = entry.files[i]
+      entry.status = entry.files.length > 1 ? `downloading part ${i + 1}/${entry.files.length}` : 'downloading'
+      const r = await fetch(hfUrl(entry.repo, f), { redirect: 'follow', signal: controller.signal })
       if (!r.ok) throw new Error(`Couldn't download ${f} (HTTP ${r.status})`)
       const out = fs.createWriteStream(path.join(dir, f))
       const reader = r.body.getReader()
@@ -569,33 +612,60 @@ app.post('/api/download', async (req, res) => {
         const { done: fin, value } = await reader.read()
         if (fin) break
         done += value.length
+        entry.completed = done
         if (!out.write(Buffer.from(value))) await new Promise(rs => out.once('drain', rs))
-        const now = Date.now()
-        if (now - lastEmit > 350) { lastEmit = now; emit({ status: files.length > 1 ? `downloading part ${i + 1}/${files.length}` : 'downloading', completed: done, total }) }
       }
       out.end()
       await new Promise((rs, rj) => { out.on('finish', rs); out.on('error', rj) })
     }
-    emit({ status: 'importing into Ollama…', completed: total, total })
+    entry.status = 'importing into Ollama…'; entry.completed = entry.total
     const modelfile = path.join(dir, 'Modelfile')
-    fs.writeFileSync(modelfile, `FROM ${path.join(dir, files[0])}\n`)
+    fs.writeFileSync(modelfile, `FROM ${path.join(dir, entry.files[0])}\n`)
     await new Promise((resolve, reject) => {
-      child = spawn('ollama', ['create', model, '-f', modelfile])
+      child = spawn('ollama', ['create', entry.model, '-f', modelfile])
       let err = ''
       const strip = s => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/[\r\x00-\x08\x0e-\x1f]/g, '').trim()
-      const feed = b => b.toString().split('\n').forEach(raw => { const l = strip(raw); if (l) emit({ status: l }) })
+      const feed = b => b.toString().split('\n').forEach(raw => { const l = strip(raw); if (l) entry.status = l })
       child.stdout.on('data', feed)
       child.stderr.on('data', d => { err += d.toString(); feed(d) })
       child.on('error', reject)
       child.on('close', code => code === 0 ? resolve() : reject(new Error(err.trim().split('\n').pop() || `ollama create exited ${code}`)))
     })
-    emit({ status: 'done', model })
+    entry.status = 'done'; entry.done = true
   } catch (e) {
-    if (!aborted) emit({ error: e.message })
+    if (controller.signal.aborted) { downloads.delete(entry.model); return }
+    entry.error = e.message; entry.done = true
   } finally {
     fs.rm(dir, { recursive: true, force: true }, () => {})
-    res.end()
+    // keep finished/errored entries briefly so the UI can show the final state
+    if (entry.done) setTimeout(() => downloads.delete(entry.model), 60000)
   }
+}
+
+// start a download (idempotent per model) — returns immediately, runs in background
+app.post('/api/download', (req, res) => {
+  const { repo, files, model } = req.body || {}
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '')) return res.status(400).json({ error: 'bad repo' })
+  if (!Array.isArray(files) || !files.length || !files.every(f => /^[A-Za-z0-9._-]+\.gguf$/i.test(f))) return res.status(400).json({ error: 'bad files' })
+  if (!/^[a-z0-9][a-z0-9._-]*(:[a-z0-9._-]+)?$/i.test(model || '')) return res.status(400).json({ error: 'bad model name' })
+  const existing = downloads.get(model)
+  if (existing && !existing.done) return res.json({ ok: true, already: true })
+  const entry = { repo, files, model, status: 'starting', completed: 0, total: 0, error: null, done: false }
+  downloads.set(model, entry)
+  runDownload(entry) // detached — survives client disconnect
+  res.json({ ok: true })
+})
+
+// snapshot of active/recent downloads for the UI to poll
+app.get('/api/downloads', (req, res) => {
+  res.json([...downloads.values()].map(({ repo, files, model, status, completed, total, error, done }) =>
+    ({ repo, files, model, status, completed, total, error, done })))
+})
+
+app.post('/api/download/cancel', (req, res) => {
+  const entry = downloads.get(req.body?.model)
+  if (entry) { entry._kill?.(); downloads.delete(entry.model) }
+  res.json({ ok: true })
 })
 
 // ---------- sessions ----------
@@ -704,12 +774,41 @@ app.post('/api/chat', async (req, res) => {
     }, 10 * 60 * 1000)
   })
 
+  // let this agent consult the OTHER agents (peers) via the ask_agent tool
+  const peers = (config.agents || []).filter(a => a.id !== session.agentId)
+  const peerAgents = peers.map(a => ({ name: a.name, blurb: (a.persona || '').split(/(?<=[.!?])\s/)[0].slice(0, 90) || 'general assistant' }))
+  const askAgent = async (agentRef, question) => {
+    const target = peers.find(a => a.id === agentRef || a.name.toLowerCase() === String(agentRef || '').toLowerCase())
+    if (!target) return `No agent named "${agentRef}". You can ask: ${peers.map(a => a.name).join(', ') || '(none available)'}.`
+    if (!question || !String(question).trim()) return 'Provide a question for the agent.'
+    let tProvider = provider, tApiKey = apiKey, tHasOAuth = hasOAuth, tModel = session.model
+    if (target.model && target.provider) {
+      const p = config.providers.find(x => x.id === target.provider)
+      if (p) { tProvider = p; tApiKey = config.keys[p.id]; tHasOAuth = Boolean(config.oauth[p.id]); tModel = target.model }
+    }
+    const tmp = { cwd: session.cwd, messages: [{ role: 'user', text: String(question) }] }
+    let answer = ''
+    try {
+      await runTurn({
+        provider: tProvider, model: tModel, apiKey: tApiKey,
+        getAccessToken: tHasOAuth ? () => validAccessToken(tProvider.id, config, saveConfig) : null,
+        getAccountId: tHasOAuth ? () => config.oauth[tProvider.id]?.accountId || null : null,
+        session: tmp, useTools: false, computerControl: false,
+        persona: target.persona || '', skills: [],
+        emit: ev => { if (ev.type === 'text_delta') answer += ev.text },
+        requestApproval: null, signal: controller.signal
+      })
+    } catch (e) { return `(${target.name} couldn't respond: ${e.message})` }
+    return `${target.name} says:\n${answer.trim() || '(no answer)'}`
+  }
+
   try {
     await runTurn({
       provider,
       model: session.model,
       apiKey,
       getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
+      getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
       session,
       useTools: session.useTools !== false,
       computerControl: Boolean(session.computerControl),
@@ -717,6 +816,8 @@ app.post('/api/chat', async (req, res) => {
       skills: mergedSkills,
       mcpTools,
       callMcp,
+      askAgent,
+      peerAgents,
       emit,
       requestApproval,
       signal: controller.signal

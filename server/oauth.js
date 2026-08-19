@@ -32,6 +32,16 @@ export const OAUTH_PROVIDERS = {
 
 const b64url = buf => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 
+// decode a JWT payload (no verification — we only read our own token's claims)
+function jwtClaims (jwt) {
+  try { return JSON.parse(Buffer.from(String(jwt).split('.')[1], 'base64').toString('utf8')) } catch { return {} }
+}
+// ChatGPT (Codex) responses backend needs the account id from the id_token
+export function chatgptAccountId (idToken) {
+  const c = jwtClaims(idToken)
+  return c['https://api.openai.com/auth']?.chatgpt_account_id || c.chatgpt_account_id || null
+}
+
 export function makePkce () {
   const verifier = b64url(crypto.randomBytes(32))
   const challenge = b64url(crypto.createHash('sha256').update(verifier).digest())
@@ -84,6 +94,8 @@ async function exchange (providerId, code) {
   return {
     access: json.access_token,
     refresh: json.refresh_token,
+    idToken: json.id_token || null,
+    accountId: chatgptAccountId(json.id_token),
     expires: Date.now() + (json.expires_in ? json.expires_in * 1000 : 3600_000)
   }
 }
@@ -125,6 +137,8 @@ export async function refreshToken (providerId, tok) {
   return {
     access: json.access_token,
     refresh: json.refresh_token || tok.refresh,
+    idToken: json.id_token || tok.idToken || null,
+    accountId: chatgptAccountId(json.id_token) || tok.accountId || null,
     expires: Date.now() + (json.expires_in ? json.expires_in * 1000 : 3600_000)
   }
 }
