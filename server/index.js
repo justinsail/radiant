@@ -10,7 +10,7 @@ import pty from 'node-pty'
 import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
 import { runTurn, listModels } from './providers.js'
 
-const PORT = 5834
+const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
 app.use(express.json({ limit: '10mb' }))
 
@@ -194,6 +194,9 @@ if (fs.existsSync(dist)) {
 // ---------- terminal over WebSocket ----------
 const server = http.createServer(app)
 const wss = new WebSocketServer({ server, path: '/term' })
+// ws re-emits the http server's 'error' events here; without a listener an
+// EADDRINUSE would throw and kill the port-fallback logic below
+wss.on('error', e => console.error('[ws]', e.message))
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, 'http://localhost')
@@ -227,6 +230,16 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => term.kill())
 })
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`radiant server listening on http://127.0.0.1:${PORT}`)
+// Resolves with the bound port once listening; falls back to a random free
+// port if the default is taken (e.g. a dev instance is already running).
+export const ready = new Promise((resolve, reject) => {
+  server.once('error', err => {
+    if (err.code === 'EADDRINUSE') {
+      server.listen(0, '127.0.0.1', () => resolve(server.address().port))
+    } else {
+      reject(err)
+    }
+  })
+  server.listen(PORT, '127.0.0.1', () => resolve(server.address().port))
 })
+ready.then(port => console.log(`radiant server listening on http://127.0.0.1:${port}`))

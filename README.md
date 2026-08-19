@@ -1,14 +1,15 @@
-# Radiant
+# Radiant ✦
 
 A local coding harness for your Mac: chat with coding agents across cloud and
-local models, watch them work, and drive a real terminal — all in one window.
+local models, watch them work in a live activity feed, and drive a real
+terminal — all in one window.
 
 ## Features
 
 - **Agent chat** with streaming responses and visible model thinking
 - **Any model, one history** — sessions store messages in a neutral format, so
   you can switch between Anthropic, OpenAI, OpenRouter, Ollama, and LM Studio
-  mid-conversation
+  mid-conversation and keep your context
 - **Agent tools** — the model can list/read/write/edit files and run shell
   commands in a per-session workspace folder, with an approval prompt before
   every command (toggle in Settings)
@@ -16,26 +17,61 @@ local models, watch them work, and drive a real terminal — all in one window.
 - **Terminal panel** — a real login shell (node-pty + xterm.js) in the sidebar
 - **Theming** — light/dark, six presets, or a fully custom accent: the whole
   palette derives from one OKLCH hue + chroma pair
-- **API keys** stored locally in `~/.radiant/config.json` (mode 0600), never
-  sent to the browser; local providers need no key
+- **Private by design** — API keys are stored locally in
+  `~/.radiant/config.json` (mode 0600) and never sent to the browser; the
+  server binds to 127.0.0.1 only; local providers need no key at all
 - **Custom providers** — add any OpenAI-compatible base URL (Groq, Mistral,
   Together, a remote Ollama box…)
 
-## Run it
+## Install the Mac app
+
+Grab `Radiant-<version>-arm64.dmg` from the releases (Apple Silicon), open it,
+and drag Radiant into Applications.
+
+The app is not code-signed, so on first launch macOS will warn you. Right-click
+Radiant.app → **Open** → **Open** (or allow it under System Settings → Privacy
+& Security). You only need to do this once.
+
+Or build it yourself:
 
 ```bash
 npm install
-npm run dev        # server on :5834, UI on http://localhost:5833
+npm run dist        # produces release/Radiant-<version>-arm64.dmg
 ```
 
-Production-ish: `npm run build && npm start` serves the built UI from :5834.
+## Run from source (dev mode)
 
-## Layout
+```bash
+npm install
+npm run dev         # server on :5834, UI with hot reload on http://localhost:5833
+```
 
-- `server/` — Express + WebSocket backend: provider streaming clients
-  (`providers.js`), agent tools (`tools.js`), config/sessions (`config.js`)
+`npm run app` builds the UI and launches the Electron app without packaging.
+
+## Using it
+
+1. Start a session. If Ollama or LM Studio is running locally, a local model is
+   picked automatically — no account, no key, nothing leaves your machine.
+2. To use cloud models, open **⚙ Settings** and paste an API key next to a
+   provider. The model picker (top right) lists every model you have access to.
+3. Point the session's workspace folder (path chip in the top bar) at a
+   project and ask the agent to build, fix, or explain something. It asks
+   before running each shell command; file edits show up in the Activity panel.
+4. The **▤** button toggles the side panel: Activity feed and Terminal.
+
+## Architecture
+
+- `server/` — Express + WebSocket backend: streaming provider clients
+  (`providers.js`, Anthropic + OpenAI-compatible), agent tools (`tools.js`),
+  config and session storage (`config.js`)
 - `src/` — React UI (Vite): chat, model picker, settings, activity feed,
   xterm terminal
+- `electron/` — thin Electron shell that boots the server in-process and
+  opens a window on it
 
 OAuth sign-in to providers is not implemented yet; the provider registry has an
 `auth` field so a device-code/OAuth flow can slot in later.
+
+## License
+
+MIT

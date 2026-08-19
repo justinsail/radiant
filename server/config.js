@@ -17,7 +17,7 @@ const DEFAULT_CONFIG = {
   keys: {},
   settings: {
     mode: 'dark',
-    themeId: 'ember',
+    themeId: 'steel',
     customHue: 45,
     customChroma: 0.19,
     approveCommands: true,

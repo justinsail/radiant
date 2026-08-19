@@ -3,12 +3,50 @@
   "version": "0.1.0",
   "private": true,
   "description": "Radiant — a local coding harness: chat with coding agents across cloud and local models.",
+  "author": "Tony Ricciardi",
+  "license": "MIT",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -k -n server,ui \"node server/index.js\" \"vite --port 5833 --strictPort\"",
     "build": "vite build",
     "start": "NODE_ENV=production node server/index.js",
+    "app": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --mac",
     "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true"
+  },
+  "build": {
+    "appId": "com.tonyricciardi.radiant",
+    "productName": "Radiant",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "server/**",
+      "electron/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/node-pty/**"
+    ],
+    "npmRebuild": false,
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "arm64"
+        },
+        {
+          "target": "zip",
+          "arch": "arm64"
+        }
+      ],
+      "identity": null,
+      "icon": "build/icon.icns"
+    }
   },
   "dependencies": {
     "dompurify": "^3.4.13",
@@ -23,6 +61,8 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "concurrently": "^9.1.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
     "highlight.js": "^11.10.0",
     "marked": "^15.0.4",
     "react": "^18.3.1",

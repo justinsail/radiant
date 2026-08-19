@@ -3,7 +3,7 @@
 // hue/chroma pair the user picks.
 export const THEMES = [
   { id: 'ember', name: 'Ember', hue: 55, chroma: 0.17 },
-  { id: 'steel', name: 'Steel', hue: 245, chroma: 0.12 },
+  { id: 'steel', name: 'Steel', hue: 258, chroma: 0.11 },
   { id: 'moss', name: 'Moss', hue: 150, chroma: 0.12 },
   { id: 'iris', name: 'Iris', hue: 300, chroma: 0.15 },
   { id: 'rose', name: 'Rose', hue: 15, chroma: 0.15 },
