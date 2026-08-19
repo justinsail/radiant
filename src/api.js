@@ -25,7 +25,35 @@ export const api = {
   patchSession: (id, body) => json('PATCH', `/api/sessions/${id}`, body),
   deleteSession: id => json('DELETE', `/api/sessions/${id}`),
   approve: (id, approved) => json('POST', '/api/approve', { id, approved }),
-  abort: sessionId => json('POST', '/api/abort', { sessionId })
+  abort: sessionId => json('POST', '/api/abort', { sessionId }),
+  getSystem: () => json('GET', '/api/system'),
+  getCatalog: () => json('GET', '/api/catalog'),
+  getLocalModels: () => json('GET', '/api/local-models'),
+  deleteLocalModel: name => json('DELETE', `/api/local-models/${encodeURIComponent(name)}`)
+}
+
+// POST /api/pull streams SSE progress events back on the response body.
+export async function streamPull (model, onEvent) {
+  const res = await fetch('/api/pull', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model })
+  })
+  if (!res.ok) throw new Error(`${res.status}`)
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue
+      try { onEvent(JSON.parse(line.slice(5))) } catch {}
+    }
+  }
 }
 
 // POST /api/chat streams SSE back on the response body.

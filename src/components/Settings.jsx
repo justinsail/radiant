@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
-import { api } from '../api.js'
+import React, { useEffect, useRef, useState } from 'react'
+import { api, streamPull } from '../api.js'
 import { THEMES, applyTheme } from '../theme.js'
+
+// ---------- Providers ----------
 
 function ProviderRow ({ provider, onConfig }) {
   const [draft, setDraft] = useState('')
@@ -38,119 +40,294 @@ function ProviderRow ({ provider, onConfig }) {
   )
 }
 
-export default function Settings ({ config, onClose, onSettings, onConfigChange }) {
-  const s = config.settings
+function ProvidersPane ({ config, onConfigChange }) {
   const [newName, setNewName] = useState('')
   const [newUrl, setNewUrl] = useState('')
-  const [cwdDraft, setCwdDraft] = useState(s.defaultCwd || '')
-  const isCustom = !THEMES.find(t => t.id === s.themeId)
-
-  const preview = patch => {
-    // live-preview theme changes before they land back from the server
-    applyTheme({ ...s, ...patch })
-    onSettings(patch)
-  }
-
   const addProvider = async () => {
     if (!newName.trim() || !newUrl.trim()) return
     const cfg = await api.addProvider({ name: newName.trim(), baseUrl: newUrl.trim(), type: 'openai', auth: 'key' })
     setNewName(''); setNewUrl('')
     onConfigChange(cfg)
   }
+  return (
+    <div className='set-section'>
+      <h3>Providers &amp; keys</h3>
+      {config.providers.map(p => (
+        <ProviderRow key={p.id} provider={p} onConfig={onConfigChange} />
+      ))}
+      <div className='add-provider'>
+        <input placeholder='Name (e.g. Groq)' value={newName} onChange={e => setNewName(e.target.value)} />
+        <input placeholder='Base URL (…/v1, OpenAI-compatible)' style={{ flex: 1, minWidth: 220 }} value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+        <button className='small-btn' onClick={addProvider}>Add provider</button>
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 0 }}>
+        Keys are stored locally in <span className='mono'>~/.radiant/config.json</span> and never leave this Mac except to call the provider itself.
+        Any OpenAI-compatible server works — Groq, Mistral, Together, a remote Ollama box…
+      </p>
+    </div>
+  )
+}
+
+// ---------- Models (local, via Ollama) ----------
+
+function fitClass (ramGB, systemRam) {
+  if (!systemRam) return ''
+  if (ramGB <= systemRam * 0.75) return 'fit-ok'
+  if (ramGB <= systemRam * 0.95) return 'fit-tight'
+  return 'fit-no'
+}
+const FIT_LABEL = { 'fit-ok': 'runs well', 'fit-tight': 'tight fit', 'fit-no': 'too big' }
+
+function VariantRow ({ variant, installed, pull, onPull, onDelete, systemRam }) {
+  const fit = fitClass(variant.ramGB, systemRam)
+  const pct = pull && pull.total ? Math.round((pull.completed / pull.total) * 100) : null
+  return (
+    <div className='variant-row'>
+      <span className='v-tag mono'>{variant.tag}</span>
+      <span className='v-meta'>{variant.params} · {variant.dlGB} GB download · ~{variant.ramGB} GB RAM</span>
+      <span className={'fit-badge ' + fit}>{FIT_LABEL[fit] || ''}</span>
+      <span className='v-action'>
+        {installed
+          ? <>
+              <span className='key-ok'>✓ installed</span>
+              <button className='small-btn danger' title='Remove from disk' onClick={() => onDelete(variant.tag)}>✕</button>
+            </>
+          : pull
+            ? <span className='pull-progress'>
+                <span className='pull-bar'><span style={{ width: (pct ?? 5) + '%' }} /></span>
+                {pct != null ? pct + '%' : (pull.status || 'starting…')}
+              </span>
+            : <button className='small-btn' onClick={() => onPull(variant.tag)} disabled={fit === 'fit-no'}>Download</button>}
+      </span>
+    </div>
+  )
+}
+
+function ModelsPane ({ onModelsChanged }) {
+  const [system, setSystem] = useState(null)
+  const [catalog, setCatalog] = useState([])
+  const [local, setLocal] = useState({ running: true, models: [] })
+  const [q, setQ] = useState('')
+  const [cat, setCat] = useState('all')
+  const [pulls, setPulls] = useState({}) // tag -> {status, completed, total}
+  const pullsRef = useRef({})
+
+  const refreshLocal = () => api.getLocalModels().then(setLocal).catch(() => {})
+  useEffect(() => {
+    api.getSystem().then(setSystem).catch(() => {})
+    api.getCatalog().then(setCatalog).catch(() => {})
+    refreshLocal()
+  }, [])
+
+  const installedSet = new Set(local.models.map(m => m.name.replace(/:latest$/, '')))
+  const isInstalled = tag => installedSet.has(tag) || installedSet.has(tag.replace(/:latest$/, ''))
+
+  const startPull = async tag => {
+    pullsRef.current = { ...pullsRef.current, [tag]: { status: 'starting' } }
+    setPulls({ ...pullsRef.current })
+    try {
+      await streamPull(tag, ev => {
+        if (ev.error) {
+          pullsRef.current = { ...pullsRef.current, [tag]: undefined }
+          window.alert(`Download failed: ${ev.error}`)
+        } else {
+          pullsRef.current = { ...pullsRef.current, [tag]: ev.status === 'done' ? undefined : ev }
+        }
+        setPulls({ ...pullsRef.current })
+      })
+    } finally {
+      pullsRef.current = { ...pullsRef.current, [tag]: undefined }
+      setPulls({ ...pullsRef.current })
+      refreshLocal()
+      onModelsChanged()
+    }
+  }
+
+  const remove = async tag => {
+    if (!window.confirm(`Remove ${tag} from disk?`)) return
+    await api.deleteLocalModel(tag)
+    refreshLocal()
+    onModelsChanged()
+  }
+
+  const cats = ['all', 'general', 'coding', 'reasoning', 'vision', 'embedding']
+  const filtered = catalog.filter(f =>
+    (cat === 'all' || f.category === cat) &&
+    (f.family + f.desc + f.variants.map(v => v.tag).join(' ')).toLowerCase().includes(q.toLowerCase())
+  )
 
   return (
+    <div className='set-section'>
+      <h3>Local models</h3>
+      {system && (
+        <div className='spec-card'>
+          <div className='spec-chip-name'>{system.chip}</div>
+          <div className='spec-detail'>
+            {system.ramGB} GB unified memory · {system.cores} cores · macOS {system.osVersion}
+          </div>
+          <div className='spec-note'>
+            Badges show what fits: <span className='fit-badge fit-ok'>runs well</span> under {Math.round(system.ramGB * 0.75)} GB,
+            <span className='fit-badge fit-tight'> tight fit</span> near the limit,
+            <span className='fit-badge fit-no'> too big</span> for this Mac.
+          </div>
+        </div>
+      )}
+      {!local.running && (
+        <div className='error-note'>⚠ Ollama isn't running — start it to download and run local models.</div>
+      )}
+      <div className='model-filter-row'>
+        <input className='text-input' style={{ fontFamily: 'inherit' }} placeholder='Search models…' value={q} onChange={e => setQ(e.target.value)} />
+        {cats.map(c => (
+          <button key={c} className={'pill-toggle' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>{c}</button>
+        ))}
+      </div>
+      <div className='model-catalog'>
+        {filtered.map(f => (
+          <div key={f.family} className='model-family'>
+            <div className='mf-head'>
+              <span className='mf-name'>{f.family}</span>
+              <span className='mf-cat'>{f.category}</span>
+              <span className='mf-desc'>{f.desc}</span>
+            </div>
+            {f.variants.map(v => (
+              <VariantRow
+                key={v.tag}
+                variant={v}
+                installed={isInstalled(v.tag)}
+                pull={pulls[v.tag]}
+                onPull={startPull}
+                onDelete={remove}
+                systemRam={system?.ramGB}
+              />
+            ))}
+          </div>
+        ))}
+        {!filtered.length && <div className='activity-empty'>No models match.</div>}
+      </div>
+    </div>
+  )
+}
+
+// ---------- Appearance ----------
+
+function AppearancePane ({ config, onSettings }) {
+  const s = config.settings
+  const isCustom = !THEMES.find(t => t.id === s.themeId)
+  const preview = patch => {
+    applyTheme({ ...s, ...patch })
+    onSettings(patch)
+  }
+  return (
+    <div className='set-section'>
+      <h3>Appearance</h3>
+      <div className='mode-row'>
+        <button className={'small-btn' + (s.mode === 'dark' ? ' primary' : '')} onClick={() => preview({ mode: 'dark' })}>☾ Dark</button>
+        <button className={'small-btn' + (s.mode === 'light' ? ' primary' : '')} onClick={() => preview({ mode: 'light' })}>☀ Light</button>
+      </div>
+      <div className='theme-grid'>
+        {THEMES.map(t => (
+          <button
+            key={t.id}
+            className={'theme-swatch' + (s.themeId === t.id ? ' selected' : '')}
+            onClick={() => preview({ themeId: t.id })}
+          >
+            <span className='dot' style={{ background: `oklch(0.62 ${t.chroma} ${t.hue})` }} />
+            {t.name}
+          </button>
+        ))}
+        <button
+          className={'theme-swatch' + (isCustom ? ' selected' : '')}
+          onClick={() => preview({ themeId: 'custom' })}
+        >
+          <span className='dot' style={{ background: `oklch(0.62 ${s.customChroma} ${s.customHue})` }} />
+          Custom
+        </button>
+      </div>
+      {isCustom && (
+        <>
+          <div className='hue-row'>
+            <label htmlFor='hue'>Hue</label>
+            <input
+              id='hue' type='range' min='0' max='360' className='hue-slider'
+              value={s.customHue}
+              onChange={e => preview({ customHue: Number(e.target.value) })}
+            />
+          </div>
+          <div className='hue-row'>
+            <label htmlFor='chroma'>Vividness</label>
+            <input
+              id='chroma' type='range' min='0' max='0.25' step='0.005' className='chroma-slider'
+              value={s.customChroma}
+              onChange={e => preview({ customChroma: Number(e.target.value) })}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------- Agent ----------
+
+function AgentPane ({ config, onSettings }) {
+  const s = config.settings
+  const [cwdDraft, setCwdDraft] = useState(s.defaultCwd || '')
+  return (
+    <div className='set-section'>
+      <h3>Agent</h3>
+      <label className='check-row'>
+        <input
+          type='checkbox'
+          checked={s.approveCommands}
+          onChange={e => onSettings({ approveCommands: e.target.checked })}
+        />
+        <span>Ask before running shell commands <span className='desc'>— recommended; file edits stay automatic</span></span>
+      </label>
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Default workspace folder for new sessions</div>
+        <input
+          className='text-input'
+          value={cwdDraft}
+          onChange={e => setCwdDraft(e.target.value)}
+          onBlur={() => cwdDraft && onSettings({ defaultCwd: cwdDraft })}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ---------- shell ----------
+
+const TABS = [
+  { id: 'providers', label: 'Providers' },
+  { id: 'models', label: 'Models' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'agent', label: 'Agent' }
+]
+
+export default function Settings ({ config, onClose, onSettings, onConfigChange, onModelsChanged }) {
+  const [tab, setTab] = useState('providers')
+  return (
     <div className='modal-backdrop' onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className='modal' role='dialog' aria-label='Settings'>
+      <div className='modal wide' role='dialog' aria-label='Settings'>
         <div className='modal-head'>
           Settings
           <button className='icon-btn' onClick={onClose}>✕</button>
         </div>
-        <div className='modal-body'>
-
-          <div className='set-section'>
-            <h3>Providers &amp; keys</h3>
-            {config.providers.map(p => (
-              <ProviderRow key={p.id} provider={p} onConfig={onConfigChange} />
-            ))}
-            <div className='add-provider'>
-              <input placeholder='Name (e.g. Groq)' value={newName} onChange={e => setNewName(e.target.value)} />
-              <input placeholder='Base URL (…/v1, OpenAI-compatible)' style={{ flex: 1, minWidth: 220 }} value={newUrl} onChange={e => setNewUrl(e.target.value)} />
-              <button className='small-btn' onClick={addProvider}>Add provider</button>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 0 }}>
-              Keys are stored locally in <span className='mono'>~/.radiant/config.json</span> and never leave this Mac except to call the provider itself.
-              Any OpenAI-compatible server works — Groq, Mistral, Together, a remote Ollama box…
-            </p>
-          </div>
-
-          <div className='set-section'>
-            <h3>Appearance</h3>
-            <div className='mode-row'>
-              <button className={'small-btn' + (s.mode === 'dark' ? ' primary' : '')} onClick={() => preview({ mode: 'dark' })}>☾ Dark</button>
-              <button className={'small-btn' + (s.mode === 'light' ? ' primary' : '')} onClick={() => preview({ mode: 'light' })}>☀ Light</button>
-            </div>
-            <div className='theme-grid'>
-              {THEMES.map(t => (
-                <button
-                  key={t.id}
-                  className={'theme-swatch' + (s.themeId === t.id ? ' selected' : '')}
-                  onClick={() => preview({ themeId: t.id })}
-                >
-                  <span className='dot' style={{ background: `oklch(0.68 ${t.chroma} ${t.hue})` }} />
-                  {t.name}
-                </button>
-              ))}
-              <button
-                className={'theme-swatch' + (isCustom ? ' selected' : '')}
-                onClick={() => preview({ themeId: 'custom' })}
-              >
-                <span className='dot' style={{ background: `oklch(0.68 ${s.customChroma} ${s.customHue})` }} />
-                Custom
+        <div className='modal-split'>
+          <nav className='set-nav'>
+            {TABS.map(t => (
+              <button key={t.id} className={'set-nav-item' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>
+                {t.label}
               </button>
-            </div>
-            {isCustom && (
-              <>
-                <div className='hue-row'>
-                  <label htmlFor='hue'>Hue</label>
-                  <input
-                    id='hue' type='range' min='0' max='360' className='hue-slider'
-                    value={s.customHue}
-                    onChange={e => preview({ customHue: Number(e.target.value) })}
-                  />
-                </div>
-                <div className='hue-row'>
-                  <label htmlFor='chroma'>Vividness</label>
-                  <input
-                    id='chroma' type='range' min='0' max='0.25' step='0.005' className='chroma-slider'
-                    value={s.customChroma}
-                    onChange={e => preview({ customChroma: Number(e.target.value) })}
-                  />
-                </div>
-              </>
-            )}
+            ))}
+          </nav>
+          <div className='modal-body'>
+            {tab === 'providers' && <ProvidersPane config={config} onConfigChange={onConfigChange} />}
+            {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
+            {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
+            {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
           </div>
-
-          <div className='set-section'>
-            <h3>Agent</h3>
-            <label className='check-row'>
-              <input
-                type='checkbox'
-                checked={s.approveCommands}
-                onChange={e => onSettings({ approveCommands: e.target.checked })}
-              />
-              <span>Ask before running shell commands <span className='desc'>— recommended; file edits stay automatic</span></span>
-            </label>
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Default workspace folder for new sessions</div>
-              <input
-                className='text-input'
-                value={cwdDraft}
-                onChange={e => setCwdDraft(e.target.value)}
-                onBlur={() => cwdDraft && onSettings({ defaultCwd: cwdDraft })}
-              />
-            </div>
-          </div>
-
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onSettings, mode, onToggleMode, rightOpen, onToggleRight }) {
+export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onSettings, mode, onToggleMode }) {
   return (
     <nav className='sidebar'>
       <div className='brand'>
@@ -29,7 +29,6 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
       <div className='sidebar-foot'>
         <button className='icon-btn' onClick={onSettings} title='Settings'>⚙ Settings</button>
         <button className='icon-btn' onClick={onToggleMode} title='Toggle light/dark'>{mode === 'dark' ? '☀' : '☾'}</button>
-        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Toggle side panel'>▤</button>
       </div>
     </nav>
   )

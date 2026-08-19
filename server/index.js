@@ -7,8 +7,10 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
+import { execSync } from 'child_process'
 import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
 import { runTurn, listModels } from './providers.js'
+import { CATALOG } from './catalog.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
@@ -64,6 +66,90 @@ app.get('/api/models', async (req, res) => {
     return models.map(m => ({ ...m, provider: p.id, providerName: p.name }))
   }))
   res.json(results.flat())
+})
+
+// ---------- local models (Ollama) ----------
+const OLLAMA = 'http://127.0.0.1:11434'
+
+app.get('/api/system', (req, res) => {
+  let chip = os.cpus()[0]?.model || 'Unknown CPU'
+  try { chip = execSync('sysctl -n machdep.cpu.brand_string', { timeout: 2000 }).toString().trim() } catch {}
+  let osVersion = ''
+  try { osVersion = execSync('sw_vers -productVersion', { timeout: 2000 }).toString().trim() } catch {}
+  res.json({
+    chip,
+    ramGB: Math.round(os.totalmem() / (1024 ** 3)),
+    cores: os.cpus().length,
+    arch: os.arch(),
+    platform: os.platform(),
+    osVersion
+  })
+})
+
+app.get('/api/catalog', (req, res) => res.json(CATALOG))
+
+app.get('/api/local-models', async (req, res) => {
+  try {
+    const r = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(4000) })
+    const data = await r.json()
+    res.json({ running: true, models: (data.models || []).map(m => ({ name: m.name, sizeGB: +(m.size / 1024 ** 3).toFixed(1) })) })
+  } catch {
+    res.json({ running: false, models: [] })
+  }
+})
+
+app.delete('/api/local-models/:name', async (req, res) => {
+  try {
+    const r = await fetch(`${OLLAMA}/api/delete`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: req.params.name })
+    })
+    res.json({ ok: r.ok })
+  } catch (e) {
+    res.status(502).json({ error: e.message })
+  }
+})
+
+// pull a model through Ollama, streaming progress back as SSE
+app.post('/api/pull', async (req, res) => {
+  const { model } = req.body
+  if (!model || !/^[\w.\/:-]+$/.test(model)) return res.status(400).json({ error: 'bad model tag' })
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+  const emit = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`)
+  const controller = new AbortController()
+  res.on('close', () => { if (!res.writableEnded) controller.abort() })
+  try {
+    const r = await fetch(`${OLLAMA}/api/pull`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model, stream: true }),
+      signal: controller.signal
+    })
+    if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`)
+    const reader = r.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop()
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const j = JSON.parse(line)
+          emit({ status: j.status, completed: j.completed, total: j.total, error: j.error })
+        } catch {}
+      }
+    }
+    emit({ status: 'done' })
+  } catch (e) {
+    if (!controller.signal.aborted) emit({ error: e.message })
+  } finally {
+    res.end()
+  }
 })
 
 // ---------- sessions ----------

@@ -1,6 +1,20 @@
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, nativeTheme } = require('electron')
 const path = require('path')
+const fs = require('fs')
+const os = require('os')
 const { pathToFileURL } = require('url')
+
+// window chrome follows the app's own light/dark setting, not the OS
+function savedMode () {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.radiant', 'config.json'), 'utf8'))
+    return cfg.settings?.mode === 'light' ? 'light' : 'dark'
+  } catch { return 'dark' }
+}
+nativeTheme.themeSource = savedMode()
+ipcMain.on('radiant:set-mode', (e, mode) => {
+  nativeTheme.themeSource = mode === 'light' ? 'light' : 'dark'
+})
 
 console.log('[radiant] main.cjs loaded, electron', process.versions.electron)
 process.on('uncaughtException', e => console.error('[radiant] uncaught:', e))
@@ -24,8 +38,12 @@ async function createWindow () {
     minWidth: 900,
     minHeight: 600,
     title: 'Radiant',
-    backgroundColor: '#161311',
-    webPreferences: { contextIsolation: true, nodeIntegration: false }
+    backgroundColor: nativeTheme.themeSource === 'light' ? '#f5f5f6' : '#141517',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.cjs')
+    }
   })
   win.on('closed', () => { win = null })
   // external links go to the real browser, not new Electron windows

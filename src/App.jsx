@@ -167,10 +167,10 @@ export default function App () {
         onSettings={() => setSettingsOpen(true)}
         mode={config.settings.mode}
         onToggleMode={() => saveSettings({ mode: config.settings.mode === 'dark' ? 'light' : 'dark' })}
-        rightOpen={rightOpen}
-        onToggleRight={() => setRightOpen(o => !o)}
       />
       <Chat
+        rightOpen={rightOpen}
+        onToggleRight={() => setRightOpen(o => !o)}
         session={session}
         live={live}
         approval={approval}
@@ -202,6 +202,7 @@ export default function App () {
           onClose={() => { setSettingsOpen(false); refreshModels() }}
           onSettings={saveSettings}
           onConfigChange={setConfig}
+          onModelsChanged={refreshModels}
         />
       )}
     </div>

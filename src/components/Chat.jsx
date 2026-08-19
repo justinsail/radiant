@@ -135,7 +135,7 @@ function ModelPicker ({ session, models, onPick, onRefresh }) {
   )
 }
 
-export default function Chat ({ session, live, approval, usage, error, models, onSend, onStop, onApproval, onPickModel, onToggleTools, onSetCwd, onNew, onRefreshModels }) {
+export default function Chat ({ session, live, approval, usage, error, models, onSend, onStop, onApproval, onPickModel, onToggleTools, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight }) {
   const [draft, setDraft] = useState('')
   const scrollRef = useRef(null)
   const streaming = Boolean(live?.streaming)
@@ -155,6 +155,9 @@ export default function Chat ({ session, live, approval, usage, error, models, o
   if (!session) {
     return (
       <main className='main'>
+        <div className='float-toggle'>
+          <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Toggle side panel'>▤</button>
+        </div>
         <div className='chat-scroll'>
           <div className='welcome'>
             <div className='logo-mark big-mark' aria-hidden />
@@ -187,6 +190,7 @@ export default function Chat ({ session, live, approval, usage, error, models, o
         >
           {session.cwd?.replace(/^\/Users\/[^/]+/, '~')}
         </button>
+        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Toggle side panel'>▤</button>
       </div>
 
       <div className='chat-scroll' ref={scrollRef}>

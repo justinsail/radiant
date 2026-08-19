@@ -15,7 +15,10 @@ export function applyTheme (settings) {
   const preset = THEMES.find(t => t.id === settings.themeId)
   const hue = preset ? preset.hue : (settings.customHue ?? 55)
   const chroma = preset ? preset.chroma : (settings.customChroma ?? 0.17)
-  root.dataset.mode = settings.mode === 'light' ? 'light' : 'dark'
+  const mode = settings.mode === 'light' ? 'light' : 'dark'
+  root.dataset.mode = mode
+  // in the Mac app, keep the window chrome in step with the app theme
+  if (window.radiantNative) window.radiantNative.setMode(mode)
   root.style.setProperty('--accent-h', String(hue))
   root.style.setProperty('--accent-c', String(chroma))
 }
