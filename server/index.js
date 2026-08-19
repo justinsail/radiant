@@ -16,6 +16,23 @@ import { ollamaBin, SPAWN_ENV } from './ollama.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
+
+// CORS: a remote client (another Mac's app, or a phone browser) talks to this
+// server from a different origin. Allow it and answer preflight BEFORE auth — the
+// custom x-radiant-token header triggers a preflight OPTIONS that carries no token.
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Headers', 'content-type, x-radiant-token, authorization')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Max-Age', '86400')
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
+
 app.use(express.json({ limit: '10mb' }))
 
 const __dirname0 = path.dirname(fileURLToPath(import.meta.url))

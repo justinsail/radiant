@@ -18,8 +18,13 @@ export function wsUrl (path) {
 }
 // Verify a remote server is reachable with the given token (used by the connect UI).
 export async function testServer (base, token) {
-  const res = await fetch(String(base).replace(/\/$/, '') + '/api/config', { headers: token ? { 'x-radiant-token': token } : {} })
-  if (res.status === 401) throw new Error('Wrong or missing access token')
+  let res
+  try {
+    res = await fetch(String(base).replace(/\/$/, '') + '/api/config', { headers: token ? { 'x-radiant-token': token } : {} })
+  } catch {
+    throw new Error("Couldn't reach that server. Check the address is right, Radiant is running and shared on the host (v0.6.9+), and both devices are on Tailscale.")
+  }
+  if (res.status === 401) throw new Error('Reached the server, but the access token is wrong or missing.')
   if (!res.ok) throw new Error(`Server responded ${res.status}`)
   return true
 }
