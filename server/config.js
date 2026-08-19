@@ -12,7 +12,8 @@ const DEFAULT_CONFIG = {
     { id: 'openai', name: 'OpenAI', type: 'openai', baseUrl: 'https://api.openai.com/v1', auth: 'key', removable: false },
     { id: 'ollama', name: 'Ollama (local)', type: 'openai', baseUrl: 'http://127.0.0.1:11434/v1', auth: 'none', removable: false },
     { id: 'lmstudio', name: 'LM Studio (local)', type: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', auth: 'none', removable: false },
-    { id: 'openrouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1', auth: 'key', removable: false }
+    { id: 'openrouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1', auth: 'key', removable: false },
+    { id: 'nousresearch', name: 'Nous Portal', type: 'openai', baseUrl: 'https://inference-api.nousresearch.com/v1', auth: 'key', removable: false }
   ],
   keys: {},
   oauth: {},
@@ -27,7 +28,7 @@ const DEFAULT_CONFIG = {
     { id: 'agent-reviewer', name: 'Reviewer', emoji: '🔍', icon: 'search', hue: 25, persona: 'You are a meticulous senior code reviewer. Hunt for bugs, edge cases, security issues, race conditions, and unclear code. Be specific — cite files and lines. Prioritize correctness over style, and call out what you are NOT sure about.', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-architect', name: 'Architect', emoji: '📐', icon: 'compass', hue: 200, persona: 'You are a software architect. Before writing code, think about structure, boundaries, data flow, and tradeoffs. Propose a design, note alternatives, and only then implement. Favor simple, evolvable designs.', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-explainer', name: 'Explainer', emoji: '💡', icon: 'bulb', hue: 90, persona: 'You explain code and concepts clearly for someone learning. Use plain language, small examples, and analogies. Read the code first, then teach it top-down. Prefer clarity over completeness.', model: null, provider: null, skills: [], useTools: true, builtin: true },
-    { id: 'agent-pair', name: 'Pair', emoji: '🧑‍💻', icon: 'code', hue: 300, persona: 'You are a pair-programming partner. Think out loud, suggest approaches before coding, keep changes small and reversible, and check in when a decision has real tradeoffs.', model: null, provider: null, skills: [], useTools: true, builtin: true }
+    { id: 'agent-pair', name: 'Coder', emoji: '🧑‍💻', icon: 'code', hue: 300, persona: 'You are a hands-on implementer. Given a task, write the code and make it work. Follow the existing patterns and style in the repo, keep changes small and focused, add or update tests, and run/verify your changes when practical. Unlike the Architect, you optimize for shipping working code now, not for exploring the design space — if the approach is unclear, pick the simplest one that fits and note the tradeoff briefly.', model: null, provider: null, skills: [], useTools: true, builtin: true }
   ],
   settings: {
     mode: 'dark',
@@ -68,9 +69,14 @@ export function loadConfig () {
       const defById = Object.fromEntries(cfg.agents.map(a => [a.id, a]))
       cfg.agents = saved.agents.map(a => {
         if (!(a.builtin && defById[a.id])) return a
-        // one-time migration: the Radiant bot now wears the swirl logo, not sparkles
-        const icon = (a.id === 'agent-radiant' && a.icon === 'sparkles') ? 'radiant' : (a.icon || defById[a.id].icon)
-        return { ...a, icon }
+        const def = defById[a.id]
+        // one-time migration: the Radiant agent now wears the swirl logo, not sparkles
+        const icon = (a.id === 'agent-radiant' && a.icon === 'sparkles') ? 'radiant' : (a.icon || def.icon)
+        // one-time migration: "Pair" became "Coder" (only if the user hasn't renamed it)
+        const migratePair = a.id === 'agent-pair' && a.name === 'Pair'
+        const name = migratePair ? def.name : a.name
+        const persona = (migratePair && /^You are a pair-programming partner/.test(a.persona || '')) ? def.persona : a.persona
+        return { ...a, icon, name, persona }
       })
     }
     if (saved.mcpServers) cfg.mcpServers = saved.mcpServers

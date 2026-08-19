@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { api, streamPull, streamQuantize } from '../api.js'
+import { api, streamDownload, streamQuantize } from '../api.js'
 import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
 import { MOTIONS } from './MotionBackground.jsx'
 import { Icon } from './Icons.jsx'
@@ -178,26 +178,26 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam }
       {open && failed && <div className='variant-row'><span className='v-meta'>Could not load file list.</span></div>}
       {open && files && !files.quants.length && <div className='variant-row'><span className='v-meta'>No GGUF files in this repo.</span></div>}
       {open && files && files.quants.map(qt => {
-        const tag = qt.label === 'DEFAULT' ? `hf.co/${repo.id}` : `hf.co/${repo.id}:${qt.label}`
+        const model = qt.model
         const ram = ramNeededGB(qt.sizeGB)
         const fit = fitClass(ram, systemRam)
-        const pull = pulls[tag]
+        const pull = pulls[model]
         const pct = pull && pull.total ? Math.round((pull.completed / pull.total) * 100) : null
         return (
           <div key={qt.label} className='variant-row'>
-            <span className='v-tag mono'>{qt.label.toLowerCase()}</span>
+            <span className='v-tag mono'>{qt.label.toLowerCase()}{qt.sharded ? ` · ${qt.files.length} parts` : ''}</span>
             <span className='v-meta'>{qt.sizeGB} GB download · ~{ram} GB RAM</span>
             <span className={'fit-badge ' + fit}>{FIT_LABEL[fit] || ''}</span>
             <span className='v-action'>
-              {installedCheck(tag)
+              {installedCheck(model)
                 ? <span className='key-ok'>✓ installed</span>
                 : pull
                   ? <span className='pull-progress'>
                       <span className='pull-bar'><span style={{ width: (pct ?? 5) + '%' }} /></span>
                       {pct != null ? pct + '%' : (pull.status || 'starting…')}
-                      <button className='pull-stop' title='Stop download' onClick={() => onCancel(tag)}>✕</button>
+                      <button className='pull-stop' title='Stop download' onClick={() => onCancel(model)}>✕</button>
                     </span>
-                  : <button className='small-btn' onClick={() => onPull(tag)} disabled={fit === 'fit-no'}>Download</button>}
+                  : <button className='small-btn' onClick={() => onPull({ repo: repo.id, files: qt.files, model })} disabled={fit === 'fit-no'}>Download</button>}
             </span>
           </div>
         )
@@ -312,18 +312,20 @@ function ModelsPane ({ onModelsChanged }) {
   const installedSet = new Set(local.models.map(m => m.name.replace(/:latest$/, '')))
   const isInstalled = tag => installedSet.has(tag) || installedSet.has(tag.replace(/:latest$/, ''))
 
-  const startPull = async tag => {
+  // item: { repo, files, model } — download exact GGUF file(s) from HF, import via Ollama
+  const startPull = async item => {
+    const key = item.model
     const controller = new AbortController()
-    ctrlRef.current[tag] = controller
-    pullsRef.current = { ...pullsRef.current, [tag]: { status: 'starting' } }
+    ctrlRef.current[key] = controller
+    pullsRef.current = { ...pullsRef.current, [key]: { status: 'starting' } }
     setPulls({ ...pullsRef.current })
     try {
-      await streamPull(tag, ev => {
+      await streamDownload(item, ev => {
         if (ev.error) {
-          pullsRef.current = { ...pullsRef.current, [tag]: undefined }
+          pullsRef.current = { ...pullsRef.current, [key]: undefined }
           window.alert(`Download failed: ${ev.error}`)
         } else {
-          pullsRef.current = { ...pullsRef.current, [tag]: ev.status === 'done' ? undefined : ev }
+          pullsRef.current = { ...pullsRef.current, [key]: ev.status === 'done' ? undefined : ev }
         }
         setPulls({ ...pullsRef.current })
       }, controller.signal)
@@ -331,8 +333,8 @@ function ModelsPane ({ onModelsChanged }) {
       // user-cancelled aborts throw AbortError — not a failure, don't alert
       if (e.name !== 'AbortError') window.alert(`Download failed: ${e.message}`)
     } finally {
-      delete ctrlRef.current[tag]
-      pullsRef.current = { ...pullsRef.current, [tag]: undefined }
+      delete ctrlRef.current[key]
+      pullsRef.current = { ...pullsRef.current, [key]: undefined }
       setPulls({ ...pullsRef.current })
       refreshLocal()
       onModelsChanged()
@@ -564,7 +566,8 @@ function AgentsPane ({ config, onConfigChange }) {
   if (editing) {
     return (
       <div className='set-section'>
-        <h3>{editing.id ? 'Edit agent' : 'New agent'}</h3>
+        <button className='back-link' onClick={() => setEditing(null)}>← All agents</button>
+        <h3 style={{ marginTop: 6 }}>{editing.id ? `Edit ${editing.name || 'agent'}` : 'New agent'}</h3>
         <AgentEditor agent={editing} skills={skills} models={models} onSave={saveAgent} onDelete={del} onClose={() => setEditing(null)} />
       </div>
     )
@@ -574,7 +577,7 @@ function AgentsPane ({ config, onConfigChange }) {
     <div className='set-section'>
       <h3>Agents</h3>
       <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
-        Agents are named bots with their own personality, model, and skills — start a session with one to give the agent a role.
+        Agents are named personas with their own personality, model, and skills — start a session with one to give the agent a role.
       </p>
       <div className='agent-grid'>
         {agents.map(a => (

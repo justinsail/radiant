@@ -130,6 +130,13 @@ code, pre, .mono { font-family: var(--font-mono); }
   mask: url('./assets/logo-mark.png') center / contain no-repeat;
 }
 
+.back-link {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 13px; padding: 4px 0;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.back-link:hover { color: var(--accent); }
+
 /* ---------- app frame ---------- */
 .app { display: flex; height: 100%; position: relative; }
 

@@ -103,6 +103,31 @@ export async function streamPull (model, onEvent, signal) {
   }
 }
 
+// POST /api/download streams SSE progress for a direct HF file download + import.
+export async function streamDownload ({ repo, files, model }, onEvent, signal) {
+  const res = await fetch('/api/download', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ repo, files, model }),
+    signal
+  })
+  if (!res.ok) throw new Error(`${res.status}`)
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue
+      try { onEvent(JSON.parse(line.slice(5))) } catch {}
+    }
+  }
+}
+
 // POST /api/chat streams SSE back on the response body.
 export async function streamChat (sessionId, content, onEvent) {
   const res = await fetch('/api/chat', {

@@ -7,7 +7,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
-import { execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken } from './oauth.js'
@@ -377,26 +377,34 @@ app.get('/api/registry-files', async (req, res) => {
     const r = await fetch(`https://huggingface.co/api/models/${repo}?blobs=true`, { signal: AbortSignal.timeout(10000) })
     if (!r.ok) throw new Error(`registry ${r.status}`)
     const data = await r.json()
-    const quants = {} // label -> {bytes, files}
+    const base = repo.split('/')[1].toLowerCase().replace(/[._-]?gguf$/i, '').replace(/[^a-z0-9._-]+/g, '-').replace(/(^-|-$)/g, '')
+    const quants = {} // label -> { bytes, files:[{name,size}] }
     for (const s of data.siblings || []) {
       const f = s.rfilename
       if (!/\.gguf$/i.test(f)) continue
-      // only top-level, single-file quants are pullable via `ollama pull hf.co/…:TAG`.
-      // skip: subfolder files (shards + companion drafts like MTP/), sharded
-      // multi-part quants (Ollama can't pull those), and non-weight companions.
+      // top-level weight files only — skip subfolder files and companions
+      // (projectors, vision/clip encoders, drafts, LoRA/adapters, MTP heads).
       if (f.includes('/')) continue
-      if (/-\d+-of-\d+\.gguf$/i.test(f)) continue
       if (/mmproj|projector|\bproj\b|vision|\bclip\b|encoder|lora|adapter|draft|\bmtp\b/i.test(f)) continue
-      const m = f.match(/[.\-_](I?Q\d[\w]*?|F16|F32|BF16|FP16|FP32)\.gguf$/i)
+      // Group sharded parts (…-00001-of-00003.gguf) under one quant. We download
+      // files directly from HF and `ollama create` from them, so shards are fine.
+      const stem = f.replace(/-\d+-of-\d+\.gguf$/i, '.gguf')
+      const m = stem.match(/[.\-_](I?Q\d[\w]*?|F16|F32|BF16|FP16|FP32)\.gguf$/i)
       const label = (m ? m[1] : 'default').toUpperCase().replace(/^FP(16|32)$/, 'F$1')
-      quants[label] = quants[label] || { bytes: 0, files: 0 }
+      quants[label] = quants[label] || { bytes: 0, files: [] }
       quants[label].bytes += s.size || 0
-      quants[label].files += 1
+      quants[label].files.push(f)
     }
     res.json({
       repo,
       quants: Object.entries(quants)
-        .map(([label, v]) => ({ label, sizeGB: +(v.bytes / 1024 ** 3).toFixed(1), files: v.files }))
+        .map(([label, v]) => ({
+          label,
+          sizeGB: +(v.bytes / 1024 ** 3).toFixed(1),
+          files: v.files.sort(),
+          sharded: v.files.length > 1,
+          model: `${base}:${label.toLowerCase()}`
+        }))
         .sort((a, b) => a.sizeGB - b.sizeGB)
     })
   } catch (e) {
@@ -518,6 +526,74 @@ app.post('/api/pull', async (req, res) => {
   } catch (e) {
     if (!controller.signal.aborted) emit({ error: e.message })
   } finally {
+    res.end()
+  }
+})
+
+// Download exact GGUF file(s) straight from Hugging Face (the way LM Studio does),
+// then register them with Ollama via `ollama create`. This sidesteps Ollama's
+// fragile registry tag-matching entirely and handles sharded quants too.
+const DL_DIR = path.join(os.homedir(), '.radiant', 'downloads')
+const hfUrl = (repo, file) => `https://huggingface.co/${repo}/resolve/main/${encodeURIComponent(file)}?download=true`
+
+app.post('/api/download', async (req, res) => {
+  const { repo, files, model } = req.body || {}
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '')) return res.status(400).json({ error: 'bad repo' })
+  if (!Array.isArray(files) || !files.length || !files.every(f => /^[A-Za-z0-9._-]+\.gguf$/i.test(f))) return res.status(400).json({ error: 'bad files' })
+  if (!/^[a-z0-9][a-z0-9._-]*(:[a-z0-9._-]+)?$/i.test(model || '')) return res.status(400).json({ error: 'bad model name' })
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+  const emit = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`)
+  const controller = new AbortController()
+  let child = null
+  let aborted = false
+  res.on('close', () => { if (!res.writableEnded) { aborted = true; controller.abort(); child?.kill('SIGKILL') } })
+  const dir = path.join(DL_DIR, crypto.randomUUID())
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+    // authoritative sizes from the HF model API (LFS content-length can be flaky)
+    let sizeByFile = {}
+    try {
+      const meta = await fetch(`https://huggingface.co/api/models/${repo}?blobs=true`, { signal: controller.signal })
+      if (meta.ok) for (const s of (await meta.json()).siblings || []) sizeByFile[s.rfilename] = s.size || 0
+    } catch {}
+    const total = files.reduce((a, f) => a + (sizeByFile[f] || 0), 0)
+    let done = 0
+    let lastEmit = 0
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i]
+      const r = await fetch(hfUrl(repo, f), { redirect: 'follow', signal: controller.signal })
+      if (!r.ok) throw new Error(`Couldn't download ${f} (HTTP ${r.status})`)
+      const out = fs.createWriteStream(path.join(dir, f))
+      const reader = r.body.getReader()
+      while (true) {
+        const { done: fin, value } = await reader.read()
+        if (fin) break
+        done += value.length
+        if (!out.write(Buffer.from(value))) await new Promise(rs => out.once('drain', rs))
+        const now = Date.now()
+        if (now - lastEmit > 350) { lastEmit = now; emit({ status: files.length > 1 ? `downloading part ${i + 1}/${files.length}` : 'downloading', completed: done, total }) }
+      }
+      out.end()
+      await new Promise((rs, rj) => { out.on('finish', rs); out.on('error', rj) })
+    }
+    emit({ status: 'importing into Ollama…', completed: total, total })
+    const modelfile = path.join(dir, 'Modelfile')
+    fs.writeFileSync(modelfile, `FROM ${path.join(dir, files[0])}\n`)
+    await new Promise((resolve, reject) => {
+      child = spawn('ollama', ['create', model, '-f', modelfile])
+      let err = ''
+      const strip = s => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/[\r\x00-\x08\x0e-\x1f]/g, '').trim()
+      const feed = b => b.toString().split('\n').forEach(raw => { const l = strip(raw); if (l) emit({ status: l }) })
+      child.stdout.on('data', feed)
+      child.stderr.on('data', d => { err += d.toString(); feed(d) })
+      child.on('error', reject)
+      child.on('close', code => code === 0 ? resolve() : reject(new Error(err.trim().split('\n').pop() || `ollama create exited ${code}`)))
+    })
+    emit({ status: 'done', model })
+  } catch (e) {
+    if (!aborted) emit({ error: e.message })
+  } finally {
+    fs.rm(dir, { recursive: true, force: true }, () => {})
     res.end()
   }
 })

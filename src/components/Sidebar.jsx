@@ -94,7 +94,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
       </div>
       <div className='sidebar-switch'>
         <button className={view === 'chats' ? 'on' : ''} onClick={() => setView('chats')}>Chats</button>
-        <button className={view === 'bots' ? 'on' : ''} onClick={() => setView('bots')}>Bots</button>
+        <button className={view === 'bots' ? 'on' : ''} onClick={() => setView('bots')}>Agents</button>
       </div>
       <button className='new-session' onClick={() => onNew()}>+ New session</button>
 

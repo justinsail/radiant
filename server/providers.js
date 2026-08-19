@@ -115,6 +115,20 @@ function toOpenAI (messages, system) {
   return out
 }
 
+// Turn a provider HTTP error body into a short, actionable message.
+async function httpErr (res) {
+  let raw = ''
+  try { raw = await res.text() } catch {}
+  let msg = raw
+  try { msg = JSON.parse(raw).error?.message || msg } catch {}
+  if (/missing_scope|model\.request|insufficient permissions/i.test(raw)) {
+    return new Error(`${res.status}: This API key is restricted and can't call models. Create a new key with default (full) permissions — or ensure the "model.request" scope and a Writer/Owner role — then paste it in Settings → Providers.`)
+  }
+  if (res.status === 401) return new Error(`401: Authentication failed — check the API key (or re-sign-in) for this provider in Settings → Providers.`)
+  if (res.status === 402 || /insufficient|quota|billing|credit/i.test(raw)) return new Error(`${res.status}: ${msg} — this usually means the account is out of credit/quota.`)
+  return new Error(`${res.status}: ${msg || 'request failed'}`)
+}
+
 // ---------- SSE line reader ----------
 async function * sseEvents (response) {
   const reader = response.body.getReader()
@@ -159,7 +173,7 @@ async function anthropicRound ({ baseUrl, apiKey, accessToken, model, messages, 
     body: JSON.stringify(body),
     signal
   })
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
+  if (!res.ok) throw await httpErr(res)
 
   const parts = []
   let current = null // {type:'text',text} or {type:'tool',id,name,json}
@@ -204,7 +218,7 @@ async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, too
   const bearer = accessToken || apiKey
   if (bearer) headers.authorization = `Bearer ${bearer}`
   const res = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers, body: JSON.stringify(body), signal })
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
+  if (!res.ok) throw await httpErr(res)
 
   let text = ''
   const calls = [] // by index: {id, name, args:''}
@@ -329,7 +343,7 @@ export async function listModels (provider, apiKey, accessToken) {
       if (accessToken) { headers.authorization = `Bearer ${accessToken}`; headers['anthropic-beta'] = 'oauth-2025-04-20' }
       else headers['x-api-key'] = apiKey
       const res = await fetch(`${provider.baseUrl}/v1/models?limit=100`, { headers, signal: AbortSignal.timeout(6000) })
-      if (!res.ok) return fallback(provider, accessToken)
+      if (!res.ok) return fallback(provider, accessToken, apiKey)
       const data = await res.json()
       const list = (data.data || []).map(m => ({ id: m.id, label: m.display_name || m.id }))
       return list.length ? list : fallback(provider, accessToken)
@@ -338,18 +352,26 @@ export async function listModels (provider, apiKey, accessToken) {
     const bearer = accessToken || apiKey
     if (bearer) headers.authorization = `Bearer ${bearer}`
     const res = await fetch(`${provider.baseUrl}/models`, { headers, signal: AbortSignal.timeout(6000) })
-    if (!res.ok) return fallback(provider, accessToken)
+    if (!res.ok) return fallback(provider, accessToken, apiKey)
     const data = await res.json()
     const list = (data.data || []).map(m => ({ id: m.id, label: m.name || m.id }))
     return list.length ? list : fallback(provider, accessToken)
   } catch {
-    return fallback(provider, accessToken)
+    return fallback(provider, accessToken, apiKey)
   }
 }
 
-function fallback (provider, accessToken) {
+// shown if a key provider's /models call fails but a key is present
+const KEY_FALLBACK_MODELS = {
+  nousresearch: ['Hermes-4-405B', 'Hermes-4-70B', 'Hermes-4.3-36B']
+}
+
+function fallback (provider, accessToken, apiKey) {
   if (accessToken && SUBSCRIPTION_MODELS[provider.id]) {
     return SUBSCRIPTION_MODELS[provider.id].map(id => ({ id, label: id }))
+  }
+  if (apiKey && KEY_FALLBACK_MODELS[provider.id]) {
+    return KEY_FALLBACK_MODELS[provider.id].map(id => ({ id, label: id }))
   }
   return []
 }
