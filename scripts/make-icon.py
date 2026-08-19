@@ -21,18 +21,19 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 BLUE = (83, 119, 179)
 WHITE = (255, 255, 255)
 CANVAS = 1024
-SS = 4  # supersample factor for the contour smoothing
+SS = 8  # supersample factor for the contour smoothing
 
 ROOT = Path(__file__).resolve().parent.parent
-# ⚠️ THE SWIRL IS LIFTED FROM THE SHIPPED ICON because there is no vector
-# source in this repo. If one ever appears, point this at it instead — the
-# rest of the script does not care where the mask comes from.
-SOURCE = ROOT / "src/assets/logo-mark.png"
+# ⚠️ A PRISTINE SOURCE, NOT THE SHIPPED FILE. The first version of this script
+# read src/assets/logo-mark.png and also WROTE it, so a second run smoothed an
+# already-smoothed mark and slowly ate the artwork. This file is the original
+# hand-made mark and nothing writes to it.
+SOURCE = ROOT / "src/assets/logo-mark-source.png"
 
 # Every place the mark is published. Keeping them in one list is the point:
 # they drifted apart before, and a favicon that disagrees with the app icon is
@@ -48,7 +49,13 @@ TARGETS = [
 
 
 def swirl_mask(src: Path) -> Image.Image:
-    """The swirl on its own, as a white-on-black mask, cropped to the ink."""
+    """The swirl on its own, as a white-on-black mask, cropped to the ink.
+
+    ⚠️ THE CENTRE DISC IS DROPPED ON PURPOSE. Tony, 2026-08-19: "fill in the
+    color in the middle." It is a separate blob from the rings, so flood-filling
+    from the centre identifies it exactly rather than guessing a radius — which
+    would be wrong the moment the artwork changed.
+    """
     a = np.array(Image.open(src).convert("RGBA"))
     alpha = a[..., 3]
     opaque = alpha > 128
@@ -57,18 +64,38 @@ def swirl_mask(src: Path) -> Image.Image:
     rad = min(xs.max() - xs.min(), ys.max() - ys.min()) / 2
     yy, xx = np.mgrid[0 : alpha.shape[0], 0 : alpha.shape[1]]
     inside = ((xx - cx) ** 2 + (yy - cy) ** 2) <= (rad * 0.99) ** 2
-    mark = Image.fromarray(((inside & (alpha < 128)) * 255).astype(np.uint8))
+    swirl = inside & (alpha < 128)
+    mark = Image.fromarray((swirl * 255).astype(np.uint8))
+    probe = mark.copy()
+    ImageDraw.floodfill(probe, (int(cx), int(cy)), 128)
+    swirl = swirl & ~(np.array(probe) == 128)
+    mark = Image.fromarray((swirl * 255).astype(np.uint8))
     box = mark.getbbox()
     return mark.crop(box) if box else mark
 
 
 def crisp(mask: Image.Image, px: int) -> Image.Image:
-    """Smooth a stair-stepped contour, then resample down for real anti-aliasing."""
+    """Flatten the wobble out of the contour, then anti-alias it properly.
+
+    ⚠️ THREE STEPS, AND EACH ONE FAILS ALONE. A light blur leaves the contour
+    lumpy — that was the first attempt, and it still read as jagged. A heavy
+    blur alone gives a soft, out-of-focus edge. Thresholding to hard pixels and
+    resampling with LANCZOS rings, because its negative lobes overshoot at a
+    hard edge, which looks like the jaggedness being removed.
+
+    So: blur hard enough to erase the wobble, re-map linearly so the edge is
+    back to roughly one final pixel wide, then AREA-AVERAGE down — the only
+    filter here that cannot ring.
+
+    The radius is tied to output size, not fixed, or the favicon would be
+    smoothed into a blob while the 1024 stayed lumpy.
+    """
+    blur = px * SS / 96.0
     big = mask.resize((px * SS, px * SS), Image.LANCZOS)
-    big = big.filter(ImageFilter.GaussianBlur(radius=px * SS / 260))
-    arr = np.array(big).astype(np.float32) / 255
-    big = Image.fromarray(((arr > 0.5) * 255).astype(np.uint8))
-    return big.resize((px, px), Image.LANCZOS)
+    big = big.filter(ImageFilter.GaussianBlur(radius=blur))
+    v = np.array(big).astype(np.float32) / 255.0
+    v = np.clip((v - 0.5) * (0.625 * blur) + 0.5, 0, 1)
+    return Image.fromarray((v * 255).astype(np.uint8)).resize((px, px), Image.BOX)
 
 
 def _shape(size: int, kind: str) -> Image.Image:
@@ -121,7 +148,7 @@ def main() -> None:
         # ⚠️ RESIZE THE FINISHED ICON, never re-render at the small size — the
         # 64px favicon rendered natively would lose the thin inner arcs
         # entirely, and the set would stop looking like one mark.
-        (master if px == CANVAS else master.resize((px, px), Image.LANCZOS)).save(path)
+        (master if px == CANVAS else master.resize((px, px), Image.BOX)).save(path)
         print(f"  {path.relative_to(ROOT)}  {px}x{px}")
     print(f"done — {kind}, colour {BLUE}")
 
