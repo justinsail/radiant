@@ -1,0 +1,32 @@
+{
+  "name": "radiant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Radiant — a local coding harness: chat with coding agents across cloud and local models.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,ui \"node server/index.js\" \"vite --port 5833 --strictPort\"",
+    "build": "vite build",
+    "start": "NODE_ENV=production node server/index.js",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.13",
+    "express": "^4.21.2",
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@fontsource/jetbrains-mono": "^5.1.1",
+    "@fontsource/space-grotesk": "^5.1.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "concurrently": "^9.1.0",
+    "highlight.js": "^11.10.0",
+    "marked": "^15.0.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^6.0.5"
+  }
+}
