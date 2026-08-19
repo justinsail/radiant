@@ -64,6 +64,34 @@ app.delete('/api/providers/:id', (req, res) => {
   res.json(publicConfig(config))
 })
 
+// ---------- quantization ----------
+app.get('/api/quantize/candidates', async (req, res) => {
+  try {
+    const { quantizableModels, QUANT_TYPES } = await import('./quantize.js')
+    const r = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(4000) })
+    const data = await r.json()
+    const local = (data.models || []).map(m => ({ name: m.name, sizeGB: +(m.size / 1024 ** 3).toFixed(1) }))
+    res.json({ models: await quantizableModels(local), quants: QUANT_TYPES })
+  } catch (e) {
+    res.status(502).json({ error: e.message, models: [], quants: [] })
+  }
+})
+
+app.post('/api/quantize', async (req, res) => {
+  const { source, target, quant } = req.body
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+  const emit = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`)
+  try {
+    const { runQuantize } = await import('./quantize.js')
+    await runQuantize({ source, target, quant }, line => emit({ line }))
+    emit({ done: true })
+  } catch (e) {
+    emit({ error: e.message })
+  } finally {
+    res.end()
+  }
+})
+
 // ---------- computer control status ----------
 app.get('/api/computer-status', async (req, res) => {
   try {

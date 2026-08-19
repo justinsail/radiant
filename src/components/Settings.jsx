@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { api, streamPull } from '../api.js'
+import { api, streamPull, streamQuantize } from '../api.js'
 import { THEMES, FONTS, UI_SCALES, applyTheme } from '../theme.js'
 
 // ---------- Providers ----------
@@ -202,6 +202,81 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, systemRam }) {
   )
 }
 
+function QuantizeBlock ({ systemRam, onDone }) {
+  const [data, setData] = useState(null) // {models, quants}
+  const [source, setSource] = useState('')
+  const [quant, setQuant] = useState('q4_K_M')
+  const [running, setRunning] = useState(false)
+  const [log, setLog] = useState([])
+  const [err, setErr] = useState(null)
+
+  const load = () => api.quantizeCandidates().then(d => {
+    setData(d)
+    if (d.models?.length && !source) setSource(d.models[0].name)
+  }).catch(e => setErr(e.message))
+  useEffect(() => { load() }, [])
+
+  const srcModel = data?.models?.find(m => m.name === source)
+  const quantInfo = data?.quants?.find(q => q.id === quant)
+  const estGB = srcModel && quantInfo ? +(srcModel.sizeGB * quantInfo.factor).toFixed(1) : null
+  const targetName = source ? `${source.split(':')[0]}:${quant.toLowerCase()}` : ''
+
+  const run = async () => {
+    setRunning(true); setLog([]); setErr(null)
+    try {
+      await streamQuantize({ source, target: targetName, quant }, ev => {
+        if (ev.error) setErr(ev.error)
+        else if (ev.line) setLog(l => [...l.slice(-6), ev.line])
+      })
+    } catch (e) { setErr(e.message) }
+    setRunning(false)
+    load(); onDone()
+  }
+
+  if (data && !data.models.length) {
+    return (
+      <div className='quant-block'>
+        <div className='quant-title'>Shrink a model (quantize)</div>
+        <div className='hf-note'>
+          Quantizing turns a full-precision model into a smaller one that needs less RAM.
+          You don't have a full-precision model yet — download an <strong>F16</strong> or <strong>BF16</strong> GGUF
+          from Hugging Face below, then come back here to shrink it.
+        </div>
+      </div>
+    )
+  }
+  if (!data) return null
+
+  return (
+    <div className='quant-block'>
+      <div className='quant-title'>Shrink a model (quantize)</div>
+      <div className='hf-note'>Turn a full-precision model into a smaller one that runs on less RAM.</div>
+      <div className='quant-row'>
+        <label>Model</label>
+        <select className='text-input' value={source} onChange={e => setSource(e.target.value)} disabled={running}>
+          {data.models.map(m => <option key={m.name} value={m.name}>{m.name} ({m.quant}, {m.sizeGB} GB)</option>)}
+        </select>
+      </div>
+      <div className='quant-row'>
+        <label>Quant</label>
+        <select className='text-input' value={quant} onChange={e => setQuant(e.target.value)} disabled={running}>
+          {data.quants.map(q => <option key={q.id} value={q.id}>{q.label} — {q.note}</option>)}
+        </select>
+      </div>
+      <div className='quant-est'>
+        Result: <span className='mono'>{targetName}</span>
+        {estGB != null && <> · about {estGB} GB{systemRam && <> · <span className={estGB <= systemRam * 0.75 ? 'key-ok' : 'fit-badge fit-tight'}>{estGB <= systemRam * 0.75 ? 'runs well here' : 'tight fit'}</span></>}</>}
+      </div>
+      <button className='small-btn primary' onClick={run} disabled={running || !source}>
+        {running ? 'Quantizing…' : 'Quantize'}
+      </button>
+      {log.length > 0 && <pre className='quant-log'>{log.join('\n')}</pre>}
+      {err && <div className='error-note'>⚠ {err}</div>}
+      {!running && !err && log.length > 0 && <div className='update-none'>Done — {targetName} is ready in your model list.</div>}
+    </div>
+  )
+}
+
 function ModelsPane ({ onModelsChanged }) {
   const [system, setSystem] = useState(null)
   const [local, setLocal] = useState({ running: true, models: [] })
@@ -292,6 +367,8 @@ function ModelsPane ({ onModelsChanged }) {
           ))}
         </div>
       )}
+
+      <QuantizeBlock systemRam={system?.ramGB} onDone={() => { refreshLocal(); onModelsChanged() }} />
 
       <div className='model-filter-row'>
         <input

@@ -38,7 +38,32 @@ export const api = {
   oauthSignout: id => json('POST', `/api/oauth/${id}/signout`),
   getVersion: () => json('GET', '/api/version'),
   updateCheck: () => json('GET', '/api/update-check'),
-  computerStatus: () => json('GET', '/api/computer-status')
+  computerStatus: () => json('GET', '/api/computer-status'),
+  quantizeCandidates: () => json('GET', '/api/quantize/candidates')
+}
+
+// POST /api/quantize streams progress lines back on the response body.
+export async function streamQuantize (body, onEvent) {
+  const res = await fetch('/api/quantize', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) throw new Error(`${res.status}`)
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue
+      try { onEvent(JSON.parse(line.slice(5))) } catch {}
+    }
+  }
 }
 
 // POST /api/pull streams SSE progress events back on the response body.
