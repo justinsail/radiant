@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Icon } from './Icons.jsx'
+import { AgentGlyph } from './AgentIcons.jsx'
 import { api } from '../api.js'
 
 function UsageChip () {
@@ -79,7 +80,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
               title={s.title}
             >
               <div className='session-title'>
-                {ag && <span className='session-agent'>{ag.emoji || '🤖'}</span>}
+                {ag && <span className='session-agent' style={{ color: `oklch(0.7 0.15 ${ag.hue ?? 258})` }}><AgentGlyph agent={ag} size={13} /></span>}
                 <span className='session-title-text'>{s.title}</span>
               </div>
               <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>

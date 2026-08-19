@@ -3,6 +3,7 @@ import { api, streamPull, streamQuantize } from '../api.js'
 import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
 import { MOTIONS } from './MotionBackground.jsx'
 import { Icon } from './Icons.jsx'
+import { AGENT_ICONS, AGENT_ICON_IDS, AgentGlyph } from './AgentIcons.jsx'
 
 // ---------- Providers ----------
 
@@ -493,8 +494,17 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
   return (
     <div className='agent-editor'>
       <div className='agent-editor-head'>
-        <input className='agent-emoji-input' value={a.emoji || ''} maxLength={2} onChange={e => set({ emoji: e.target.value })} />
+        <span className='agent-emoji-input' style={{ color: `oklch(0.65 0.15 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={22} /></span>
         <input className='text-input' style={{ fontFamily: 'inherit', flex: 1 }} placeholder='Agent name' value={a.name} onChange={e => set({ name: e.target.value })} />
+      </div>
+      <div className='agent-field'>Icon
+        <div className='icon-picker'>
+          {AGENT_ICON_IDS.map(id => (
+            <button key={id} type='button' className={'icon-choice' + (a.icon === id ? ' sel' : '')} style={{ '--ah': a.hue ?? 258 }} onClick={() => set({ icon: id })} title={id}>
+              {AGENT_ICONS[id]({ size: 18 })}
+            </button>
+          ))}
+        </div>
       </div>
       <label className='agent-field'>Personality / instructions
         <textarea className='text-input' style={{ fontFamily: 'inherit', minHeight: 90, resize: 'vertical' }} placeholder="e.g. You are a meticulous code reviewer…" value={a.persona || ''} onChange={e => set({ persona: e.target.value })} />
@@ -569,7 +579,7 @@ function AgentsPane ({ config, onConfigChange }) {
       <div className='agent-grid'>
         {agents.map(a => (
           <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 258 }} onClick={() => setEditing(a)}>
-            <span className='agent-avatar'>{a.emoji || '🤖'}</span>
+            <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={20} /></span>
             <span className='agent-card-name'>{a.name}</span>
             <span className='agent-card-desc'>{a.persona ? a.persona.slice(0, 70) + (a.persona.length > 70 ? '…' : '') : 'General assistant'}</span>
           </button>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Markdown from './Markdown.jsx'
 import { Icon } from './Icons.jsx'
+import { AgentGlyph } from './AgentIcons.jsx'
 import { api } from '../api.js'
 
 const TOOL_ICONS = {
@@ -66,7 +67,7 @@ function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, stre
     <div className='msg msg-assistant'>
       <div className='who'>
         {agent
-          ? <><span className='who-agent-emoji' style={{ '--ah': agent.hue ?? 258 }}>{agent.emoji || '🤖'}</span><span className='who-word'>{agent.name}</span></>
+          ? <><span className='who-agent-emoji' style={{ '--ah': agent.hue ?? 258, color: `oklch(0.7 0.16 ${agent.hue ?? 258})` }}><AgentGlyph agent={agent} size={14} /></span><span className='who-word'>{agent.name}</span></>
           : <><span className='logo-mark' aria-hidden /><span className='wordmark who-word'>Radiant</span></>}
         {model && <span className='who-model'>{model}</span>}
         {streaming && <span className='who-model'>· working</span>}
@@ -279,7 +280,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
                   <div className='welcome-agents'>
                     {agents.map(a => (
                       <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 258 }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
-                        <span className='agent-avatar'>{a.emoji || '🤖'}</span>
+                        <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={21} /></span>
                         <span className='welcome-agent-name'>{a.name}</span>
                       </button>
                     ))}

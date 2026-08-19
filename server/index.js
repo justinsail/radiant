@@ -172,12 +172,12 @@ app.get('/api/files', (req, res) => {
 
 // ---------- agents ----------
 app.post('/api/agents', (req, res) => {
-  const { name, emoji, hue, persona, model, provider, skills, useTools, computerControl } = req.body
+  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   config.agents = config.agents || []
   config.agents.push({
     id: 'ag-' + crypto.randomBytes(4).toString('hex'),
-    name, emoji: emoji || '🤖', hue: hue ?? 258, persona: persona || '',
+    name, emoji: emoji || '🤖', icon: icon || null, hue: hue ?? 258, persona: persona || '',
     model: model || null, provider: provider || null, skills: skills || [],
     useTools: useTools !== false, computerControl: Boolean(computerControl)
   })
@@ -188,7 +188,7 @@ app.post('/api/agents', (req, res) => {
 app.patch('/api/agents/:id', (req, res) => {
   const a = (config.agents || []).find(x => x.id === req.params.id)
   if (!a) return res.status(404).json({ error: 'not found' })
-  for (const k of ['name', 'emoji', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl']) {
+  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl']) {
     if (k in req.body) a[k] = req.body[k]
   }
   saveConfig(config)
