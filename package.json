@@ -1,6 +1,6 @@
 {
   "name": "radiant",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Radiant — a local coding harness: chat with coding agents across cloud and local models.",
   "author": "Tony Ricciardi",
@@ -11,8 +11,9 @@
     "dev": "concurrently -k -n server,ui \"node server/index.js\" \"vite --port 5833 --strictPort\"",
     "build": "vite build",
     "start": "NODE_ENV=production node server/index.js",
+    "compile:helper": "swiftc -O native/RadiantControl.swift -o native/radiant-control",
     "app": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --mac",
+    "dist": "npm run build && npm run compile:helper && electron-builder --mac",
     "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true"
   },
   "build": {
@@ -28,8 +29,15 @@
       "electron/**",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "native/radiant-control",
+        "to": "native/radiant-control"
+      }
+    ],
     "asarUnpack": [
-      "**/node_modules/node-pty/**"
+      "**/node_modules/node-pty/**",
+      "**/node_modules/playwright-core/**"
     ],
     "npmRebuild": false,
     "mac": {

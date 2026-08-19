@@ -21,7 +21,15 @@ export function helperAvailable () {
   try { return fs.existsSync(helperPath()) } catch { return false }
 }
 
+let ensuredExec = false
+function ensureExecutable () {
+  if (ensuredExec) return
+  try { fs.chmodSync(helperPath(), 0o755) } catch {}
+  ensuredExec = true
+}
+
 async function ctl (...args) {
+  ensureExecutable() // packaging can strip the exec bit off the bundled helper
   const { stdout } = await execFileP(helperPath(), args.map(String), { timeout: 15000 })
   return stdout.trim()
 }
