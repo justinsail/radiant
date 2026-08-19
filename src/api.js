@@ -39,7 +39,11 @@ export const api = {
   getVersion: () => json('GET', '/api/version'),
   updateCheck: () => json('GET', '/api/update-check'),
   computerStatus: () => json('GET', '/api/computer-status'),
-  quantizeCandidates: () => json('GET', '/api/quantize/candidates')
+  quantizeCandidates: () => json('GET', '/api/quantize/candidates'),
+  getUsage: () => json('GET', '/api/usage'),
+  addSkill: skill => json('POST', '/api/skills', skill),
+  updateSkill: (id, patch) => json('PATCH', `/api/skills/${id}`, patch),
+  deleteSkill: id => json('DELETE', `/api/skills/${id}`)
 }
 
 // POST /api/quantize streams progress lines back on the response body.

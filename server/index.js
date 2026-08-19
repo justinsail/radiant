@@ -103,6 +103,56 @@ app.post('/api/quantize', async (req, res) => {
   }
 })
 
+// ---------- usage / credits ----------
+app.get('/api/usage', async (req, res) => {
+  const out = []
+  // OpenRouter exposes remaining credits
+  if (config.keys.openrouter) {
+    try {
+      const r = await fetch('https://openrouter.ai/api/v1/credits', {
+        headers: { authorization: `Bearer ${config.keys.openrouter}` },
+        signal: AbortSignal.timeout(6000)
+      })
+      if (r.ok) {
+        const d = (await r.json()).data || {}
+        const remaining = (d.total_credits ?? 0) - (d.total_usage ?? 0)
+        out.push({ provider: 'openrouter', label: 'OpenRouter', kind: 'credits', remaining: +remaining.toFixed(2), used: +(d.total_usage ?? 0).toFixed(2), total: +(d.total_credits ?? 0).toFixed(2) })
+      }
+    } catch {}
+  }
+  // subscription sign-ins: limits aren't exposed via a stable API, note them
+  for (const id of ['anthropic', 'openai']) {
+    if (config.oauth[id]) out.push({ provider: id, label: id === 'anthropic' ? 'Claude' : 'ChatGPT', kind: 'subscription' })
+  }
+  res.json({ items: out })
+})
+
+// ---------- skills ----------
+app.post('/api/skills', (req, res) => {
+  const { name, description, content } = req.body
+  if (!name || !content) return res.status(400).json({ error: 'name and content required' })
+  config.skills = config.skills || []
+  config.skills.push({ id: 'sk-' + crypto.randomBytes(4).toString('hex'), name, description: description || '', content, enabled: true })
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+app.patch('/api/skills/:id', (req, res) => {
+  const sk = (config.skills || []).find(s => s.id === req.params.id)
+  if (!sk) return res.status(404).json({ error: 'not found' })
+  for (const k of ['name', 'description', 'content', 'enabled']) {
+    if (k in req.body) sk[k] = req.body[k]
+  }
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+app.delete('/api/skills/:id', (req, res) => {
+  config.skills = (config.skills || []).filter(s => s.id !== req.params.id)
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
 // ---------- computer control status ----------
 app.get('/api/computer-status', async (req, res) => {
   try {
@@ -413,6 +463,7 @@ app.post('/api/chat', async (req, res) => {
       session,
       useTools: session.useTools !== false,
       computerControl: Boolean(session.computerControl),
+      skills: (config.skills || []).filter(s => s.enabled),
       emit,
       requestApproval,
       signal: controller.signal

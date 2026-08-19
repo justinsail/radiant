@@ -274,6 +274,11 @@ code, pre, .mono { font-family: var(--font-mono); }
   font-size: 12px; font-weight: 500; text-align: center;
 }
 .update-pill:hover { background: var(--accent-dim); color: var(--on-accent); }
+.usage-chip { padding: 8px 14px 0; display: flex; flex-direction: column; gap: 3px; }
+.usage-line { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); }
+.usage-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.usage-dot.ok { background: var(--ok); }
+.usage-sub { color: var(--text-faint); font-size: 10px; font-family: var(--font-body); text-transform: uppercase; letter-spacing: 0.04em; }
 .sidebar-foot { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
 
 /* About pane */
@@ -699,6 +704,16 @@ input[type='range']::-webkit-slider-thumb {
   border: none; padding: 0; background: none; cursor: pointer; opacity: 0;
 }
 .accent-picker-text { display: flex; flex-direction: column; gap: 2px; }
+
+/* skills */
+.skill-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.skill-toggle { flex-shrink: 0; padding-top: 2px; }
+.skill-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+.skill-main { flex: 1; min-width: 0; }
+.skill-name { font-weight: 500; font-size: 13px; }
+.skill-body { font-size: 12px; color: var(--text-faint); margin-top: 2px; line-height: 1.45; }
+.skill-add { margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg); }
+.skill-add textarea { width: 100%; }
 
 .comp-stat { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12.5px; }
 .comp-stat .desc { color: var(--text-faint); font-size: 12px; }

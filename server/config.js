@@ -16,6 +16,11 @@ const DEFAULT_CONFIG = {
   ],
   keys: {},
   oauth: {},
+  skills: [
+    { id: 'seed-commits', name: 'Conventional commits', description: 'Commit messages in Conventional Commits format.', content: 'When writing git commit messages, use Conventional Commits format (feat:, fix:, docs:, refactor:, chore:, test:) — a concise summary line, and a short body only when it adds value.', enabled: false },
+    { id: 'seed-plan', name: 'Plan before acting', description: 'State a brief plan before non-trivial changes.', content: 'Before making non-trivial changes, state your plan in 1–2 sentences, then carry it out. Keep the user oriented on what you are about to do.', enabled: false },
+    { id: 'seed-minimal', name: 'Minimal diffs', description: 'Smallest change that solves the problem.', content: 'Make the smallest change that solves the problem. Match the surrounding code style and conventions. Do not refactor or reformat unrelated code.', enabled: false }
+  ],
   settings: {
     mode: 'dark',
     themeId: 'steel',
@@ -49,6 +54,7 @@ export function loadConfig () {
     }
     cfg.keys = saved.keys || {}
     cfg.oauth = saved.oauth || {}
+    if (saved.skills) cfg.skills = saved.skills
     cfg.settings = { ...cfg.settings, ...(saved.settings || {}) }
   } catch { /* first run */ }
   return cfg
@@ -67,6 +73,7 @@ export function publicConfig (cfg) {
       hasKey: p.auth === 'none' || Boolean(cfg.keys[p.id]),
       signedIn: Boolean(cfg.oauth[p.id])
     })),
+    skills: cfg.skills || [],
     settings: cfg.settings
   }
 }

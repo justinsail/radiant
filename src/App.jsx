@@ -190,7 +190,11 @@ export default function App () {
         onDelete={removeSession}
         onSettings={openSettings}
         mode={config.settings.mode}
-        onToggleMode={() => saveSettings({ mode: config.settings.mode === 'dark' ? 'light' : 'dark' })}
+        onToggleMode={() => {
+          const order = ['light', 'medium', 'dark']
+          const next = order[(order.indexOf(config.settings.mode) + 1) % 3] || 'dark'
+          saveSettings({ mode: next })
+        }}
         updateInfo={updateInfo}
         onUpdate={() => { if (window.radiantNative?.openSettings) window.radiantNative.openSettings('about'); else { setSettingsTab('about'); setSettingsOpen(true) } }}
       />

@@ -421,6 +421,59 @@ function ModelsPane ({ onModelsChanged }) {
   )
 }
 
+// ---------- Skills ----------
+
+function SkillsPane ({ config, onConfigChange }) {
+  const skills = config.skills || []
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [content, setContent] = useState('')
+
+  const toggle = async (id, enabled) => onConfigChange(await api.updateSkill(id, { enabled }))
+  const remove = async id => { if (window.confirm('Delete this skill?')) onConfigChange(await api.deleteSkill(id)) }
+  const add = async () => {
+    if (!name.trim() || !content.trim()) return
+    const cfg = await api.addSkill({ name: name.trim(), content: content.trim() })
+    setName(''); setContent(''); setAdding(false)
+    onConfigChange(cfg)
+  }
+
+  return (
+    <div className='set-section'>
+      <h3>Skills</h3>
+      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
+        Skills are reusable instructions the agent follows when enabled — coding conventions, a house
+        style, a workflow. Turn them on to add them to every session's guidance.
+      </p>
+
+      {skills.map(sk => (
+        <div key={sk.id} className='skill-row'>
+          <label className='skill-toggle'>
+            <input type='checkbox' checked={Boolean(sk.enabled)} onChange={e => toggle(sk.id, e.target.checked)} />
+          </label>
+          <div className='skill-main'>
+            <div className='skill-name'>{sk.name}</div>
+            <div className='skill-body'>{sk.description || sk.content}</div>
+          </div>
+          <button className='small-btn danger' onClick={() => remove(sk.id)} title='Delete skill'>✕</button>
+        </div>
+      ))}
+      {!skills.length && <div className='activity-empty' style={{ marginTop: 8 }}>No skills yet.</div>}
+
+      {adding
+        ? <div className='skill-add'>
+            <input className='text-input' style={{ fontFamily: 'inherit', marginBottom: 8 }} placeholder='Skill name (e.g. House style)' value={name} onChange={e => setName(e.target.value)} />
+            <textarea className='text-input' style={{ fontFamily: 'inherit', minHeight: 90, resize: 'vertical' }} placeholder='Instructions the agent should follow…' value={content} onChange={e => setContent(e.target.value)} />
+            <div className='row' style={{ marginTop: 8 }}>
+              <button className='small-btn primary' onClick={add} disabled={!name.trim() || !content.trim()}>Add skill</button>
+              <button className='small-btn' onClick={() => setAdding(false)}>Cancel</button>
+            </div>
+          </div>
+        : <button className='small-btn' style={{ marginTop: 12 }} onClick={() => setAdding(true)}>+ New skill</button>}
+    </div>
+  )
+}
+
 // ---------- Appearance ----------
 
 function AppearancePane ({ config, onSettings }) {
@@ -708,6 +761,7 @@ function AboutPane ({ config, onSettings }) {
 const TABS = [
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },
+  { id: 'skills', label: 'Skills' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'agent', label: 'Agent' },
   { id: 'about', label: 'About' }
@@ -732,6 +786,7 @@ export default function Settings ({ config, initialTab = 'providers', embedded =
         <div className='modal-body'>
           {tab === 'providers' && <ProvidersPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
+          {tab === 'skills' && <SkillsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
           {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
           {tab === 'about' && <AboutPane config={config} onSettings={onSettings} />}

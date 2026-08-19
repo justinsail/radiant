@@ -1,5 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Icon } from './Icons.jsx'
+import { api } from '../api.js'
+
+function UsageChip () {
+  const [items, setItems] = useState(null)
+  useEffect(() => {
+    let alive = true
+    const load = () => api.getUsage().then(u => { if (alive) setItems(u.items) }).catch(() => {})
+    load()
+    const t = setInterval(load, 5 * 60 * 1000)
+    return () => { alive = false; clearInterval(t) }
+  }, [])
+  const credits = items?.find(i => i.kind === 'credits')
+  const subs = (items || []).filter(i => i.kind === 'subscription')
+  if (!items || (!credits && !subs.length)) return null
+  return (
+    <div className='usage-chip' title={
+      (credits ? `${credits.label}: $${credits.remaining} left of $${credits.total} ($${credits.used} used)\n` : '') +
+      (subs.length ? subs.map(s => `${s.label}: subscription (usage limits not exposed)`).join('\n') : '')
+    }>
+      {credits && <span className='usage-line'><span className='usage-dot' /> ${credits.remaining} <span className='usage-sub'>OpenRouter</span></span>}
+      {subs.map(s => <span key={s.provider} className='usage-line'><span className='usage-dot ok' /> {s.label} <span className='usage-sub'>plan</span></span>)}
+    </div>
+  )
+}
 
 const MIN_W = 190
 const MAX_W = 460
@@ -66,10 +90,11 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
           ↑ Update to {updateInfo.latest}
         </button>
       )}
+      <UsageChip />
       <div className='sidebar-foot'>
         <button className='icon-btn' onClick={onSettings} title='Open settings'><Icon.settings /> Settings</button>
-        <button className='icon-btn' onClick={onToggleMode} title={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
-          {mode === 'light' ? <Icon.moon /> : <Icon.sun />}
+        <button className='icon-btn' onClick={onToggleMode} title={`Appearance: ${mode} — click to cycle light / medium / dark`}>
+          {mode === 'light' ? <Icon.sun /> : mode === 'medium' ? <Icon.contrast /> : <Icon.moon />}
         </button>
       </div>
       <div className='sidebar-resize' onMouseDown={startDrag} title='Drag to resize' />
