@@ -743,6 +743,8 @@ button.hf-head:hover { background: var(--bg-hover); }
   background: var(--bg-hover); overflow: hidden; display: inline-block;
 }
 .pull-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
+.pull-stop { border: none; background: none; color: var(--text-faint); font-size: 12px; padding: 0 2px; line-height: 1; }
+.pull-stop:hover { color: var(--danger); }
 
 /* subscription sign-in */
 .provider-row-wrap { border-bottom: 1px solid var(--border); }

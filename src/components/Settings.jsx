@@ -155,7 +155,7 @@ function fmtCount (n) {
   return String(n)
 }
 
-function HFRepoRow ({ repo, installedCheck, pulls, onPull, systemRam }) {
+function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam }) {
   const [open, setOpen] = useState(false)
   const [files, setFiles] = useState(null)
   const [failed, setFailed] = useState(false)
@@ -193,6 +193,7 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, systemRam }) {
                   ? <span className='pull-progress'>
                       <span className='pull-bar'><span style={{ width: (pct ?? 5) + '%' }} /></span>
                       {pct != null ? pct + '%' : (pull.status || 'starting…')}
+                      <button className='pull-stop' title='Stop download' onClick={() => onCancel(tag)}>✕</button>
                     </span>
                   : <button className='small-btn' onClick={() => onPull(tag)} disabled={fit === 'fit-no'}>Download</button>}
             </span>
@@ -287,6 +288,7 @@ function ModelsPane ({ onModelsChanged }) {
   const [hfError, setHfError] = useState(null)
   const [pulls, setPulls] = useState({}) // tag -> {status, completed, total}
   const pullsRef = useRef({})
+  const ctrlRef = useRef({}) // tag -> AbortController for in-flight downloads
   const hfTimer = useRef(null)
 
   useEffect(() => {
@@ -309,6 +311,8 @@ function ModelsPane ({ onModelsChanged }) {
   const isInstalled = tag => installedSet.has(tag) || installedSet.has(tag.replace(/:latest$/, ''))
 
   const startPull = async tag => {
+    const controller = new AbortController()
+    ctrlRef.current[tag] = controller
     pullsRef.current = { ...pullsRef.current, [tag]: { status: 'starting' } }
     setPulls({ ...pullsRef.current })
     try {
@@ -320,13 +324,21 @@ function ModelsPane ({ onModelsChanged }) {
           pullsRef.current = { ...pullsRef.current, [tag]: ev.status === 'done' ? undefined : ev }
         }
         setPulls({ ...pullsRef.current })
-      })
+      }, controller.signal)
+    } catch (e) {
+      // user-cancelled aborts throw AbortError — not a failure, don't alert
+      if (e.name !== 'AbortError') window.alert(`Download failed: ${e.message}`)
     } finally {
+      delete ctrlRef.current[tag]
       pullsRef.current = { ...pullsRef.current, [tag]: undefined }
       setPulls({ ...pullsRef.current })
       refreshLocal()
       onModelsChanged()
     }
+  }
+
+  const cancelPull = tag => {
+    ctrlRef.current[tag]?.abort()
   }
 
   const remove = async tag => {
@@ -398,6 +410,7 @@ function ModelsPane ({ onModelsChanged }) {
             installedCheck={tag => isInstalled(tag)}
             pulls={pulls}
             onPull={startPull}
+            onCancel={cancelPull}
             systemRam={system?.ramGB}
           />
         ))}

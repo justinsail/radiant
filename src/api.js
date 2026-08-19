@@ -67,11 +67,12 @@ export async function streamQuantize (body, onEvent) {
 }
 
 // POST /api/pull streams SSE progress events back on the response body.
-export async function streamPull (model, onEvent) {
+export async function streamPull (model, onEvent, signal) {
   const res = await fetch('/api/pull', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model })
+    body: JSON.stringify({ model }),
+    signal
   })
   if (!res.ok) throw new Error(`${res.status}`)
   const reader = res.body.getReader()

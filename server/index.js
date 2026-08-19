@@ -217,17 +217,14 @@ app.get('/api/registry-files', async (req, res) => {
     for (const s of data.siblings || []) {
       const f = s.rfilename
       if (!/\.gguf$/i.test(f)) continue
-      // skip vision projectors / adapters — they're companion files, not weights,
-      // and their tiny size mislabels the quant list (e.g. a 0.9 GB "F16")
-      if (/mmproj|projector|\bproj\b|lora|adapter/i.test(f)) continue
-      const parts = f.split('/')
-      let label = null
-      if (parts.length > 1 && /^(i?q\d|f16|f32|bf16)/i.test(parts[0])) label = parts[0]
-      else {
-        const m = f.match(/[.\-_](I?Q\d[\w]*?|F16|F32|BF16)(?:[.\-_]\d+-of-\d+)?\.gguf$/i)
-        label = m ? m[1] : 'default'
-      }
-      label = label.toUpperCase()
+      // only top-level, single-file quants are pullable via `ollama pull hf.co/…:TAG`.
+      // skip: subfolder files (shards + companion drafts like MTP/), sharded
+      // multi-part quants (Ollama can't pull those), and non-weight companions.
+      if (f.includes('/')) continue
+      if (/-\d+-of-\d+\.gguf$/i.test(f)) continue
+      if (/mmproj|projector|\bproj\b|lora|adapter|draft|\bmtp\b/i.test(f)) continue
+      const m = f.match(/[.\-_](I?Q\d[\w]*?|F16|F32|BF16)\.gguf$/i)
+      const label = (m ? m[1] : 'default').toUpperCase()
       quants[label] = quants[label] || { bytes: 0, files: 0 }
       quants[label].bytes += s.size || 0
       quants[label].files += 1
