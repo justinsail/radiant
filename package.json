@@ -1,6 +1,6 @@
 {
   "name": "radiant",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Radiant — a local coding harness: chat with coding agents across cloud and local models.",
   "author": "Tony Ricciardi",
@@ -23,6 +23,7 @@
       "output": "release",
       "buildResources": "build"
     },
+    "afterPack": "./build/afterPack.cjs",
     "files": [
       "dist/**",
       "server/**",

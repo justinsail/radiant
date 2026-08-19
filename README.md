@@ -28,9 +28,20 @@ terminal — all in one window.
 Grab `Radiant-<version>-arm64.dmg` from the releases (Apple Silicon), open it,
 and drag Radiant into Applications.
 
-The app is not code-signed, so on first launch macOS will warn you. Right-click
-Radiant.app → **Open** → **Open** (or allow it under System Settings → Privacy
-& Security). You only need to do this once.
+The app is not signed by Apple, so on first launch macOS blocks it. Drag
+Radiant to Applications, then **right-click Radiant → Open → Open** (or allow it
+under System Settings → Privacy & Security → "Open Anyway"). You only do this
+once.
+
+If macOS says **"Radiant is damaged and can't be opened"**, that's Gatekeeper on
+a downloaded unsigned app — the app is fine. Clear the quarantine flag once:
+
+```bash
+xattr -cr /Applications/Radiant.app
+```
+
+then open it normally. (Proper signing + notarization, which removes this step
+entirely, is planned.)
 
 Or build it yourself:
 
