@@ -23,7 +23,6 @@
       "output": "release",
       "buildResources": "build"
     },
-    "afterPack": "./build/afterPack.cjs",
     "files": [
       "dist/**",
       "server/**",
@@ -53,7 +52,11 @@
           "arch": "arm64"
         }
       ],
-      "identity": null,
+      "identity": "Anthony Ricciardi (5VY66S6G3M)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "icon": "build/icon.icns"
     }
   },
