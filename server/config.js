@@ -23,7 +23,7 @@ const DEFAULT_CONFIG = {
     { id: 'seed-minimal', name: 'Minimal diffs', description: 'Smallest change that solves the problem.', content: 'Make the smallest change that solves the problem. Match the surrounding code style and conventions. Do not refactor or reformat unrelated code.', enabled: false }
   ],
   agents: [
-    { id: 'agent-radiant', name: 'Radiant', emoji: '✦', icon: 'sparkles', hue: 258, persona: '', model: null, provider: null, skills: [], useTools: true, builtin: true },
+    { id: 'agent-radiant', name: 'Radiant', emoji: '✦', icon: 'radiant', hue: 258, persona: '', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-reviewer', name: 'Reviewer', emoji: '🔍', icon: 'search', hue: 25, persona: 'You are a meticulous senior code reviewer. Hunt for bugs, edge cases, security issues, race conditions, and unclear code. Be specific — cite files and lines. Prioritize correctness over style, and call out what you are NOT sure about.', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-architect', name: 'Architect', emoji: '📐', icon: 'compass', hue: 200, persona: 'You are a software architect. Before writing code, think about structure, boundaries, data flow, and tradeoffs. Propose a design, note alternatives, and only then implement. Favor simple, evolvable designs.', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-explainer', name: 'Explainer', emoji: '💡', icon: 'bulb', hue: 90, persona: 'You explain code and concepts clearly for someone learning. Use plain language, small examples, and analogies. Read the code first, then teach it top-down. Prefer clarity over completeness.', model: null, provider: null, skills: [], useTools: true, builtin: true },
@@ -66,7 +66,12 @@ export function loadConfig () {
     if (saved.agents) {
       // backfill new built-in fields (e.g. icon) onto saved built-in agents
       const defById = Object.fromEntries(cfg.agents.map(a => [a.id, a]))
-      cfg.agents = saved.agents.map(a => (a.builtin && defById[a.id]) ? { ...a, icon: a.icon || defById[a.id].icon } : a)
+      cfg.agents = saved.agents.map(a => {
+        if (!(a.builtin && defById[a.id])) return a
+        // one-time migration: the Radiant bot now wears the swirl logo, not sparkles
+        const icon = (a.id === 'agent-radiant' && a.icon === 'sparkles') ? 'radiant' : (a.icon || defById[a.id].icon)
+        return { ...a, icon }
+      })
     }
     if (saved.mcpServers) cfg.mcpServers = saved.mcpServers
     cfg.settings = { ...cfg.settings, ...(saved.settings || {}) }

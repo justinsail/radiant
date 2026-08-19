@@ -12,6 +12,8 @@ function S ({ children, size = 16 }) {
 
 // id -> render function. Keep these recognizable at 16px.
 export const AGENT_ICONS = {
+  // The Radiant / Templeton swirl mark, tinted to the agent's colour via the mask.
+  radiant: ({ size = 16 } = {}) => <span className='logo-mark' style={{ width: size, height: size, background: 'currentColor', verticalAlign: 'middle' }} aria-hidden />,
   bot: p => <S {...p}><rect x='4' y='8' width='16' height='12' rx='2' /><path d='M12 8V4M8 2h8M9 14h.01M15 14h.01' /></S>,
   sparkles: p => <S {...p}><path d='M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z' /></S>,
   code: p => <S {...p}><path d='M16 18l6-6-6-6M8 6l-6 6 6 6' /></S>,

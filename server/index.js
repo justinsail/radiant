@@ -386,9 +386,9 @@ app.get('/api/registry-files', async (req, res) => {
       // multi-part quants (Ollama can't pull those), and non-weight companions.
       if (f.includes('/')) continue
       if (/-\d+-of-\d+\.gguf$/i.test(f)) continue
-      if (/mmproj|projector|\bproj\b|lora|adapter|draft|\bmtp\b/i.test(f)) continue
-      const m = f.match(/[.\-_](I?Q\d[\w]*?|F16|F32|BF16)\.gguf$/i)
-      const label = (m ? m[1] : 'default').toUpperCase()
+      if (/mmproj|projector|\bproj\b|vision|\bclip\b|encoder|lora|adapter|draft|\bmtp\b/i.test(f)) continue
+      const m = f.match(/[.\-_](I?Q\d[\w]*?|F16|F32|BF16|FP16|FP32)\.gguf$/i)
+      const label = (m ? m[1] : 'default').toUpperCase().replace(/^FP(16|32)$/, 'F$1')
       quants[label] = quants[label] || { bytes: 0, files: 0 }
       quants[label].bytes += s.size || 0
       quants[label].files += 1
@@ -427,15 +427,65 @@ app.delete('/api/local-models/:name', async (req, res) => {
   }
 })
 
+// Ollama pulls `hf.co/repo:TAG` by matching TAG as a case-insensitive substring
+// of exactly one filename. It errors with a cryptic "file does not exist" when the
+// quant is only published as a multi-part split, when the file was renamed, or when
+// the tag matches more than one file. Preflight against HF so we can either fix the
+// tag or give the user an actionable message instead of Ollama's cryptic one.
+const IS_SHARD = f => /-\d+-of-\d+\.gguf$/i.test(f)
+const IS_COMPANION = f => /mmproj|projector|\bproj\b|vision|\bclip\b|encoder|lora|adapter|draft|\bmtp\b/i.test(f)
+const IS_SINGLE = f => !f.includes('/') && !IS_SHARD(f) && !IS_COMPANION(f)
+
+async function resolveHfPull (model) {
+  const m = model.match(/^hf\.co\/([\w.-]+\/[\w.-]+)(?::(.+))?$/i)
+  if (!m) return { model } // ollama library name, not an HF pull — pass through
+  const repo = m[1]
+  const tag = m[2] || null
+  let siblings
+  try {
+    const r = await fetch(`https://huggingface.co/api/models/${repo}?blobs=true`, { signal: AbortSignal.timeout(10000) })
+    if (!r.ok) return { model } // registry hiccup — let Ollama try anyway
+    siblings = ((await r.json()).siblings || []).map(s => s.rfilename).filter(f => /\.gguf$/i.test(f))
+  } catch { return { model } }
+  const single = siblings.filter(IS_SINGLE)
+  if (!tag) return single.length ? { model } : { error: `No downloadable single-file GGUF found in ${repo}.` }
+  const t = tag.toLowerCase()
+  const singleHits = single.filter(f => f.toLowerCase().includes(t))
+  // Ollama matches the tag against EVERY file in the repo (including shards). If a
+  // sharded set shares this tag, Ollama tries to pull the shards and fails with
+  // "sharded GGUF" — even when a valid single file also exists — so catch it here.
+  const shardHits = siblings.filter(f => IS_SHARD(f) && f.toLowerCase().includes(t))
+  if (shardHits.length) {
+    return { error: `“${tag}” is published as a multi-part sharded GGUF in ${repo}, which Ollama can’t download from the registry. Pick a single-file quantization (one without a “…-00001-of-000NN” split), or a different repo.` }
+  }
+  if (singleHits.length === 1) return { model } // unique single-file match — good to pull
+  if (singleHits.length > 1) {
+    // Ambiguous among single files: find the shortest unique substring tag.
+    const exact = singleHits.find(f => new RegExp(`[.\\-_]${t}\\.gguf$`, 'i').test(f)) || singleHits.sort((a, b) => a.length - b.length)[0]
+    const stem = exact.replace(/\.gguf$/i, '')
+    for (let n = 2; n <= 5; n++) {
+      const sub = stem.split(/[.\-_]/).slice(-n).join('-')
+      if (single.filter(f => f.toLowerCase().includes(sub.toLowerCase())).length === 1) {
+        return { model: `hf.co/${repo}:${sub}`, note: `Matched ${exact}` }
+      }
+    }
+    return { error: `“${tag}” matches ${singleHits.length} files in ${repo} and Ollama can’t tell them apart. Pick a more specific quantization.` }
+  }
+  return { error: `No “${tag}” GGUF in ${repo}. It may be a projector/adapter or was renamed — collapse and reopen the repo to refresh the list.` }
+}
+
 // pull a model through Ollama, streaming progress back as SSE
 app.post('/api/pull', async (req, res) => {
-  const { model } = req.body
+  let { model } = req.body
   if (!model || !/^[\w.\/:-]+$/.test(model)) return res.status(400).json({ error: 'bad model tag' })
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
   const emit = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`)
   const controller = new AbortController()
   res.on('close', () => { if (!res.writableEnded) controller.abort() })
   try {
+    const resolved = await resolveHfPull(model)
+    if (resolved.error) { emit({ error: resolved.error }); return }
+    if (resolved.model !== model) { model = resolved.model; emit({ status: resolved.note || `resolved to ${model}` }) }
     const r = await fetch(`${OLLAMA}/api/pull`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -456,7 +506,11 @@ app.post('/api/pull', async (req, res) => {
         if (!line.trim()) continue
         try {
           const j = JSON.parse(line)
-          emit({ status: j.status, completed: j.completed, total: j.total, error: j.error })
+          // Enrich Ollama's cryptic "file does not exist" with what it usually means.
+          const err = j.error && /file does not exist|does not exist|not found/i.test(j.error)
+            ? `${j.error} — this quant may be split-only or renamed on Hugging Face. Try a different quantization or repo.`
+            : j.error
+          emit({ status: j.status, completed: j.completed, total: j.total, error: err })
         } catch {}
       }
     }

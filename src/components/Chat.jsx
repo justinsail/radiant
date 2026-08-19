@@ -235,26 +235,6 @@ export default function Chat ({ session, live, approval, usage, error, models, a
   }
 
   // voice dictation via the Web Speech API
-  const [listening, setListening] = useState(false)
-  const recogRef = useRef(null)
-  const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
-  const toggleVoice = () => {
-    if (!SpeechRec) return
-    if (listening) { recogRef.current?.stop(); return }
-    const r = new SpeechRec()
-    r.continuous = true; r.interimResults = true; r.lang = 'en-US'
-    let base = draft ? draft + ' ' : ''
-    r.onresult = e => {
-      let txt = ''
-      for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript
-      setDraft(base + txt)
-    }
-    r.onend = () => setListening(false)
-    r.onerror = () => setListening(false)
-    recogRef.current = r
-    r.start(); setListening(true)
-  }
-
   const submit = () => {
     const text = draft.trim()
     if ((!text && !attachments.length) || streaming || !session) return
@@ -419,9 +399,6 @@ export default function Chat ({ session, live, approval, usage, error, models, a
               onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
             />
             <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images'><Icon.plus size={17} /></button>
-            {SpeechRec && (
-              <button className={'attach-btn' + (listening ? ' listening' : '')} onClick={toggleVoice} title={listening ? 'Stop dictation' : 'Dictate with your voice'}><Icon.mic size={16} /></button>
-            )}
             <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
             <button
               className={'pill-toggle' + (toolsOn ? ' on' : '')}
