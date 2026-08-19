@@ -257,6 +257,23 @@ async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, too
 // to chatgpt.com/backend-api/codex/responses using the Responses API shape plus a
 // ChatGPT-Account-ID header. We mirror that. (Unofficial — same client as Codex.)
 const CHATGPT_BASE = 'https://chatgpt.com/backend-api/codex'
+const CODEX_CLIENT_VERSION = '0.146.0'
+const CHATGPT_DEFAULT_MODEL = 'gpt-5.6-sol'
+
+// Live model list for a ChatGPT subscription (the Codex backend renames models
+// often — gpt-5-codex/gpt-5 are retired; current ids are gpt-5.6-sol etc.).
+async function chatgptModels (accessToken, accountId) {
+  try {
+    const r = await fetch(`${CHATGPT_BASE}/models?client_version=${CODEX_CLIENT_VERSION}`, {
+      headers: { authorization: `Bearer ${accessToken}`, 'chatgpt-account-id': accountId || '', originator: 'codex_cli_rs', 'openai-beta': 'responses=experimental', accept: 'application/json' },
+      signal: AbortSignal.timeout(6000)
+    })
+    if (!r.ok) return null
+    const data = await r.json()
+    const list = (data.models || []).filter(m => m.supported_in_api && m.visibility === 'list').map(m => ({ id: m.slug, label: m.display_name || m.slug }))
+    return list.length ? list : null
+  } catch { return null }
+}
 
 function toResponsesInput (messages) {
   const input = []
@@ -279,8 +296,10 @@ function toResponsesInput (messages) {
 }
 
 async function chatgptRound ({ accessToken, accountId, model, messages, system, tools, toolDefs, emit, signal }) {
-  // The Codex backend for a ChatGPT account only accepts the Codex model.
-  const useModel = /codex/i.test(model) ? model : 'gpt-5-codex'
+  // The Codex backend rejects retired ids (gpt-5, gpt-5-codex, gpt-5.1…); remap
+  // those to the current default. Live ids (gpt-5.6-sol, gpt-5.5, …) pass through.
+  const retired = /codex|^gpt-5$|^gpt-5\.1$|^gpt-4/i.test(model)
+  const useModel = (!model || retired) ? CHATGPT_DEFAULT_MODEL : model
   const body = { model: useModel, instructions: system, input: toResponsesInput(messages), store: false, stream: true }
   if (tools) body.tools = (toolDefs || TOOL_DEFS).map(t => ({ type: 'function', name: t.name, description: t.description, parameters: t.input_schema, strict: false }))
   const headers = {
@@ -434,15 +453,19 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
 // reachable with an OAuth token (e.g. ChatGPT). Keeps the picker usable.
 const SUBSCRIPTION_MODELS = {
   anthropic: ['claude-opus-4-1', 'claude-sonnet-4-5', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
-  // ChatGPT-subscription traffic goes through the Codex backend, which for a
-  // ChatGPT account only accepts the Codex model (plain gpt-5 is rejected: 400
-  // "not supported when using Codex with a ChatGPT account").
-  openai: ['gpt-5-codex']
+  // Fallback only. The real ChatGPT-subscription model list is fetched live from
+  // the Codex backend (chatgptModels); it uses rolling codenames like gpt-5.6-sol
+  // and rejects the old gpt-5 / gpt-5-codex ids outright.
+  openai: ['gpt-5.6-sol']
 }
 
 // ---------- model listing ----------
 // apiKey OR accessToken (OAuth subscription). For OAuth, auth is Bearer.
-export async function listModels (provider, apiKey, accessToken) {
+export async function listModels (provider, apiKey, accessToken, accountId) {
+  // ChatGPT subscription: fetch the live Codex model list (rolling codenames)
+  if (provider.id === 'openai' && accessToken && !apiKey) {
+    return (await chatgptModels(accessToken, accountId)) || fallback(provider, accessToken, apiKey)
+  }
   try {
     if (provider.type === 'anthropic') {
       const headers = { 'anthropic-version': '2023-06-01' }

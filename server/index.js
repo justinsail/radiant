@@ -448,7 +448,7 @@ app.get('/api/models', async (req, res) => {
     const hasOAuth = Boolean(config.oauth[p.id])
     if (p.auth === 'key' && !hasKey && !hasOAuth) return []
     const accessToken = hasOAuth ? await validAccessToken(p.id, config, saveConfig).catch(() => null) : null
-    const models = await listModels(p, config.keys[p.id], accessToken)
+    const models = await listModels(p, config.keys[p.id], accessToken, hasOAuth ? config.oauth[p.id]?.accountId : null)
     models.sort((a, b) => a.id.localeCompare(b.id))
     return models.map(m => ({ ...m, provider: p.id, providerName: p.name }))
   }))
