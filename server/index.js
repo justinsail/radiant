@@ -28,6 +28,17 @@ let config = loadConfig()
 const activeTurns = new Map() // sessionId -> { controller }
 const pendingApprovals = new Map() // callId -> resolve(bool)
 
+// Reload config from disk before handling config-touching requests, so a second
+// instance (or a stale in-memory copy) can't clobber another's keys/oauth when
+// it saves. Skips long-lived streams that captured config at their start.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') &&
+      !/^\/api\/(chat|pull|quantize|abort|approve)/.test(req.path)) {
+    config = loadConfig()
+  }
+  next()
+})
+
 // ---------- config ----------
 app.get('/api/config', (req, res) => res.json(publicConfig(config)))
 
@@ -159,8 +170,11 @@ app.post('/api/oauth/:id/signout', (req, res) => {
 // ---------- models ----------
 app.get('/api/models', async (req, res) => {
   const results = await Promise.all(config.providers.map(async p => {
-    if (p.auth === 'key' && !config.keys[p.id]) return []
-    const models = await listModels(p, config.keys[p.id])
+    const hasKey = Boolean(config.keys[p.id])
+    const hasOAuth = Boolean(config.oauth[p.id])
+    if (p.auth === 'key' && !hasKey && !hasOAuth) return []
+    const accessToken = hasOAuth ? await validAccessToken(p.id, config, saveConfig).catch(() => null) : null
+    const models = await listModels(p, config.keys[p.id], accessToken)
     models.sort((a, b) => a.id.localeCompare(b.id))
     return models.map(m => ({ ...m, provider: p.id, providerName: p.name }))
   }))
@@ -346,6 +360,7 @@ app.delete('/api/sessions/:id', (req, res) => {
 
 // ---------- chat (SSE) ----------
 app.post('/api/chat', async (req, res) => {
+  config = loadConfig() // see the latest keys/oauth before the turn
   const { sessionId, content } = req.body
   const session = loadSession(sessionId)
   if (!session) return res.status(404).json({ error: 'session not found' })

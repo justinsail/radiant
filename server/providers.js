@@ -302,25 +302,43 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, sessio
   emit({ type: 'done' })
 }
 
+// Fallback model lists for subscription sign-ins whose model endpoints aren't
+// reachable with an OAuth token (e.g. ChatGPT). Keeps the picker usable.
+const SUBSCRIPTION_MODELS = {
+  anthropic: ['claude-opus-4-1', 'claude-sonnet-4-5', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
+  openai: ['gpt-5', 'gpt-5-codex', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'o4-mini']
+}
+
 // ---------- model listing ----------
-export async function listModels (provider, apiKey) {
-  const headers = {}
+// apiKey OR accessToken (OAuth subscription). For OAuth, auth is Bearer.
+export async function listModels (provider, apiKey, accessToken) {
   try {
     if (provider.type === 'anthropic') {
-      const res = await fetch(`${provider.baseUrl}/v1/models?limit=100`, {
-        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        signal: AbortSignal.timeout(6000)
-      })
-      if (!res.ok) return []
+      const headers = { 'anthropic-version': '2023-06-01' }
+      if (accessToken) { headers.authorization = `Bearer ${accessToken}`; headers['anthropic-beta'] = 'oauth-2025-04-20' }
+      else headers['x-api-key'] = apiKey
+      const res = await fetch(`${provider.baseUrl}/v1/models?limit=100`, { headers, signal: AbortSignal.timeout(6000) })
+      if (!res.ok) return fallback(provider, accessToken)
       const data = await res.json()
-      return (data.data || []).map(m => ({ id: m.id, label: m.display_name || m.id }))
+      const list = (data.data || []).map(m => ({ id: m.id, label: m.display_name || m.id }))
+      return list.length ? list : fallback(provider, accessToken)
     }
-    if (apiKey) headers.authorization = `Bearer ${apiKey}`
+    const headers = {}
+    const bearer = accessToken || apiKey
+    if (bearer) headers.authorization = `Bearer ${bearer}`
     const res = await fetch(`${provider.baseUrl}/models`, { headers, signal: AbortSignal.timeout(6000) })
-    if (!res.ok) return []
+    if (!res.ok) return fallback(provider, accessToken)
     const data = await res.json()
-    return (data.data || []).map(m => ({ id: m.id, label: m.name || m.id }))
+    const list = (data.data || []).map(m => ({ id: m.id, label: m.name || m.id }))
+    return list.length ? list : fallback(provider, accessToken)
   } catch {
-    return [] // provider offline / unreachable
+    return fallback(provider, accessToken)
   }
+}
+
+function fallback (provider, accessToken) {
+  if (accessToken && SUBSCRIPTION_MODELS[provider.id]) {
+    return SUBSCRIPTION_MODELS[provider.id].map(id => ({ id, label: id }))
+  }
+  return []
 }

@@ -1,7 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('radiantNative', {
-  setMode: mode => ipcRenderer.send('radiant:set-mode', mode)
+  setMode: mode => ipcRenderer.send('radiant:set-mode', mode),
+  openSettings: tab => ipcRenderer.send('rad:open-settings', tab),
+  closeSettings: () => ipcRenderer.send('rad:close-settings'),
+  onSettingsClosed: cb => {
+    const h = () => cb()
+    ipcRenderer.on('rad:settings-closed', h)
+    return () => ipcRenderer.removeListener('rad:settings-closed', h)
+  }
 })
 
 // auto-updater bridge (only present in the packaged app)

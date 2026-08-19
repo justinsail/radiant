@@ -22,8 +22,29 @@ process.on('uncaughtException', e => console.error('[radiant] uncaught:', e))
 process.on('unhandledRejection', e => console.error('[radiant] unhandled rejection:', e))
 
 let win = null
+let settingsWin = null
 let serverPort = null
 let updater = null
+
+ipcMain.on('rad:open-settings', async (e, tab) => {
+  const port = await ensureServer()
+  const hash = 'settings' + (tab ? '/' + tab : '')
+  if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.focus(); if (tab) settingsWin.loadURL(`http://127.0.0.1:${port}/#${hash}`); return }
+  settingsWin = new BrowserWindow({
+    width: 940, height: 720, minWidth: 720, minHeight: 520,
+    title: 'Radiant Settings',
+    backgroundColor: nativeTheme.themeSource === 'light' ? '#f5f5f6' : '#141517',
+    parent: win || undefined,
+    webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') }
+  })
+  settingsWin.on('closed', () => {
+    settingsWin = null
+    if (win && !win.isDestroyed()) win.webContents.send('rad:settings-closed')
+  })
+  settingsWin.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' } })
+  settingsWin.loadURL(`http://127.0.0.1:${port}/#${hash}`)
+})
+ipcMain.on('rad:close-settings', () => { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.close() })
 
 async function ensureServer () {
   if (serverPort) return serverPort

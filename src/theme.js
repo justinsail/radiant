@@ -88,7 +88,6 @@ export function applyTheme (settings) {
   const tint = settings.bgTint != null ? settings.bgTint : (preset ? preset.tint : 1)
   const mode = ['light', 'medium', 'dark'].includes(settings.mode) ? settings.mode : 'dark'
   root.dataset.mode = mode
-  root.dataset.animatedBg = settings.animatedBg ? 'on' : 'off'
   // window chrome (Electron) only knows light/dark — medium reads as dark
   if (window.radiantNative) window.radiantNative.setMode(mode === 'light' ? 'light' : 'dark')
   root.style.setProperty('--accent-h', String(hue))

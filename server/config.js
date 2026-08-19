@@ -24,7 +24,7 @@ const DEFAULT_CONFIG = {
     fontFamily: 'inter',
     uiScale: 1,
     customTint: 1,
-    animatedBg: false,
+    motionBg: 'off',
     approveCommands: true,
     autoUpdateCheck: true,
     defaultModel: null,

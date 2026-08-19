@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar.jsx'
 import Chat from './components/Chat.jsx'
 import RightPanel from './components/RightPanel.jsx'
 import Settings from './components/Settings.jsx'
+import MotionBackground from './components/MotionBackground.jsx'
 
 export default function App () {
   const [config, setConfig] = useState(null)
@@ -43,6 +44,20 @@ export default function App () {
     setConfig(cfg)
     applyTheme(cfg.settings)
   }
+
+  const openSettings = () => {
+    if (window.radiantNative?.openSettings) window.radiantNative.openSettings()
+    else setSettingsOpen(true)
+  }
+
+  // when the separate settings window closes, pull in any changes it made
+  useEffect(() => {
+    if (!window.radiantNative?.onSettingsClosed) return
+    return window.radiantNative.onSettingsClosed(() => {
+      api.getConfig().then(cfg => { setConfig(cfg); applyTheme(cfg.settings) }).catch(() => {})
+      refreshModels()
+    })
+  }, [refreshModels])
 
   const openSession = async id => {
     const s = await api.getSession(id)
@@ -165,11 +180,7 @@ export default function App () {
 
   return (
     <div className='app'>
-      {config.settings.animatedBg && (
-        <div className='aurora' aria-hidden>
-          <span className='aurora-blob b1' /><span className='aurora-blob b2' /><span className='aurora-blob b3' />
-        </div>
-      )}
+      <MotionBackground kind={config.settings.motionBg} />
       <Sidebar
         sessions={sessions}
         activeId={session?.id}
@@ -177,11 +188,11 @@ export default function App () {
         onOpen={openSession}
         onNew={newSession}
         onDelete={removeSession}
-        onSettings={() => setSettingsOpen(true)}
+        onSettings={openSettings}
         mode={config.settings.mode}
         onToggleMode={() => saveSettings({ mode: config.settings.mode === 'dark' ? 'light' : 'dark' })}
         updateInfo={updateInfo}
-        onUpdate={() => { setSettingsTab('about'); setSettingsOpen(true) }}
+        onUpdate={() => { if (window.radiantNative?.openSettings) window.radiantNative.openSettings('about'); else { setSettingsTab('about'); setSettingsOpen(true) } }}
       />
       <Chat
         rightOpen={rightOpen}

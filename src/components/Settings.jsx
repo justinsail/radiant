@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { api, streamPull, streamQuantize } from '../api.js'
 import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
+import { MOTIONS } from './MotionBackground.jsx'
 import { Icon } from './Icons.jsx'
 
 // ---------- Providers ----------
@@ -499,10 +500,14 @@ function AppearancePane ({ config, onSettings }) {
         </span>
       </div>
 
-      <label className='check-row' style={{ marginTop: 14 }}>
-        <input type='checkbox' checked={Boolean(s.animatedBg)} onChange={e => preview({ animatedBg: e.target.checked })} />
-        <span>Animated background <span className='desc'>— a slow aurora drift behind the app (respects reduced-motion)</span></span>
-      </label>
+      <div className='sub-label'>Animated background</div>
+      <div className='accent-picker' style={{ gap: 10 }}>
+        <select className='text-input' style={{ fontFamily: 'inherit', maxWidth: 240 }}
+          value={s.motionBg || 'off'} onChange={e => preview({ motionBg: e.target.value })}>
+          {MOTIONS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <span style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>Moving backdrop behind the app (respects reduced-motion)</span>
+      </div>
 
       <div className='sub-label'>Font</div>
       <div className='theme-grid'>
@@ -708,32 +713,36 @@ const TABS = [
   { id: 'about', label: 'About' }
 ]
 
-export default function Settings ({ config, initialTab = 'providers', onClose, onSettings, onConfigChange, onModelsChanged }) {
+export default function Settings ({ config, initialTab = 'providers', embedded = false, onClose, onSettings, onConfigChange, onModelsChanged }) {
   const [tab, setTab] = useState(initialTab)
-  return (
-    <div className='modal-backdrop' onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className='modal wide' role='dialog' aria-label='Settings'>
-        <div className='modal-head'>
-          Settings
-          <button className='icon-btn' onClick={onClose} title='Close settings'><Icon.close /></button>
-        </div>
-        <div className='modal-split'>
-          <nav className='set-nav'>
-            {TABS.map(t => (
-              <button key={t.id} className={'set-nav-item' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
-          <div className='modal-body'>
-            {tab === 'providers' && <ProvidersPane config={config} onConfigChange={onConfigChange} />}
-            {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
-            {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
-            {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
-            {tab === 'about' && <AboutPane config={config} onSettings={onSettings} />}
-          </div>
+  const body = (
+    <div className={'modal wide' + (embedded ? ' embedded' : '')} role='dialog' aria-label='Settings'>
+      <div className='modal-head'>
+        Settings
+        {!embedded && <button className='icon-btn' onClick={onClose} title='Close settings'><Icon.close /></button>}
+      </div>
+      <div className='modal-split'>
+        <nav className='set-nav'>
+          {TABS.map(t => (
+            <button key={t.id} className={'set-nav-item' + (tab === t.id ? ' active' : '')} onClick={() => setTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+        <div className='modal-body'>
+          {tab === 'providers' && <ProvidersPane config={config} onConfigChange={onConfigChange} />}
+          {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
+          {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
+          {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
+          {tab === 'about' && <AboutPane config={config} onSettings={onSettings} />}
         </div>
       </div>
+    </div>
+  )
+  if (embedded) return body
+  return (
+    <div className='modal-backdrop' onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      {body}
     </div>
   )
 }
