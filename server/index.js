@@ -77,6 +77,7 @@ function hostAddresses () {
 // in-flight turn state
 const activeTurns = new Map() // sessionId -> { controller }
 const pendingApprovals = new Map() // callId -> resolve(bool)
+const pendingQuestions = new Map() // questionId -> resolve(answer string)
 
 // Reload config from disk before handling config-touching requests, so a second
 // instance (or a stale in-memory copy) can't clobber another's keys/oauth when
@@ -805,9 +806,10 @@ app.get('/api/sessions/:id', (req, res) => {
 app.patch('/api/sessions/:id', (req, res) => {
   const s = loadSession(req.params.id)
   if (!s) return res.status(404).json({ error: 'not found' })
-  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'pinned']) {
+  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'pinned', 'planMode']) {
     if (k in req.body) s[k] = req.body[k]
   }
+  if ('title' in req.body) s.autoTitle = false // manual rename pins the title
   saveSession(s)
   res.json(s)
 })
@@ -859,8 +861,10 @@ app.post('/api/chat', async (req, res) => {
   const text = typeof content === 'string' ? content : (content.text || '')
   const attachments = (typeof content === 'object' && content.attachments) || []
   session.messages.push({ role: 'user', text, attachments })
-  if (session.messages.length === 1) {
+  if (session.messages.length === 1 && session.autoTitle !== false) {
+    // instant placeholder; upgraded to a nicer title after the turn (see below)
     session.title = text.length > 48 ? text.slice(0, 48) + '…' : (text || `${attachments.length} file(s)`)
+    session.autoTitle = true
     emit({ type: 'title', title: session.title })
   }
   saveSession(session)
@@ -878,6 +882,14 @@ app.post('/api/chat', async (req, res) => {
     setTimeout(() => {
       if (pendingApprovals.delete(call.id)) resolve(false)
     }, 10 * 60 * 1000)
+  })
+
+  // pause the turn and ask the user a multiple-choice question (ask_user tool)
+  const requestUserChoice = (question, options) => new Promise(resolve => {
+    const id = crypto.randomUUID()
+    pendingQuestions.set(id, resolve)
+    emit({ type: 'question_request', id, question, options: Array.isArray(options) ? options : [] })
+    setTimeout(() => { if (pendingQuestions.delete(id)) resolve('(no answer — the user did not respond in time)') }, 10 * 60 * 1000)
   })
 
   // let this agent consult the OTHER agents (peers) via the ask_agent tool
@@ -924,13 +936,16 @@ app.post('/api/chat', async (req, res) => {
       callMcp,
       askAgent,
       peerAgents,
+      planMode: Boolean(session.planMode),
+      onPlanExit: () => { session.planMode = false; emit({ type: 'plan_mode', on: false }) },
       emit,
       requestApproval,
+      requestUserChoice,
       signal: controller.signal
     })
     // auto-title a still-unnamed session from its first user message
     const firstUser = session.messages.find(m => m.role === 'user')
-    if (firstUser?.text && (!session.title || /^new session$/i.test(session.title)) && !controller.signal.aborted) {
+    if (firstUser?.text && session.autoTitle !== false && !controller.signal.aborted) {
       const clean = s => (s || '').replace(/\s+/g, ' ').trim().replace(/^["'#\s]+|["'.…\s]+$/g, '').slice(0, 56)
       // fast heuristic fallback: first several words of the request
       let t = clean(firstUser.text.split(' ').slice(0, 8).join(' '))
@@ -972,6 +987,13 @@ app.post('/api/approve', (req, res) => {
     pendingApprovals.delete(id)
     resolve(Boolean(approved))
   }
+  res.json({ ok: true })
+})
+
+app.post('/api/answer-question', (req, res) => {
+  const { id, answer } = req.body
+  const resolve = pendingQuestions.get(id)
+  if (resolve) { pendingQuestions.delete(id); resolve(String(answer ?? '')) }
   res.json({ ok: true })
 })
 

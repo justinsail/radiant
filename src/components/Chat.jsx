@@ -65,6 +65,25 @@ function Deliverables ({ parts }) {
   )
 }
 
+// the agent paused to ask the user something (ask_user / plan approval)
+function QuestionCard ({ question, onAnswer }) {
+  const [other, setOther] = useState('')
+  return (
+    <div className='question-card'>
+      <div className='q'>{question.question}</div>
+      <div className='question-options'>
+        {(question.options || []).map((o, i) => (
+          <button key={i} className='small-btn primary' onClick={() => onAnswer(o)}>{o}</button>
+        ))}
+      </div>
+      <div className='question-other'>
+        <input placeholder='Or type your own answer…' value={other} onChange={e => setOther(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && other.trim()) onAnswer(other.trim()) }} />
+        <button className='small-btn' onClick={() => other.trim() && onAnswer(other.trim())} disabled={!other.trim()}>Send</button>
+      </div>
+    </div>
+  )
+}
+
 const TOOL_ICONS = {
   run_command: '⌘',
   read_file: '≡',
@@ -257,7 +276,7 @@ function readFileAsAttachment (file) {
 
 const MenuIcon = () => <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'><path d='M4 6h16M4 12h16M4 18h16' /></svg>
 
-export default function Chat ({ session, live, todos = [], approval, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+export default function Chat ({ session, live, todos = [], approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
@@ -402,6 +421,7 @@ export default function Chat ({ session, live, todos = [], approval, usage, erro
               </div>
             </div>
           )}
+          {question && <QuestionCard question={question} onAnswer={onAnswer} />}
           {error && <div className='error-note'>⚠ {error}</div>}
         </div>
       </div>
@@ -482,6 +502,13 @@ export default function Chat ({ session, live, todos = [], approval, usage, erro
               data-tip={'Computer control: let the model drive the\nbrowser & desktop (needs a vision model +\nmacOS permissions). Click to turn ' + (session.computerControl ? 'off' : 'on') + '.'}
             >
               🖥 computer {session.computerControl ? 'on' : 'off'}
+            </button>
+            <button
+              className={'pill-toggle' + (session.planMode ? ' on' : '')}
+              onClick={onTogglePlan}
+              data-tip={'Plan mode: the agent researches and proposes a\nplan for your approval before changing anything.\nClick to turn ' + (session.planMode ? 'off' : 'on') + '.'}
+            >
+              📋 plan {session.planMode ? 'on' : 'off'}
             </button>
             <div className='grow' />
             {usage && (usage.input || usage.output) ? (

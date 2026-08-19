@@ -5,8 +5,11 @@ import { COMPUTER_TOOL_DEFS, COMPUTER_TOOL_NAMES, COMPUTER_SAFE, runComputerTool
 
 const MAX_ROUNDS = 30
 
-function systemPrompt (cwd, useTools, model, computerControl, skills, persona) {
+function systemPrompt (cwd, useTools, model, computerControl, skills, persona, planMode) {
   const personaText = persona ? `\n\n${persona}` : ''
+  const planText = planMode
+    ? '\n\nPLAN MODE IS ON. Do NOT edit files, create files, or run mutating commands yet. Research the codebase (read/list/grep only), think through the approach, then present a concrete step-by-step plan by calling the exit_plan_mode tool with your plan in markdown. Only after the user approves the plan will you be able to make changes.'
+    : ''
   const skillText = (skills && skills.length)
     ? `\n\nActive skills (follow these):\n${skills.map(s => `• ${s.name}: ${s.content}`).join('\n')}`
     : ''
@@ -14,7 +17,7 @@ function systemPrompt (cwd, useTools, model, computerControl, skills, persona) {
 Workspace directory: ${cwd}
 ${useTools ? 'You have tools to read, write, and edit files and to run shell commands in the workspace. Use them to investigate before answering and to make changes when asked. Prefer edit_file for small changes and write_file for new files. After making changes, verify them when practical (run the code, run tests).' : 'Tools are disabled for this conversation; answer from knowledge and the conversation only.'}${computerControl ? `
 You can also control the computer. browser_* tools drive an automated browser; screen_* tools control the whole desktop. ALWAYS take a screenshot first (browser_screenshot / screen_screenshot) and look at it before clicking or typing — click coordinates are pixel positions read from the most recent screenshot. Work in small steps: screenshot, act, screenshot again to confirm. Prefer browser_* for web tasks.` : ''}
-Be direct and concise. Use markdown; fence code blocks with a language tag. When you finish a task, summarize what changed in a sentence or two.${skillText}`
+Be direct and concise. Use markdown; fence code blocks with a language tag. When you finish a task, summarize what changed in a sentence or two.${planText}${skillText}`
 }
 
 // ---------- internal message format -> provider wire formats ----------
@@ -362,10 +365,33 @@ function askAgentToolDef (peers) {
   }
 }
 
+const ASK_USER_TOOL = {
+  name: 'ask_user',
+  description: 'Ask the user a question and pause until they answer. Use this when a decision is genuinely theirs (ambiguous requirements, a fork with real tradeoffs) rather than guessing. Prefer offering a few concrete options.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      question: { type: 'string', description: 'The question to ask' },
+      options: { type: 'array', items: { type: 'string' }, description: 'A few concrete choices (optional). The user may also type their own answer.' }
+    },
+    required: ['question']
+  }
+}
+
+const EXIT_PLAN_TOOL = {
+  name: 'exit_plan_mode',
+  description: 'Call this when your plan is ready, to present it to the user for approval. Pass the full plan as markdown. If approved, plan mode turns off and you may start making changes; if not, incorporate their feedback and keep planning.',
+  input_schema: {
+    type: 'object',
+    properties: { plan: { type: 'string', description: 'The step-by-step plan, in markdown' } },
+    required: ['plan']
+  }
+}
+
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, mcpTools, callMcp, askAgent, peerAgents, emit, requestApproval, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, emit, requestApproval, requestUserChoice, signal }) {
   const cwd = session.cwd || os.homedir()
-  const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona)
+  const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona, planMode)
   const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
 
@@ -378,7 +404,9 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
     ...TOOL_DEFS,
     ...(computerControl ? COMPUTER_TOOL_DEFS : []),
     ...(mcpTools || []),
-    ...(canAskAgents ? [askAgentToolDef(peerAgents)] : [])
+    ...(canAskAgents ? [askAgentToolDef(peerAgents)] : []),
+    ...(requestUserChoice ? [ASK_USER_TOOL] : []),
+    ...(planMode ? [EXIT_PLAN_TOOL] : [])
   ]
 
   let toolsEnabled = useTools
@@ -441,6 +469,19 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
         const done = todos.filter(t => t.status === 'done').length
         part.result = `Todo list updated (${done}/${todos.length} done).`
         part.hidden = true // shown as the checklist widget, not a tool chip
+      } else if (call.name === 'ask_user' && requestUserChoice) {
+        const answer = await requestUserChoice(call.args?.question || 'Which option?', call.args?.options)
+        part.result = `The user answered: ${answer}`
+      } else if (call.name === 'exit_plan_mode') {
+        const choice = await (requestUserChoice
+          ? requestUserChoice(`Approve this plan?\n\n${call.args?.plan || ''}`, ['Approve & build', 'Keep planning'])
+          : Promise.resolve('Approve & build'))
+        if (/approve/i.test(choice)) {
+          if (onPlanExit) onPlanExit()
+          part.result = 'Plan approved. Plan mode is now OFF — proceed with the implementation.'
+        } else {
+          part.result = `The user wants to keep refining the plan${choice && !/keep planning/i.test(choice) ? `: ${choice}` : ''}. Stay in plan mode and revise.`
+        }
       } else if (call.name === 'ask_agent') {
         emit({ type: 'notice', text: `Consulting ${call.args?.agent || 'another agent'}…` })
         part.result = await askAgent(call.args?.agent, call.args?.question)

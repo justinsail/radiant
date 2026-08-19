@@ -29,6 +29,7 @@ export default function App () {
   const [compareOpen, setCompareOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // mobile sidebar drawer
   const [todos, setTodos] = useState([]) // agent checklist for the active session
+  const [question, setQuestion] = useState(null) // { id, question, options } when the agent asks
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
@@ -70,6 +71,7 @@ export default function App () {
     const s = await api.getSession(id)
     setSession(s)
     setTodos(s.todos || [])
+    setQuestion(null)
     setError(null)
     if (streamingSessionRef.current !== id) { setLive(null); setApproval(null) }
   }
@@ -85,6 +87,7 @@ export default function App () {
     const s = await api.createSession(body)
     setSession(s)
     setTodos([])
+    setQuestion(null)
     setLive(null)
     setApproval(null)
     setError(null)
@@ -171,6 +174,8 @@ export default function App () {
             break
           }
           case 'approval_request': setApproval({ id: ev.id, name: ev.name, args: ev.args }); break
+          case 'question_request': setQuestion({ id: ev.id, question: ev.question, options: ev.options || [] }); break
+          case 'plan_mode': setSession(s => (s && s.id === sessionId ? { ...s, planMode: ev.on } : s)); break
           case 'usage': setUsage(u => ({ input: ev.input ?? u?.input, output: ev.output ?? u?.output })); break
           case 'notice': liveMsg.parts.push({ type: 'notice', text: ev.text }); break
           case 'todos': setTodos(ev.todos || []); break
@@ -262,6 +267,9 @@ export default function App () {
         onPickModel={m => patchSession({ provider: m.provider, model: m.id })}
         onToggleTools={() => patchSession({ useTools: !(session.useTools !== false) })}
         onToggleComputer={() => patchSession({ computerControl: !session.computerControl })}
+        onTogglePlan={() => patchSession({ planMode: !session.planMode })}
+        question={question}
+        onAnswer={answer => { if (question) { api.answerQuestion(question.id, answer).catch(() => {}); setQuestion(null) } }}
         onSetCwd={cwd => patchSession({ cwd })}
         onNew={newSession}
         onRefreshModels={refreshModels}

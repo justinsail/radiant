@@ -556,13 +556,19 @@ code, pre, .mono { font-family: var(--font-mono); }
 }
 
 /* approval card */
-.approval-card {
+.approval-card, .question-card {
   border: 1px solid var(--border-strong);
   background: var(--bg-panel);
   box-shadow: var(--shadow-sm);
   border-radius: 12px;
   padding: 12px 14px; margin: 10px 0;
 }
+.question-card { border-color: var(--accent-dim); }
+.question-card .q { font-weight: 500; font-size: 13px; margin-bottom: 10px; white-space: pre-wrap; }
+.question-options { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.question-other { display: flex; gap: 8px; }
+.question-other input { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); outline: none; font-size: 12.5px; }
+.question-other input:focus { border-color: var(--accent); }
 .approval-card .q { font-weight: 500; margin-bottom: 8px; font-size: 13px; }
 .approval-card code {
   display: block; background: var(--bg-input); border: 1px solid var(--border);
