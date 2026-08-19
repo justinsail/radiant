@@ -414,6 +414,11 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
   let lastSig = null
   let repeatCount = 0
   const REPEAT_NUDGES = { 3: 'stop and re-read the last result — this exact call has produced the same output 3 times', 5: 'you are stuck in a loop (5 identical calls). Change your approach or explain what is blocking you', 8: 'STOP repeating this call (8 times). Do something different or tell the user you are blocked' }
+  // per-session stats (folded into session.stats)
+  const stats = session.stats || { turns: 0, inTokens: 0, outTokens: 0, llmMs: 0, toolMs: 0 }
+  stats.turns += 1
+  const emitS = ev => { if (ev.type === 'usage') { stats.inTokens += ev.input || 0; stats.outTokens += ev.output || 0 } emit(ev) }
+  const finishStats = () => { session.stats = stats; emit({ type: 'stats', stats }) }
   for (let round = 0; round < MAX_ROUNDS; round++) {
     emit({ type: 'round_start', round })
     const args = {
@@ -424,16 +429,18 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
       system,
       tools: toolsEnabled,
       toolDefs,
-      emit,
+      emit: emitS,
       signal
     }
     let result
+    const roundStart = Date.now()
     try {
       result = provider.type === 'anthropic'
         ? await anthropicRound({ ...args, messages: toAnthropic(session.messages) })
         : useChatgpt
           ? await chatgptRound({ ...args, accountId, messages: session.messages })
           : await openaiRound({ ...args, messages: toOpenAI(session.messages, system) })
+      stats.llmMs += Date.now() - roundStart
     } catch (e) {
       // Model doesn't support tools (common with local models) -> retry once without them.
       if (toolsEnabled && round === 0 && /tool/i.test(e.message) && /support|invalid|unknown|400/i.test(e.message)) {
@@ -448,8 +455,9 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
     for (const p of result.parts) {
       if (p.type === 'text') assistant.parts.push(p)
     }
-    if (!toolParts.length || !result.stopOnTools) { emit({ type: 'done' }); return }
+    if (!toolParts.length || !result.stopOnTools) { finishStats(); emit({ type: 'done' }); return }
 
+    const toolLoopStart = Date.now()
     for (const call of toolParts) {
       const part = { type: 'tool', id: call.id, name: call.name, args: call.args }
       assistant.parts.push(part)
@@ -501,7 +509,9 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
       if (REPEAT_NUDGES[repeatCount]) part.result = `[reminder: ${REPEAT_NUDGES[repeatCount]}]\n\n${part.result ?? ''}`
       emit({ type: 'tool_result', id: call.id, result: part.result, denied: !approved, hasImage: Boolean(part.resultImage) })
     }
+    stats.toolMs += Date.now() - toolLoopStart
   }
+  finishStats()
   emit({ type: 'notice', text: `Stopped after ${MAX_ROUNDS} tool rounds.` })
   emit({ type: 'done' })
 }

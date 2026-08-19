@@ -1073,7 +1073,80 @@ function DevicesPane () {
   )
 }
 
+const GUIDE = [
+  {
+    title: 'Chat & agents',
+    items: [
+      ['Agents', 'Named personas with their own model, personality, and skills. Pick one from the welcome screen; the Agents sidebar view groups your sessions by agent. Edit them in Settings → Agents.'],
+      ['Agents consult each other', 'Any agent can call the ask_agent tool to get a second opinion from another agent (e.g. Reviewer asks Architect) and fold the answer in.'],
+      ['Plan mode (📋)', 'Toggle it in the composer. The agent researches and proposes a step-by-step plan for your approval before changing anything — then builds once you approve.'],
+      ['The agent can ask you', 'When a decision is genuinely yours, the agent pauses and asks a multiple-choice question (you can also type your own answer) instead of guessing.'],
+      ['Task checklists', 'On multi-step work the agent keeps a live to-do list above the composer (done / in-progress / pending).'],
+      ['Files changed', 'After a turn, the files the agent created or edited appear as clickable chips — click to open them.'],
+      ['Loop-breaker', 'If an agent gets stuck repeating the same action, Radiant nudges it to change approach — without blocking legitimate repeats.'],
+      ['Auto titles', 'New chats name themselves from your first message. Rename to pin your own title.']
+    ]
+  },
+  {
+    title: 'Models & providers',
+    items: [
+      ['Subscriptions', 'Sign in with your Claude, ChatGPT, or Nous Portal subscription (Settings → Providers) — no API key needed. Or paste an API key for any provider.'],
+      ['Any OpenAI-compatible provider', 'Add Groq, Mistral, Together, a remote server, etc. with a name + base URL.'],
+      ['Local models', 'Run models from Ollama or LM Studio with no key. Search Hugging Face and download GGUFs straight from Settings → Models.'],
+      ['Compare', 'Run one prompt against two models side by side (command palette → Compare).']
+    ]
+  },
+  {
+    title: 'Tools the agent can use',
+    items: [
+      ['Files & commands', 'Read, write, and edit files and run shell commands in the workspace folder. Toggle with the “tools” pill; command runs ask for approval.'],
+      ['Background jobs', 'Long builds, test watchers, and dev servers run in the background so the agent keeps working and checks on them.'],
+      ['Terminal', 'A real terminal in the activity panel (top-right icon).'],
+      ['Computer control (🖥)', 'Let a vision model drive the browser and desktop (needs macOS permissions).'],
+      ['MCP', 'Connect Model Context Protocol servers in Settings → MCP to give agents extra tools.'],
+      ['Skills', 'Drop a skill file into Settings → Skills (or type one) to inject house rules / instructions the agent follows.']
+    ]
+  },
+  {
+    title: 'Your devices',
+    items: [
+      ['One server, all your devices', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share on my network) and connect your other Macs and phone to it — they share the same agents, models, and sessions.'],
+      ['On your phone', 'Open the host’s address in Safari (over Tailscale) and Add to Home Screen — it installs like an app.']
+    ]
+  },
+  {
+    title: 'Look & feel',
+    items: [
+      ['Themes', 'A dozen palettes plus a custom accent, in light / medium / dark (bottom-left toggle).'],
+      ['Motion backgrounds', 'Ten animated backgrounds in Settings → Appearance.'],
+      ['Usage meters', 'Live remaining quota for your subscriptions and OpenRouter balance at the bottom of the sidebar.'],
+      ['Command palette', 'Press ⌘K for quick actions, model switching, and jumping between sessions.']
+    ]
+  }
+]
+
+function GuidePane () {
+  return (
+    <div className='set-section guide'>
+      <h3>Read me — what Radiant can do</h3>
+      <p className='hint' style={{ marginTop: 0 }}>A quick tour of the features. Everything here is configured in the other tabs.</p>
+      {GUIDE.map(sec => (
+        <div key={sec.title} className='guide-section'>
+          <div className='guide-title'>{sec.title}</div>
+          {sec.items.map(([name, desc]) => (
+            <div key={name} className='guide-item'>
+              <span className='guide-name'>{name}</span>
+              <span className='guide-desc'>{desc}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const TABS = [
+  { id: 'guide', label: 'Read me' },
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },
   { id: 'agents', label: 'Agents' },
@@ -1102,6 +1175,7 @@ export default function Settings ({ config, initialTab = 'providers', embedded =
           ))}
         </nav>
         <div className='modal-body'>
+          {tab === 'guide' && <GuidePane />}
           {tab === 'providers' && <ProvidersPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
           {tab === 'agents' && <AgentsPane config={config} onConfigChange={onConfigChange} />}

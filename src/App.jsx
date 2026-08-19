@@ -30,6 +30,7 @@ export default function App () {
   const [navOpen, setNavOpen] = useState(false) // mobile sidebar drawer
   const [todos, setTodos] = useState([]) // agent checklist for the active session
   const [question, setQuestion] = useState(null) // { id, question, options } when the agent asks
+  const [stats, setStats] = useState(null) // cumulative session stats
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
@@ -71,6 +72,7 @@ export default function App () {
     const s = await api.getSession(id)
     setSession(s)
     setTodos(s.todos || [])
+    setStats(s.stats || null)
     setQuestion(null)
     setError(null)
     if (streamingSessionRef.current !== id) { setLive(null); setApproval(null) }
@@ -88,6 +90,7 @@ export default function App () {
     setSession(s)
     setTodos([])
     setQuestion(null)
+    setStats(null)
     setLive(null)
     setApproval(null)
     setError(null)
@@ -176,6 +179,7 @@ export default function App () {
           case 'approval_request': setApproval({ id: ev.id, name: ev.name, args: ev.args }); break
           case 'question_request': setQuestion({ id: ev.id, question: ev.question, options: ev.options || [] }); break
           case 'plan_mode': setSession(s => (s && s.id === sessionId ? { ...s, planMode: ev.on } : s)); break
+          case 'stats': setStats(ev.stats); break
           case 'usage': setUsage(u => ({ input: ev.input ?? u?.input, output: ev.output ?? u?.output })); break
           case 'notice': liveMsg.parts.push({ type: 'notice', text: ev.text }); break
           case 'todos': setTodos(ev.todos || []); break
@@ -256,6 +260,7 @@ export default function App () {
         agents={config.agents || []}
         session={session}
         todos={todos}
+        stats={stats}
         live={live}
         approval={approval}
         usage={usage}

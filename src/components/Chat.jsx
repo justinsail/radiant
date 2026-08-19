@@ -276,7 +276,19 @@ function readFileAsAttachment (file) {
 
 const MenuIcon = () => <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'><path d='M4 6h16M4 12h16M4 18h16' /></svg>
 
-export default function Chat ({ session, live, todos = [], approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+const fmtTok = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n || 0)
+
+function StatsChip ({ stats }) {
+  if (!stats || !stats.turns) return null
+  const secs = Math.round((stats.llmMs + stats.toolMs) / 1000)
+  return (
+    <span className='stats-chip' title={`This session\n${stats.turns} turn(s)\n${stats.inTokens} in / ${stats.outTokens} out tokens\nLLM: ${(stats.llmMs / 1000).toFixed(1)}s · tools: ${(stats.toolMs / 1000).toFixed(1)}s`}>
+      {stats.turns}⟳ · {fmtTok(stats.inTokens + stats.outTokens)} tok · {secs}s
+    </span>
+  )
+}
+
+export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
@@ -367,6 +379,7 @@ export default function Chat ({ session, live, todos = [], approval, question, o
         <button className='menu-btn' onClick={onMenu} title='Menu' aria-label='Open menu'><MenuIcon /></button>
         <div className='title'>{session.title}</div>
         <div className='spacer' />
+        <StatsChip stats={stats} />
         <button
           className='cwd-chip'
           title={`Workspace folder for this session (the agent reads/writes here):\n${session.cwd}\nClick to change`}

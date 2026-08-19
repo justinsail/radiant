@@ -1,8 +1,24 @@
 import fs from 'fs'
 import path from 'path'
-import { execFile } from 'child_process'
+import crypto from 'crypto'
+import { execFile, spawn } from 'child_process'
 
 const MAX_OUTPUT = 40_000
+
+// background jobs (run_command with run_in_background:true). id -> job
+const jobs = new Map()
+function newJob (command, cwd) {
+  const id = 'job_' + crypto.randomBytes(3).toString('hex')
+  const proc = spawn('bash', ['-lc', command], { cwd, detached: false })
+  const job = { id, command, output: '', done: false, exitCode: null, startedAt: Date.now(), proc }
+  const cap = d => { job.output = (job.output + d.toString()).slice(-200_000) }
+  proc.stdout.on('data', cap)
+  proc.stderr.on('data', cap)
+  proc.on('close', code => { job.done = true; job.exitCode = code; job.proc = null })
+  proc.on('error', e => { job.output += `\n[spawn error: ${e.message}]`; job.done = true; job.exitCode = -1; job.proc = null })
+  jobs.set(id, job)
+  return id
+}
 
 // Tool definitions in a neutral shape; providers.js converts per API.
 export const TOOL_DEFS = [
@@ -56,12 +72,30 @@ export const TOOL_DEFS = [
   },
   {
     name: 'run_command',
-    description: 'Run a shell command in the workspace directory with bash. Output is truncated to 40000 characters. Timeout 120s.',
+    description: 'Run a shell command in the workspace directory with bash. Output is truncated to 40000 characters. Timeout 120s. For long-running commands (builds, test watchers, dev servers), set run_in_background:true to get a job id back immediately and keep working.',
     input_schema: {
       type: 'object',
-      properties: { command: { type: 'string', description: 'The bash command to run' } },
+      properties: {
+        command: { type: 'string', description: 'The bash command to run' },
+        run_in_background: { type: 'boolean', description: 'Run detached and return a job id immediately instead of waiting (for builds, servers, watchers).' }
+      },
       required: ['command']
     }
+  },
+  {
+    name: 'job_output',
+    description: 'Get the current output and status of a background job started with run_command(run_in_background:true).',
+    input_schema: { type: 'object', properties: { id: { type: 'string', description: 'The job id' } }, required: ['id'] }
+  },
+  {
+    name: 'job_list',
+    description: 'List background jobs and whether each is still running.',
+    input_schema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'job_kill',
+    description: 'Stop a background job.',
+    input_schema: { type: 'object', properties: { id: { type: 'string', description: 'The job id' } }, required: ['id'] }
   },
   {
     name: 'todo_write',
@@ -136,6 +170,10 @@ export async function runTool (name, input, cwd) {
         return `Replaced ${input.replace_all ? count : 1} occurrence(s) in ${file}`
       }
       case 'run_command': {
+        if (input.run_in_background) {
+          const id = newJob(input.command, cwd)
+          return `Started in the background as ${id}. Use job_output("${id}") to check on it, job_kill("${id}") to stop it.`
+        }
         return await new Promise(resolve => {
           execFile('bash', ['-c', input.command], { cwd, timeout: 120_000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
             let out = ''
@@ -146,6 +184,22 @@ export async function runTool (name, input, cwd) {
             resolve(truncate(out || '(no output)'))
           })
         })
+      }
+      case 'job_output': {
+        const job = jobs.get(input.id)
+        if (!job) return `No job ${input.id}. Use job_list to see running jobs.`
+        const status = job.done ? `finished (exit ${job.exitCode})` : 'still running'
+        return truncate(`[job ${job.id} — ${status}]\n${job.output || '(no output yet)'}`)
+      }
+      case 'job_list': {
+        if (!jobs.size) return 'No background jobs.'
+        return [...jobs.values()].map(j => `${j.id}  ${j.done ? `done(${j.exitCode})` : 'running'}  ${j.command.slice(0, 60)}`).join('\n')
+      }
+      case 'job_kill': {
+        const job = jobs.get(input.id)
+        if (!job) return `No job ${input.id}.`
+        if (job.proc) { try { job.proc.kill('SIGKILL') } catch {} }
+        return `Killed ${input.id}.`
       }
       default:
         return `Error: unknown tool ${name}`
