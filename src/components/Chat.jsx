@@ -59,12 +59,14 @@ function ThinkingTrace ({ thinking, active, seconds }) {
   )
 }
 
-function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming }) {
+function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming, model }) {
   return (
     <div className='msg msg-assistant'>
       <div className='who'>
         <span className='logo-mark' aria-hidden />
-        Radiant{streaming ? ' · working' : ''}
+        <span className='wordmark who-word'>Radiant</span>
+        {model && <span className='who-model'>{model}</span>}
+        {streaming && <span className='who-model'>· working</span>}
       </div>
       {thinking ? <ThinkingTrace thinking={thinking} active={Boolean(thinkingActive)} seconds={thinkingSecs} /> : null}
       {parts.map((p, i) => {
@@ -161,10 +163,8 @@ export default function Chat ({ session, live, approval, usage, error, models, o
         <div className='chat-scroll'>
           <div className='welcome'>
             <div className='logo-mark big-mark' aria-hidden />
-            <h1>Bright ideas, <em>shipped</em></h1>
-            <p>Radiant is your local coding harness — cloud models or your own, side by side.</p>
-            <p className='hint'>Start a session, pick a model, and put an agent to work in any folder on this Mac.</p>
-            <p style={{ marginTop: 24 }}>
+            <div className='wordmark welcome-word'>Radiant</div>
+            <p style={{ marginTop: 28 }}>
               <button className='small-btn primary' onClick={onNew}>Start a session</button>
             </p>
           </div>
@@ -198,10 +198,11 @@ export default function Chat ({ session, live, approval, usage, error, models, o
           {session.messages.map((m, i) =>
             m.role === 'user'
               ? <div key={i} className='msg msg-user'><div className='bubble'>{m.text}</div></div>
-              : <AssistantMessage key={i} parts={m.parts || []} />
+              : <AssistantMessage key={i} parts={m.parts || []} model={m.model} />
           )}
           {live && (
             <AssistantMessage
+              model={session.model}
               parts={live.parts}
               thinking={live.thinking}
               thinkingActive={live.thinkingActive}

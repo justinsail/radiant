@@ -29,7 +29,9 @@ export const api = {
   getSystem: () => json('GET', '/api/system'),
   getCatalog: () => json('GET', '/api/catalog'),
   getLocalModels: () => json('GET', '/api/local-models'),
-  deleteLocalModel: name => json('DELETE', `/api/local-models/${encodeURIComponent(name)}`)
+  deleteLocalModel: name => json('DELETE', `/api/local-models/${encodeURIComponent(name)}`),
+  registrySearch: q => json('GET', `/api/registry-search?q=${encodeURIComponent(q)}`),
+  registryFiles: repo => json('GET', `/api/registry-files?repo=${encodeURIComponent(repo)}`)
 }
 
 // POST /api/pull streams SSE progress events back on the response body.

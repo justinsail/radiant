@@ -5,7 +5,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
     <nav className='sidebar'>
       <div className='brand'>
         <div className={'logo-mark brand-mark' + (working ? ' working' : '')} aria-hidden />
-        Radiant
+        <span className='wordmark brand-word'>Radiant</span>
       </div>
       <button className='new-session' onClick={onNew}>+ New session</button>
       <div className='session-list'>

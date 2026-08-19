@@ -3,8 +3,8 @@ import { TOOL_DEFS, runTool } from './tools.js'
 
 const MAX_ROUNDS = 30
 
-function systemPrompt (cwd, useTools) {
-  return `You are Radiant, a coding agent running on the user's ${os.type() === 'Darwin' ? 'Mac' : os.type()} (${os.platform()} ${os.release()}).
+function systemPrompt (cwd, useTools, model) {
+  return `You are a coding agent running inside Radiant, a local coding harness on the user's ${os.type() === 'Darwin' ? 'Mac' : os.type()} (${os.platform()} ${os.release()}). Radiant is the app, not you: you are the model "${model}". If asked what model you are, answer with your actual model name and maker.
 Workspace directory: ${cwd}
 ${useTools ? 'You have tools to read, write, and edit files and to run shell commands in the workspace. Use them to investigate before answering and to make changes when asked. Prefer edit_file for small changes and write_file for new files. After making changes, verify them when practical (run the code, run tests).' : 'Tools are disabled for this conversation; answer from knowledge and the conversation only.'}
 Be direct and concise. Use markdown; fence code blocks with a language tag. When you finish a task, summarize what changed in a sentence or two.`
@@ -173,8 +173,8 @@ async function openaiRound ({ baseUrl, apiKey, model, messages, tools, emit, sig
 // ---------- the agent loop ----------
 export async function runTurn ({ provider, model, apiKey, session, useTools, emit, requestApproval, signal }) {
   const cwd = session.cwd || os.homedir()
-  const system = systemPrompt(cwd, useTools)
-  const assistant = { role: 'assistant', parts: [] }
+  const system = systemPrompt(cwd, useTools, model)
+  const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
 
   let toolsEnabled = useTools

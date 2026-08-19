@@ -63,6 +63,7 @@ app.get('/api/models', async (req, res) => {
   const results = await Promise.all(config.providers.map(async p => {
     if (p.auth === 'key' && !config.keys[p.id]) return []
     const models = await listModels(p, config.keys[p.id])
+    models.sort((a, b) => a.id.localeCompare(b.id))
     return models.map(m => ({ ...m, provider: p.id, providerName: p.name }))
   }))
   res.json(results.flat())
@@ -87,6 +88,59 @@ app.get('/api/system', (req, res) => {
 })
 
 app.get('/api/catalog', (req, res) => res.json(CATALOG))
+
+// live registry search: GGUF repos on Hugging Face, pullable via `ollama pull hf.co/{repo}:{quant}`
+app.get('/api/registry-search', async (req, res) => {
+  const q = String(req.query.q || '').slice(0, 100)
+  try {
+    const url = `https://huggingface.co/api/models?filter=gguf&sort=downloads&direction=-1&limit=30${q ? `&search=${encodeURIComponent(q)}` : ''}`
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) })
+    if (!r.ok) throw new Error(`registry ${r.status}`)
+    const data = await r.json()
+    res.json(data.map(m => ({
+      id: m.id,
+      downloads: m.downloads || 0,
+      likes: m.likes || 0,
+      updatedAt: m.lastModified
+    })))
+  } catch (e) {
+    res.status(502).json({ error: e.message })
+  }
+})
+
+app.get('/api/registry-files', async (req, res) => {
+  const repo = String(req.query.repo || '')
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return res.status(400).json({ error: 'bad repo' })
+  try {
+    const r = await fetch(`https://huggingface.co/api/models/${repo}?blobs=true`, { signal: AbortSignal.timeout(10000) })
+    if (!r.ok) throw new Error(`registry ${r.status}`)
+    const data = await r.json()
+    const quants = {} // label -> {bytes, files}
+    for (const s of data.siblings || []) {
+      const f = s.rfilename
+      if (!/\.gguf$/i.test(f)) continue
+      const parts = f.split('/')
+      let label = null
+      if (parts.length > 1 && /^(i?q\d|f16|f32|bf16)/i.test(parts[0])) label = parts[0]
+      else {
+        const m = f.match(/[.\-_](I?Q\d[\w]*?|F16|F32|BF16)(?:[.\-_]\d+-of-\d+)?\.gguf$/i)
+        label = m ? m[1] : 'default'
+      }
+      label = label.toUpperCase()
+      quants[label] = quants[label] || { bytes: 0, files: 0 }
+      quants[label].bytes += s.size || 0
+      quants[label].files += 1
+    }
+    res.json({
+      repo,
+      quants: Object.entries(quants)
+        .map(([label, v]) => ({ label, sizeGB: +(v.bytes / 1024 ** 3).toFixed(1), files: v.files }))
+        .sort((a, b) => a.sizeGB - b.sizeGB)
+    })
+  } catch (e) {
+    res.status(502).json({ error: e.message })
+  }
+})
 
 app.get('/api/local-models', async (req, res) => {
   try {
