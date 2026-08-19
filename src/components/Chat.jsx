@@ -209,7 +209,9 @@ function readFileAsAttachment (file) {
   })
 }
 
-export default function Chat ({ session, live, approval, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight }) {
+const MenuIcon = () => <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'><path d='M4 6h16M4 12h16M4 18h16' /></svg>
+
+export default function Chat ({ session, live, approval, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
@@ -262,6 +264,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
   if (!session) {
     return (
       <main className='main'>
+        <button className='menu-btn' onClick={onMenu} title='Menu' aria-label='Open menu'><MenuIcon /></button>
         <div className='float-toggle'>
           <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel'} data-tip-below><Icon.panel /></button>
         </div>
@@ -296,6 +299,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
   return (
     <main className='main'>
       <div className='topbar'>
+        <button className='menu-btn' onClick={onMenu} title='Menu' aria-label='Open menu'><MenuIcon /></button>
         <div className='title'>{session.title}</div>
         <div className='spacer' />
         <button

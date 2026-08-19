@@ -27,6 +27,7 @@ export default function App () {
   const [updateInfo, setUpdateInfo] = useState(null) // {latest, dmgUrl} when an update exists
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false) // mobile sidebar drawer
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
@@ -215,14 +216,15 @@ export default function App () {
   }
 
   return (
-    <div className='app'>
+    <div className={'app' + (navOpen ? ' nav-open' : '')}>
       <MotionBackground kind={config.settings.motionBg} />
+      <div className='nav-backdrop' onClick={() => setNavOpen(false)} />
       <Sidebar
         sessions={sessions}
         activeId={session?.id}
         working={Boolean(live?.streaming)}
-        onOpen={openSession}
-        onNew={newSession}
+        onOpen={id => { openSession(id); setNavOpen(false) }}
+        onNew={(...a) => { newSession(...a); setNavOpen(false) }}
         onDelete={removeSession}
         onRename={renameSession}
         onPin={pinSession}
@@ -240,6 +242,7 @@ export default function App () {
       <Chat
         rightOpen={rightOpen}
         onToggleRight={() => setRightOpen(o => !o)}
+        onMenu={() => setNavOpen(true)}
         agents={config.agents || []}
         session={session}
         live={live}

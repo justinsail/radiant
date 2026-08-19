@@ -16,6 +16,12 @@ function UsageChip () {
   const subs = (items || []).filter(i => i.kind === 'subscription')
   if (!items || (!credits && !subs.length)) return null
   const fmtReset = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) }
+  const resetShort = iso => {
+    const d = new Date(iso); if (isNaN(d)) return ''
+    const now = new Date()
+    const time = d.toLocaleTimeString([], { hour: 'numeric', minute: d.getMinutes() ? '2-digit' : undefined })
+    return d.toDateString() === now.toDateString() ? time : d.toLocaleDateString([], { weekday: 'short' }) + ' ' + time
+  }
   const subTitle = s => {
     if (!s.windows?.length) return `${s.label}: signed in (usage not reported)`
     return `${s.label}:\n` + s.windows.map(w => `  ${w.name}: ${w.usedPct != null ? w.usedPct + '% used' : 'active'}${w.resetAt ? ` · resets ${fmtReset(w.resetAt)}` : ''}`).join('\n')
@@ -26,10 +32,13 @@ function UsageChip () {
       {subs.map(s => {
         const primary = s.windows?.[0]
         const pct = primary?.usedPct
+        const reset = primary?.resetAt ? resetShort(primary.resetAt) : ''
         return (
-          <span key={s.provider} className='usage-line' title={subTitle(s)}>
+          <span key={s.provider} className='usage-line sub' title={subTitle(s)}>
             <span className={'usage-dot' + (pct != null && pct >= 90 ? ' warn' : ' ok')} /> {s.label}
-            <span className='usage-sub'>{pct != null ? `${pct}% used` : 'plan'}</span>
+            <span className='usage-sub'>
+              {pct != null ? `${pct}%` : 'plan'}{reset ? <span className='usage-reset'> · ↻ {reset}</span> : ''}
+            </span>
           </span>
         )
       })}
