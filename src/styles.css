@@ -242,6 +242,19 @@ code, pre, .mono { font-family: var(--font-mono); }
   .brand-mark.working { animation: none; filter: drop-shadow(0 0 5px var(--accent)); }
 }
 
+.sidebar-switch { display: flex; gap: 3px; margin: 0 12px 8px; padding: 3px; background: var(--bg-input); border-radius: 9px; }
+.sidebar-switch button { flex: 1; padding: 5px; border: none; border-radius: 6px; background: none; color: var(--text-muted); font-size: 12px; font-weight: 500; }
+.sidebar-switch button.on { background: var(--bg-raised); color: var(--text); box-shadow: var(--shadow-sm); }
+
+.bot-group { margin-bottom: 8px; }
+.bot-head { display: flex; align-items: center; gap: 7px; padding: 6px 10px 4px; }
+.bot-head-icon { display: inline-flex; }
+.bot-head-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bot-head-count { font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); }
+.bot-new { border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); width: 20px; height: 20px; border-radius: 6px; font-size: 14px; line-height: 1; display: grid; place-items: center; }
+.bot-new:hover { border-color: var(--accent-dim); color: var(--accent); }
+.bot-group .session-item { margin-left: 8px; }
+
 .new-session {
   margin: 2px 12px 10px;
   padding: 8px 12px;
@@ -784,6 +797,11 @@ input[type='range']::-webkit-slider-thumb {
 .welcome-agent-name { font-size: 12px; font-weight: 500; }
 
 /* skills */
+.skill-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 20px; margin-bottom: 14px; border: 1.5px dashed var(--border-strong); border-radius: 12px; color: var(--text-muted); cursor: pointer; }
+.skill-drop:hover { border-color: var(--accent-dim); }
+.skill-drop.over { border-color: var(--accent); background: var(--accent-wash); color: var(--text); }
+.skill-drop svg { color: var(--text-faint); }
+.skill-drop-hint { font-size: 11px; color: var(--text-faint); }
 .skill-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .skill-toggle { flex-shrink: 0; padding-top: 2px; }
 .skill-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }

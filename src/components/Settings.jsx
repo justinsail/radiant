@@ -595,11 +595,30 @@ function AgentsPane ({ config, onConfigChange }) {
 
 // ---------- Skills ----------
 
+// parse a dropped skill file: SKILL.md-style frontmatter (name/description) + body
+function parseSkillFile (filename, text) {
+  let name = filename.replace(/\.(md|markdown|txt|skill)$/i, '').replace(/[-_]/g, ' ')
+  let description = ''
+  let content = text
+  const fm = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  if (fm) {
+    const meta = fm[1]
+    const nm = meta.match(/^name:\s*(.+)$/mi)
+    const desc = meta.match(/^description:\s*(.+)$/mi)
+    if (nm) name = nm[1].trim().replace(/^["']|["']$/g, '')
+    if (desc) description = desc[1].trim().replace(/^["']|["']$/g, '')
+    content = fm[2].trim()
+  }
+  return { name: name.trim(), description, content: content.trim() }
+}
+
 function SkillsPane ({ config, onConfigChange }) {
   const skills = config.skills || []
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
+  const [dragOver, setDragOver] = useState(false)
+  const fileRef = useRef(null)
 
   const toggle = async (id, enabled) => onConfigChange(await api.updateSkill(id, { enabled }))
   const remove = async id => { if (window.confirm('Delete this skill?')) onConfigChange(await api.deleteSkill(id)) }
@@ -610,6 +629,18 @@ function SkillsPane ({ config, onConfigChange }) {
     onConfigChange(cfg)
   }
 
+  const importFiles = async fileList => {
+    let cfg = null
+    for (const file of Array.from(fileList).slice(0, 10)) {
+      try {
+        const text = await file.text()
+        const sk = parseSkillFile(file.name, text)
+        if (sk.content) cfg = await api.addSkill({ ...sk, enabled: true })
+      } catch {}
+    }
+    if (cfg) onConfigChange(cfg)
+  }
+
   return (
     <div className='set-section'>
       <h3>Skills</h3>
@@ -617,6 +648,19 @@ function SkillsPane ({ config, onConfigChange }) {
         Skills are reusable instructions the agent follows when enabled — coding conventions, a house
         style, a workflow. Turn them on to add them to every session's guidance.
       </p>
+
+      <div
+        className={'skill-drop' + (dragOver ? ' over' : '')}
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files) }}
+        onClick={() => fileRef.current?.click()}
+      >
+        <input ref={fileRef} type='file' accept='.md,.markdown,.txt,.skill' multiple hidden onChange={e => { if (e.target.files.length) importFiles(e.target.files); e.target.value = '' }} />
+        <Icon.download size={20} />
+        <div>Drop a skill file here <span style={{ color: 'var(--text-faint)' }}>— or click to browse</span></div>
+        <div className='skill-drop-hint'>Markdown (.md) files with optional <span className='mono'>name:</span> / <span className='mono'>description:</span> frontmatter</div>
+      </div>
 
       {skills.map(sk => (
         <div key={sk.id} className='skill-row'>

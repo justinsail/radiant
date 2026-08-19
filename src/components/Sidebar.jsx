@@ -62,38 +62,71 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
     document.body.style.userSelect = 'none'
   }
 
+  const [view, setView] = useState('chats')
+
+  const SessionRow = ({ s, showAgent = true }) => {
+    const ag = agentOf(s.agentId)
+    return (
+      <div
+        className={'session-item' + (s.id === activeId ? ' active' : '') + (s.pinned ? ' pinned' : '')}
+        onClick={() => onOpen(s.id)}
+        title={s.title}
+      >
+        <div className='session-title'>
+          {showAgent && ag && <span className='session-agent' style={{ color: `oklch(0.7 0.15 ${ag.hue ?? 258})` }}><AgentGlyph agent={ag} size={13} /></span>}
+          <span className='session-title-text'>{s.title}</span>
+        </div>
+        <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
+        <div className='session-actions'>
+          <button title={s.pinned ? 'Unpin' : 'Pin to top'} onClick={e => { e.stopPropagation(); onPin(s.id, !s.pinned) }}>{s.pinned ? '★' : '☆'}</button>
+          <button title='Rename' onClick={e => { e.stopPropagation(); const t = window.prompt('Rename session:', s.title); if (t && t.trim()) onRename(s.id, t.trim()) }}>✎</button>
+          <button title='Delete' onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${s.title}"?`)) onDelete(s.id) }}>✕</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <nav className='sidebar' style={{ width }}>
       <div className='brand'>
         <div className={'logo-mark brand-mark' + (working ? ' working' : '')} aria-hidden />
         <span className='wordmark brand-word'>Radiant</span>
       </div>
-      <button className='new-session' onClick={onNew}>+ New session</button>
-      <div className='session-list'>
-        {sessions.map(s => {
-          const ag = agentOf(s.agentId)
-          return (
-            <div
-              key={s.id}
-              className={'session-item' + (s.id === activeId ? ' active' : '') + (s.pinned ? ' pinned' : '')}
-              onClick={() => onOpen(s.id)}
-              title={s.title}
-            >
-              <div className='session-title'>
-                {ag && <span className='session-agent' style={{ color: `oklch(0.7 0.15 ${ag.hue ?? 258})` }}><AgentGlyph agent={ag} size={13} /></span>}
-                <span className='session-title-text'>{s.title}</span>
-              </div>
-              <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
-              <div className='session-actions'>
-                <button title={s.pinned ? 'Unpin' : 'Pin to top'} onClick={e => { e.stopPropagation(); onPin(s.id, !s.pinned) }}>{s.pinned ? '★' : '☆'}</button>
-                <button title='Rename' onClick={e => { e.stopPropagation(); const t = window.prompt('Rename session:', s.title); if (t && t.trim()) onRename(s.id, t.trim()) }}>✎</button>
-                <button title='Delete' onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${s.title}"?`)) onDelete(s.id) }}>✕</button>
-              </div>
-            </div>
-          )
-        })}
-        {!sessions.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
+      <div className='sidebar-switch'>
+        <button className={view === 'chats' ? 'on' : ''} onClick={() => setView('chats')}>Chats</button>
+        <button className={view === 'bots' ? 'on' : ''} onClick={() => setView('bots')}>Bots</button>
       </div>
+      <button className='new-session' onClick={() => onNew()}>+ New session</button>
+
+      {view === 'chats' ? (
+        <div className='session-list'>
+          {sessions.map(s => <SessionRow key={s.id} s={s} />)}
+          {!sessions.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
+        </div>
+      ) : (
+        <div className='session-list'>
+          {agents.map(a => {
+            const own = sessions.filter(s => s.agentId === a.id)
+            return (
+              <div key={a.id} className='bot-group'>
+                <div className='bot-head'>
+                  <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={16} /></span>
+                  <span className='bot-head-name'>{a.name}</span>
+                  <span className='bot-head-count'>{own.length}</span>
+                  <button className='bot-new' title={`New session with ${a.name}`} onClick={() => onNew(a.id)}>+</button>
+                </div>
+                {own.map(s => <SessionRow key={s.id} s={s} showAgent={false} />)}
+              </div>
+            )
+          })}
+          {(() => { const orphans = sessions.filter(s => !agentOf(s.agentId)); return orphans.length > 0 && (
+            <div className='bot-group'>
+              <div className='bot-head'><span className='bot-head-name' style={{ color: 'var(--text-faint)' }}>No agent</span><span className='bot-head-count'>{orphans.length}</span></div>
+              {orphans.map(s => <SessionRow key={s.id} s={s} />)}
+            </div>
+          )})()}
+        </div>
+      )}
       {updateInfo && (
         <button className='update-pill' onClick={onUpdate} title={`Radiant ${updateInfo.latest} is available`}>
           ↑ Update to {updateInfo.latest}
