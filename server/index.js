@@ -11,10 +11,16 @@ import { execSync } from 'child_process'
 import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken } from './oauth.js'
+import { checkForUpdate } from './updater.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
 app.use(express.json({ limit: '10mb' }))
+
+const __dirname0 = path.dirname(fileURLToPath(import.meta.url))
+const APP_VERSION = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname0, '..', 'package.json'), 'utf8')).version } catch { return '0.0.0' }
+})()
 
 let config = loadConfig()
 
@@ -56,6 +62,17 @@ app.delete('/api/providers/:id', (req, res) => {
     saveConfig(config)
   }
   res.json(publicConfig(config))
+})
+
+// ---------- version & updates ----------
+app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }))
+
+app.get('/api/update-check', async (req, res) => {
+  try {
+    res.json(await checkForUpdate(APP_VERSION))
+  } catch (e) {
+    res.status(502).json({ error: e.message, current: APP_VERSION })
+  }
 })
 
 // ---------- subscription sign-in (OAuth) ----------

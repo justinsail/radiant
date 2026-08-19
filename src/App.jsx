@@ -17,8 +17,10 @@ export default function App () {
   const [usage, setUsage] = useState(null)
   const [error, setError] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsTab, setSettingsTab] = useState('providers')
   const [rightOpen, setRightOpen] = useState(false)
   const [rightTab, setRightTab] = useState('activity')
+  const [updateInfo, setUpdateInfo] = useState(null) // {latest, dmgUrl} when an update exists
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
@@ -28,6 +30,9 @@ export default function App () {
     api.getConfig().then(cfg => {
       setConfig(cfg)
       applyTheme(cfg.settings)
+      if (cfg.settings.autoUpdateCheck !== false) {
+        api.updateCheck().then(u => { if (u.hasUpdate) setUpdateInfo(u) }).catch(() => {})
+      }
     }).catch(e => setError('Cannot reach the Radiant server: ' + e.message))
     refreshSessions()
     refreshModels()
@@ -170,6 +175,8 @@ export default function App () {
         onSettings={() => setSettingsOpen(true)}
         mode={config.settings.mode}
         onToggleMode={() => saveSettings({ mode: config.settings.mode === 'dark' ? 'light' : 'dark' })}
+        updateInfo={updateInfo}
+        onUpdate={() => { setSettingsTab('about'); setSettingsOpen(true) }}
       />
       <Chat
         rightOpen={rightOpen}
@@ -202,7 +209,8 @@ export default function App () {
       {settingsOpen && (
         <Settings
           config={config}
-          onClose={() => { setSettingsOpen(false); refreshModels() }}
+          initialTab={settingsTab}
+          onClose={() => { setSettingsOpen(false); setSettingsTab('providers'); refreshModels() }}
           onSettings={saveSettings}
           onConfigChange={setConfig}
           onModelsChanged={refreshModels}

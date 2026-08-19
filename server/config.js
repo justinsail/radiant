@@ -22,6 +22,7 @@ const DEFAULT_CONFIG = {
     customHue: 45,
     customChroma: 0.19,
     approveCommands: true,
+    autoUpdateCheck: true,
     defaultModel: null,
     defaultCwd: os.homedir()
   }

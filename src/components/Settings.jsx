@@ -417,17 +417,83 @@ function AgentPane ({ config, onSettings }) {
   )
 }
 
+// ---------- About & updates ----------
+
+function AboutPane ({ config, onSettings }) {
+  const s = config.settings
+  const [version, setVersion] = useState(null)
+  const [status, setStatus] = useState(null) // update-check result or {error}
+  const [checking, setChecking] = useState(false)
+
+  useEffect(() => { api.getVersion().then(v => setVersion(v.version)).catch(() => {}) }, [])
+
+  const check = async () => {
+    setChecking(true); setStatus(null)
+    try { setStatus(await api.updateCheck()) } catch (e) { setStatus({ error: e.message }) }
+    setChecking(false)
+  }
+  const download = () => { if (status?.dmgUrl) window.open(status.dmgUrl, '_blank', 'noopener') }
+
+  return (
+    <div className='set-section'>
+      <h3>About Radiant</h3>
+      <div className='about-row'>
+        <div className='logo-mark' style={{ width: 40, height: 40 }} aria-hidden />
+        <div>
+          <div className='wordmark' style={{ fontSize: 18 }}>Radiant</div>
+          <div className='about-ver'>Version {version || '…'}</div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <button className='small-btn primary' onClick={check} disabled={checking}>
+          {checking ? 'Checking…' : 'Check for updates'}
+        </button>
+      </div>
+
+      {status && !status.error && (
+        status.hasUpdate
+          ? <div className='update-avail'>
+              <div><strong>Radiant {status.latest}</strong> is available (you have {status.current}).</div>
+              <div className='row' style={{ marginTop: 8 }}>
+                <button className='small-btn primary' onClick={download}>Download</button>
+              </div>
+              <div className='oauth-note' style={{ marginTop: 8 }}>
+                Download the new .dmg and drag Radiant into Applications to replace this copy.
+              </div>
+            </div>
+          : <div className='update-none'>You're on the latest version ({status.current}).</div>
+      )}
+      {status?.error && <div className='error-note'>⚠ Couldn't check: {status.error}</div>}
+
+      <label className='check-row' style={{ marginTop: 14 }}>
+        <input
+          type='checkbox'
+          checked={s.autoUpdateCheck !== false}
+          onChange={e => onSettings({ autoUpdateCheck: e.target.checked })}
+        />
+        <span>Automatically check for updates on launch</span>
+      </label>
+      <div className='oauth-note'>
+        The desktop app also has <span className='mono'>Radiant → Check for Updates…</span> in the menu bar.
+        Auto-install requires a signed build; for now updates are one-click downloads.
+      </div>
+    </div>
+  )
+}
+
 // ---------- shell ----------
 
 const TABS = [
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },
   { id: 'appearance', label: 'Appearance' },
-  { id: 'agent', label: 'Agent' }
+  { id: 'agent', label: 'Agent' },
+  { id: 'about', label: 'About' }
 ]
 
-export default function Settings ({ config, onClose, onSettings, onConfigChange, onModelsChanged }) {
-  const [tab, setTab] = useState('providers')
+export default function Settings ({ config, initialTab = 'providers', onClose, onSettings, onConfigChange, onModelsChanged }) {
+  const [tab, setTab] = useState(initialTab)
   return (
     <div className='modal-backdrop' onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className='modal wide' role='dialog' aria-label='Settings'>
@@ -448,6 +514,7 @@ export default function Settings ({ config, onClose, onSettings, onConfigChange,
             {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
             {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
             {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
+            {tab === 'about' && <AboutPane config={config} onSettings={onSettings} />}
           </div>
         </div>
       </div>

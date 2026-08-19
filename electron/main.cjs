@@ -3,6 +3,7 @@ const path = require('path')
 const fs = require('fs')
 const os = require('os')
 const { pathToFileURL } = require('url')
+const { installUpdater } = require('./updater.cjs')
 
 // window chrome follows the app's own light/dark setting, not the OS
 function savedMode () {
@@ -22,6 +23,7 @@ process.on('unhandledRejection', e => console.error('[radiant] unhandled rejecti
 
 let win = null
 let serverPort = null
+let updater = null
 
 async function ensureServer () {
   if (serverPort) return serverPort
@@ -52,6 +54,10 @@ async function createWindow () {
     return { action: 'deny' }
   })
   await win.loadURL(`http://127.0.0.1:${port}`)
+
+  // menu-bar "Check for Updates…" + a quiet auto-check on launch
+  updater = installUpdater({ getPort: () => serverPort, getWindow: () => win })
+  updater.startAutoCheck()
 }
 
 app.whenReady().then(createWindow)

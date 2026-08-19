@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 const MIN_W = 190
 const MAX_W = 460
 
-export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onSettings, mode, onToggleMode }) {
+export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onSettings, mode, onToggleMode, updateInfo, onUpdate }) {
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem('radiant.sidebarWidth'))
     return saved >= MIN_W && saved <= MAX_W ? saved : 248
@@ -60,6 +60,11 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         ))}
         {!sessions.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
       </div>
+      {updateInfo && (
+        <button className='update-pill' onClick={onUpdate} title={`Radiant ${updateInfo.latest} is available`}>
+          ↑ Update to {updateInfo.latest}
+        </button>
+      )}
       <div className='sidebar-foot'>
         <button className='icon-btn' onClick={onSettings} title='Settings'>⚙ Settings</button>
         <button className='icon-btn' onClick={onToggleMode} title='Toggle light/dark'>{mode === 'dark' ? '☀' : '☾'}</button>
