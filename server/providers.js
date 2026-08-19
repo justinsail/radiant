@@ -382,6 +382,10 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
   ]
 
   let toolsEnabled = useTools
+  // loop-breaker: nudge (never block) when the model repeats an identical call
+  let lastSig = null
+  let repeatCount = 0
+  const REPEAT_NUDGES = { 3: 'stop and re-read the last result — this exact call has produced the same output 3 times', 5: 'you are stuck in a loop (5 identical calls). Change your approach or explain what is blocking you', 8: 'STOP repeating this call (8 times). Do something different or tell the user you are blocked' }
   for (let round = 0; round < MAX_ROUNDS; round++) {
     emit({ type: 'round_start', round })
     const args = {
@@ -430,6 +434,13 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
       if (!approved) {
         part.denied = true
         part.result = 'The user declined this action. Ask them how they would like to proceed, or try a different approach.'
+      } else if (call.name === 'todo_write') {
+        const todos = Array.isArray(call.args?.todos) ? call.args.todos : []
+        session.todos = todos
+        emit({ type: 'todos', todos })
+        const done = todos.filter(t => t.status === 'done').length
+        part.result = `Todo list updated (${done}/${todos.length} done).`
+        part.hidden = true // shown as the checklist widget, not a tool chip
       } else if (call.name === 'ask_agent') {
         emit({ type: 'notice', text: `Consulting ${call.args?.agent || 'another agent'}…` })
         part.result = await askAgent(call.args?.agent, call.args?.question)
@@ -442,6 +453,11 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
       } else {
         part.result = await runTool(call.name, call.args, cwd)
       }
+      // loop-breaker: append an escalating reminder on identical consecutive calls
+      const sig = call.name + ':' + JSON.stringify(call.args)
+      repeatCount = sig === lastSig ? repeatCount + 1 : 1
+      lastSig = sig
+      if (REPEAT_NUDGES[repeatCount]) part.result = `[reminder: ${REPEAT_NUDGES[repeatCount]}]\n\n${part.result ?? ''}`
       emit({ type: 'tool_result', id: call.id, result: part.result, denied: !approved, hasImage: Boolean(part.resultImage) })
     }
   }

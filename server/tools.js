@@ -62,6 +62,28 @@ export const TOOL_DEFS = [
       properties: { command: { type: 'string', description: 'The bash command to run' } },
       required: ['command']
     }
+  },
+  {
+    name: 'todo_write',
+    description: 'Record or update your task checklist for this session so the user can follow along on multi-step work. Call it when you start a multi-step task and whenever a step\'s status changes. Always send the FULL list each time (it replaces the previous one). Keep exactly one item "in_progress".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        todos: {
+          type: 'array',
+          description: 'The complete ordered checklist.',
+          items: {
+            type: 'object',
+            properties: {
+              text: { type: 'string', description: 'Short task description' },
+              status: { type: 'string', enum: ['pending', 'in_progress', 'done'], description: 'Current status' }
+            },
+            required: ['text', 'status']
+          }
+        }
+      },
+      required: ['todos']
+    }
   }
 ]
 

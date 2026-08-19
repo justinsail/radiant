@@ -28,6 +28,7 @@ export default function App () {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // mobile sidebar drawer
+  const [todos, setTodos] = useState([]) // agent checklist for the active session
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
@@ -68,6 +69,7 @@ export default function App () {
   const openSession = async id => {
     const s = await api.getSession(id)
     setSession(s)
+    setTodos(s.todos || [])
     setError(null)
     if (streamingSessionRef.current !== id) { setLive(null); setApproval(null) }
   }
@@ -82,6 +84,7 @@ export default function App () {
     }
     const s = await api.createSession(body)
     setSession(s)
+    setTodos([])
     setLive(null)
     setApproval(null)
     setError(null)
@@ -155,6 +158,7 @@ export default function App () {
             break
           case 'tool_start':
             endThinking()
+            if (ev.name === 'todo_write') break // rendered as the checklist, not a chip
             liveMsg.parts.push({ type: 'tool', id: ev.id, name: ev.name, args: ev.args, pending: true })
             setActivity(a => [...a, { id: ev.id, name: ev.name, args: ev.args, at: Date.now() }])
             setRightOpen(true)
@@ -169,7 +173,8 @@ export default function App () {
           case 'approval_request': setApproval({ id: ev.id, name: ev.name, args: ev.args }); break
           case 'usage': setUsage(u => ({ input: ev.input ?? u?.input, output: ev.output ?? u?.output })); break
           case 'notice': liveMsg.parts.push({ type: 'notice', text: ev.text }); break
-          case 'title': refreshSessions(); break
+          case 'todos': setTodos(ev.todos || []); break
+          case 'title': setSession(s => (s && s.id === sessionId ? { ...s, title: ev.title } : s)); refreshSessions(); break
           case 'error': setError(ev.message); break
           default: break
         }
@@ -245,6 +250,7 @@ export default function App () {
         onMenu={() => setNavOpen(true)}
         agents={config.agents || []}
         session={session}
+        todos={todos}
         live={live}
         approval={approval}
         usage={usage}

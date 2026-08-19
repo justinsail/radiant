@@ -86,7 +86,8 @@ export const api = {
   updateMcp: (id, patch) => json('PATCH', `/api/mcp/${id}`, patch),
   deleteMcp: id => json('DELETE', `/api/mcp/${id}`),
   getShare: () => json('GET', '/api/share'),
-  setShare: enabled => json('POST', '/api/share', { enabled })
+  setShare: enabled => json('POST', '/api/share', { enabled }),
+  openFile: p => json('POST', '/api/open', { path: p })
 }
 
 // POST /api/quantize streams progress lines back on the response body.

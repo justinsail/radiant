@@ -351,6 +351,13 @@ async function claudeUsage (token) {
   return normWindows([['5h', d.five_hour], ['weekly', d.seven_day]])
 }
 
+// open a file/folder in the OS default app (for the "files changed" chips)
+app.post('/api/open', (req, res) => {
+  const p = String(req.body?.path || '')
+  if (!p || !fs.existsSync(p)) return res.status(400).json({ error: 'no such file' })
+  try { spawn('open', [p], { detached: true, stdio: 'ignore' }).unref(); res.json({ ok: true }) } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 // ---------- skills ----------
 app.post('/api/skills', (req, res) => {
   const { name, description, content } = req.body
@@ -921,6 +928,33 @@ app.post('/api/chat', async (req, res) => {
       requestApproval,
       signal: controller.signal
     })
+    // auto-title a still-unnamed session from its first user message
+    const firstUser = session.messages.find(m => m.role === 'user')
+    if (firstUser?.text && (!session.title || /^new session$/i.test(session.title)) && !controller.signal.aborted) {
+      const clean = s => (s || '').replace(/\s+/g, ' ').trim().replace(/^["'#\s]+|["'.…\s]+$/g, '').slice(0, 56)
+      // fast heuristic fallback: first several words of the request
+      let t = clean(firstUser.text.split(' ').slice(0, 8).join(' '))
+      // nicer LLM title, but only for cloud models (local ones are slow / echo the prompt)
+      const cloud = ['anthropic', 'openai', 'openrouter', 'nousresearch'].includes(provider.id)
+      if (cloud) {
+        try {
+          const tmp = { cwd: session.cwd, messages: [{ role: 'user', text: `Reply with ONLY a 3-6 word title (no quotes, no punctuation) summarizing this coding request:\n\n${firstUser.text.slice(0, 600)}` }] }
+          let out = ''
+          await runTurn({
+            provider, model: session.model, apiKey,
+            getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
+            getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
+            session: tmp, useTools: false, computerControl: false, persona: '', skills: [],
+            emit: ev => { if (ev.type === 'text_delta') out += ev.text },
+            requestApproval: null, signal: controller.signal
+          })
+          out = clean(out.split('\n').find(l => l.trim()) || '')
+          // use it unless the model just echoed the request
+          if (out && !firstUser.text.toLowerCase().startsWith(out.toLowerCase().slice(0, 20))) t = out
+        } catch {}
+      }
+      if (t) { session.title = t; emit({ type: 'title', title: t }) }
+    }
   } catch (e) {
     if (!controller.signal.aborted) emit({ type: 'error', message: e.message })
   } finally {

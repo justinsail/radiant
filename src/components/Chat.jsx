@@ -20,6 +20,51 @@ function agentBlurb (a) {
   return first.length > 64 ? first.slice(0, 61).trimEnd() + '…' : first
 }
 
+// agent task checklist (from the todo_write tool)
+function TodoChecklist ({ todos }) {
+  const [collapsed, setCollapsed] = useState(false)
+  if (!todos?.length) return null
+  const done = todos.filter(t => t.status === 'done').length
+  const all = done === todos.length
+  return (
+    <div className={'todo-panel' + (all ? ' complete' : '')}>
+      <button className='todo-head' onClick={() => setCollapsed(c => !c)}>
+        <span className='todo-caret'>{collapsed ? '▸' : '▾'}</span>
+        Tasks <span className='todo-count'>{done}/{todos.length}</span>
+      </button>
+      {!collapsed && todos.map((t, i) => (
+        <div key={i} className={'todo-item ' + t.status}>
+          <span className='todo-box' aria-hidden>{t.status === 'done' ? '✓' : t.status === 'in_progress' ? '◐' : '○'}</span>
+          <span className='todo-text'>{t.text}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// files this turn created or edited, as clickable chips
+function Deliverables ({ parts }) {
+  const files = []
+  const seen = new Set()
+  for (const p of parts) {
+    if (p.type === 'tool' && (p.name === 'write_file' || p.name === 'edit_file') && !p.denied && p.result && !/^Error/i.test(String(p.result))) {
+      const fp = p.args?.path
+      if (fp && !seen.has(fp)) { seen.add(fp); files.push(fp) }
+    }
+  }
+  if (!files.length) return null
+  return (
+    <div className='deliverables'>
+      <span className='deliverables-label'>Files changed</span>
+      {files.map(f => (
+        <button key={f} className='deliverable' title={f} onClick={() => api.openFile(f).catch(() => {})}>
+          <span className='deliverable-ico' aria-hidden>✎</span>{f.split('/').pop()}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const TOOL_ICONS = {
   run_command: '⌘',
   read_file: '≡',
@@ -91,10 +136,11 @@ function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, stre
       {thinking ? <ThinkingTrace thinking={thinking} active={Boolean(thinkingActive)} seconds={thinkingSecs} /> : null}
       {parts.map((p, i) => {
         if (p.type === 'text') return <Markdown key={i} text={p.text} />
-        if (p.type === 'tool') return <ToolChip key={p.id || i} part={p} />
+        if (p.type === 'tool') return (p.name === 'todo_write' || p.hidden) ? null : <ToolChip key={p.id || i} part={p} />
         if (p.type === 'notice') return <div key={i} className='notice'>{p.text}</div>
         return null
       })}
+      {!streaming && <Deliverables parts={parts} />}
       {streaming && !parts.length && !thinking && <div className='notice'>…</div>}
     </div>
   )
@@ -211,7 +257,7 @@ function readFileAsAttachment (file) {
 
 const MenuIcon = () => <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'><path d='M4 6h16M4 12h16M4 18h16' /></svg>
 
-export default function Chat ({ session, live, approval, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+export default function Chat ({ session, live, todos = [], approval, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
@@ -361,6 +407,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
       </div>
 
       <div className='composer'>
+        <TodoChecklist todos={todos} />
         <div
           className={'composer-box' + (dragOver ? ' drag-over' : '')}
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
