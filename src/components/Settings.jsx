@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { api, startDownload, getDownloads, cancelDownload, streamQuantize } from '../api.js'
+import { api, startDownload, getDownloads, cancelDownload, streamQuantize, getServer, setServer, testServer } from '../api.js'
 import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
 import { MOTIONS } from './MotionBackground.jsx'
 import { Icon } from './Icons.jsx'
@@ -978,12 +978,86 @@ function AboutPane ({ config, onSettings }) {
 
 // ---------- shell ----------
 
+function DevicesPane () {
+  const [share, setShare] = useState(null)
+  const server = getServer()
+  const [base, setBase] = useState(server.base || '')
+  const [token, setToken] = useState(server.token || '')
+  const [msg, setMsg] = useState(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { api.getShare().then(setShare).catch(() => {}) }, [])
+  const copy = t => { try { navigator.clipboard?.writeText(t) } catch {} }
+
+  const toggleShare = async () => {
+    try { const r = await api.setShare(!(share?.desired)); setShare(s => ({ ...s, ...r })) } catch (e) { setMsg(e.message) }
+  }
+  const connect = async () => {
+    setBusy(true); setMsg(null)
+    try {
+      let url = base.trim(); if (url && !/^https?:\/\//i.test(url)) url = 'http://' + url
+      await testServer(url, token.trim())
+      setServer({ base: url, token: token.trim() }); location.reload()
+    } catch (e) { setMsg(e.message); setBusy(false) }
+  }
+  const useLocal = () => { setServer(null); location.reload() }
+
+  return (
+    <div className='set-section'>
+      <h3>Devices &amp; sharing</h3>
+
+      <div className='set-block'>
+        <div className='set-block-title'>Share this Mac's server</div>
+        <p className='hint' style={{ marginTop: 2 }}>Let your other Macs and your phone use this machine's models, agents, and sessions. Best on an always-on Mac; reach it over Tailscale. Changing this needs a Radiant relaunch.</p>
+        <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(share?.desired)} onChange={toggleShare} /> Share on my network</label>
+        {share && share.desired !== share.enabled && <div className='error-note' style={{ marginTop: 6 }}>Quit and reopen Radiant to {share.desired ? 'start' : 'stop'} sharing.</div>}
+        {share?.desired && share?.token && (
+          <div style={{ marginTop: 10 }}>
+            <div className='connect-field'>Access token
+              <div className='row'><code className='mono share-token'>{share.token}</code><button className='small-btn' onClick={() => copy(share.token)}>Copy</button></div>
+            </div>
+            <div className='connect-field' style={{ marginTop: 8 }}>Other devices connect to:
+              {(share.addresses || []).length
+                ? share.addresses.map(a => (
+                    <div key={a.address} className='row' style={{ marginTop: 4 }}>
+                      <code className='mono'>{a.address}:{share.port}</code>
+                      <span className='fit-badge' style={{ opacity: 0.8 }}>{a.label}</span>
+                      <button className='small-btn' onClick={() => copy(`${a.address}:${share.port}`)}>Copy</button>
+                    </div>))
+                : <div className='v-meta'>No network address found — is Tailscale running?</div>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className='set-block' style={{ marginTop: 16 }}>
+        <div className='set-block-title'>Connect this app to another Radiant</div>
+        <p className='hint' style={{ marginTop: 2 }}>Point this app at a shared Radiant on another Mac (e.g. your always-on host). It'll use that server's models, agents, and sessions instead of its own.</p>
+        <label className='connect-field'>Server address
+          <input className='text-input' placeholder='100.x.y.z:5834 (Tailscale) or host.local:5834' value={base} onChange={e => setBase(e.target.value)} />
+        </label>
+        <label className='connect-field' style={{ marginTop: 8 }}>Access token
+          <input className='text-input' type='password' placeholder='Token from the host Mac' value={token} onChange={e => setToken(e.target.value)} />
+        </label>
+        {msg && <div className='error-note' style={{ marginTop: 6 }}>⚠ {msg}</div>}
+        <div className='row' style={{ marginTop: 10 }}>
+          <button className='small-btn primary' onClick={connect} disabled={busy || !base.trim()}>{busy ? 'Connecting…' : 'Connect & reload'}</button>
+          {server.base && <button className='small-btn' onClick={useLocal}>Use this Mac's own server</button>}
+        </div>
+        {server.base
+          ? <div className='v-meta' style={{ marginTop: 6 }}>Currently connected to <code className='mono'>{server.base}</code></div>
+          : <div className='v-meta' style={{ marginTop: 6 }}>Currently using this Mac's own server.</div>}
+      </div>
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },
   { id: 'agents', label: 'Agents' },
   { id: 'skills', label: 'Skills' },
   { id: 'mcp', label: 'MCP' },
+  { id: 'devices', label: 'Devices' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'agent', label: 'Automation' },
   { id: 'about', label: 'About' }
@@ -1011,6 +1085,7 @@ export default function Settings ({ config, initialTab = 'providers', embedded =
           {tab === 'agents' && <AgentsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'skills' && <SkillsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'mcp' && <McpPane config={config} onConfigChange={onConfigChange} />}
+          {tab === 'devices' && <DevicesPane />}
           {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
           {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
           {tab === 'about' && <AboutPane config={config} onSettings={onSettings} />}

@@ -8,6 +8,7 @@ import Settings from './components/Settings.jsx'
 import MotionBackground from './components/MotionBackground.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import ComparePanel from './components/ComparePanel.jsx'
+import ConnectGate from './components/ConnectGate.jsx'
 
 export default function App () {
   const [config, setConfig] = useState(null)
@@ -209,7 +210,8 @@ export default function App () {
   }
 
   if (!config) {
-    return <div className='app'><div style={{ margin: 'auto', color: 'var(--text-muted)' }}>{error || 'Warming up…'}</div></div>
+    if (error) return <ConnectGate error={error} />
+    return <div className='app'><div style={{ margin: 'auto', color: 'var(--text-muted)' }}>Warming up…</div></div>
   }
 
   return (

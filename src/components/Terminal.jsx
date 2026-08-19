@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { wsUrl } from '../api.js'
 
 function cssVar (name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -34,8 +35,7 @@ export default function Terminal ({ cwd, mode }) {
     fit.fit()
     termRef.current = term
 
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${location.host}/term?cwd=${encodeURIComponent(cwd || '')}`)
+    const ws = new WebSocket(wsUrl(`/term?cwd=${encodeURIComponent(cwd || '')}`))
     ws.onopen = () => {
       ws.send(`\x00resize:${term.cols},${term.rows}`)
       term.focus()

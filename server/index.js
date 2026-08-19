@@ -12,6 +12,7 @@ import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSe
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken } from './oauth.js'
 import { checkForUpdate } from './updater.js'
+import { ollamaBin, SPAWN_ENV } from './ollama.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
@@ -23,6 +24,38 @@ const APP_VERSION = (() => {
 })()
 
 let config = loadConfig()
+
+// ---- network sharing --------------------------------------------------------
+// Normally the server binds to localhost only. On an always-on "host" Mac you can
+// share it so other Macs and phones connect as clients. When shared it binds to
+// all interfaces and requires an access token on every /api and /term request
+// (loopback — the app on the host machine itself — is exempt). Reachability is
+// expected to go over Tailscale; the token is a second lock.
+const share0 = config.settings.share || {}
+const SHARE_ENABLED = process.env.RADIANT_SHARE === '1' || Boolean(share0.enabled)
+const SHARE_TOKEN = process.env.RADIANT_TOKEN || share0.token || null
+const BIND_HOST = SHARE_ENABLED ? '0.0.0.0' : '127.0.0.1'
+const isLoopback = ra => !ra || ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1'
+function tokenOk (req) {
+  if (isLoopback(req.socket?.remoteAddress)) return true
+  if (!SHARE_TOKEN) return false
+  const tok = req.headers['x-radiant-token'] || String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+  return tok === SHARE_TOKEN
+}
+// LAN / Tailscale addresses this host is reachable at
+function hostAddresses () {
+  const out = []
+  const ifaces = os.networkInterfaces()
+  for (const name of Object.keys(ifaces)) {
+    for (const a of ifaces[name] || []) {
+      if (a.family !== 'IPv4' || a.internal) continue
+      const tailscale = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)
+      out.push({ address: a.address, label: tailscale ? 'Tailscale' : name })
+    }
+  }
+  out.sort((x, y) => (x.label === 'Tailscale' ? -1 : 0) - (y.label === 'Tailscale' ? -1 : 0))
+  return out
+}
 
 // in-flight turn state
 const activeTurns = new Map() // sessionId -> { controller }
@@ -39,6 +72,14 @@ app.use((req, res, next) => {
   next()
 })
 
+// Access-token gate for remote clients (loopback is always allowed). Only /api and
+// the terminal socket are gated; the static UI loads freely so a phone can reach
+// the token-entry screen.
+app.use('/api', (req, res, next) => {
+  if (tokenOk(req)) return next()
+  res.status(401).json({ error: 'This Radiant server requires an access token.' })
+})
+
 // ---------- config ----------
 app.get('/api/config', (req, res) => res.json(publicConfig(config)))
 
@@ -46,6 +87,27 @@ app.put('/api/settings', (req, res) => {
   config.settings = { ...config.settings, ...req.body }
   saveConfig(config)
   res.json(publicConfig(config))
+})
+
+// current sharing state + the addresses/token other devices use to connect
+app.get('/api/share', (req, res) => {
+  res.json({
+    enabled: SHARE_ENABLED,      // reflects the RUNNING server (needs relaunch to change)
+    desired: Boolean(config.settings.share?.enabled),
+    token: SHARE_TOKEN,
+    port: PORT,
+    addresses: hostAddresses()
+  })
+})
+
+// toggle sharing (applies on next launch, since the bind host is fixed at boot)
+app.post('/api/share', (req, res) => {
+  const enabled = Boolean(req.body?.enabled)
+  const cur = config.settings.share || {}
+  const token = cur.token || crypto.randomBytes(24).toString('base64url')
+  config.settings.share = { enabled, token }
+  saveConfig(config)
+  res.json({ desired: enabled, enabled: SHARE_ENABLED, token, needsRelaunch: enabled !== SHARE_ENABLED, port: PORT, addresses: hostAddresses() })
 })
 
 app.post('/api/providers/:id/key', (req, res) => {
@@ -622,7 +684,7 @@ async function runDownload (entry) {
     const modelfile = path.join(dir, 'Modelfile')
     fs.writeFileSync(modelfile, `FROM ${path.join(dir, entry.files[0])}\n`)
     await new Promise((resolve, reject) => {
-      child = spawn('ollama', ['create', entry.model, '-f', modelfile])
+      child = spawn(ollamaBin(), ['create', entry.model, '-f', modelfile], { env: SPAWN_ENV })
       let err = ''
       const strip = s => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/[\r\x00-\x08\x0e-\x1f]/g, '').trim()
       const feed = b => b.toString().split('\n').forEach(raw => { const l = strip(raw); if (l) entry.status = l })
@@ -865,6 +927,12 @@ wss.on('error', e => console.error('[ws]', e.message))
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, 'http://localhost')
+  // terminal socket is gated too — browsers can't set headers on a WS, so remote
+  // clients pass the token as a query param
+  if (!isLoopback(req.socket?.remoteAddress)) {
+    const tok = url.searchParams.get('token')
+    if (!SHARE_TOKEN || tok !== SHARE_TOKEN) { ws.close(1008, 'unauthorized'); return }
+  }
   const cwd = url.searchParams.get('cwd') || os.homedir()
   const shell = process.env.SHELL || '/bin/zsh'
   let term
@@ -900,11 +968,11 @@ wss.on('connection', (ws, req) => {
 export const ready = new Promise((resolve, reject) => {
   server.once('error', err => {
     if (err.code === 'EADDRINUSE') {
-      server.listen(0, '127.0.0.1', () => resolve(server.address().port))
+      server.listen(0, BIND_HOST, () => resolve(server.address().port))
     } else {
       reject(err)
     }
   })
-  server.listen(PORT, '127.0.0.1', () => resolve(server.address().port))
+  server.listen(PORT, BIND_HOST, () => resolve(server.address().port))
 })
-ready.then(port => console.log(`radiant server listening on http://127.0.0.1:${port}`))
+ready.then(port => console.log(`radiant server listening on http://${BIND_HOST}:${port}${SHARE_ENABLED ? ' (shared — token required for remote clients)' : ''}`))

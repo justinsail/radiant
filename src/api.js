@@ -1,7 +1,33 @@
-async function json (method, url, body) {
-  const res = await fetch(url, {
+// Which Radiant server to talk to. Empty base = this app's own bundled server
+// (same origin). A remote base + token points at a shared server on another Mac.
+let SERVER = (() => { try { return JSON.parse(localStorage.getItem('radiant.server')) || {} } catch { return {} } })()
+export function getServer () { return { ...SERVER } }
+export function setServer (s) {
+  SERVER = s && s.base ? { base: String(s.base).replace(/\/$/, ''), token: s.token || '' } : {}
+  localStorage.setItem('radiant.server', JSON.stringify(SERVER))
+}
+export function apiUrl (path) { return (SERVER.base || '') + path }
+export function authHeaders (extra = {}) { return SERVER.token ? { ...extra, 'x-radiant-token': SERVER.token } : { ...extra } }
+// WebSocket URL for the terminal, honoring a remote server + token.
+export function wsUrl (path) {
+  if (!SERVER.base) { const p = location.protocol === 'https:' ? 'wss' : 'ws'; return `${p}://${location.host}${path}` }
+  const u = new URL(SERVER.base)
+  const proto = u.protocol === 'https:' ? 'wss' : 'ws'
+  const sep = path.includes('?') ? '&' : '?'
+  return `${proto}://${u.host}${path}${SERVER.token ? `${sep}token=${encodeURIComponent(SERVER.token)}` : ''}`
+}
+// Verify a remote server is reachable with the given token (used by the connect UI).
+export async function testServer (base, token) {
+  const res = await fetch(String(base).replace(/\/$/, '') + '/api/config', { headers: token ? { 'x-radiant-token': token } : {} })
+  if (res.status === 401) throw new Error('Wrong or missing access token')
+  if (!res.ok) throw new Error(`Server responded ${res.status}`)
+  return true
+}
+
+async function json (method, path, body) {
+  const res = await fetch(apiUrl(path), {
     method,
-    headers: body ? { 'content-type': 'application/json' } : {},
+    headers: authHeaders(body ? { 'content-type': 'application/json' } : {}),
     body: body ? JSON.stringify(body) : undefined
   })
   if (!res.ok) {
@@ -51,14 +77,16 @@ export const api = {
   mcpStatus: () => json('GET', '/api/mcp/status'),
   addMcp: server => json('POST', '/api/mcp', server),
   updateMcp: (id, patch) => json('PATCH', `/api/mcp/${id}`, patch),
-  deleteMcp: id => json('DELETE', `/api/mcp/${id}`)
+  deleteMcp: id => json('DELETE', `/api/mcp/${id}`),
+  getShare: () => json('GET', '/api/share'),
+  setShare: enabled => json('POST', '/api/share', { enabled })
 }
 
 // POST /api/quantize streams progress lines back on the response body.
 export async function streamQuantize (body, onEvent) {
-  const res = await fetch('/api/quantize', {
+  const res = await fetch(apiUrl('/api/quantize'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify(body)
   })
   if (!res.ok) throw new Error(`${res.status}`)
@@ -80,9 +108,9 @@ export async function streamQuantize (body, onEvent) {
 
 // POST /api/pull streams SSE progress events back on the response body.
 export async function streamPull (model, onEvent, signal) {
-  const res = await fetch('/api/pull', {
+  const res = await fetch(apiUrl('/api/pull'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ model }),
     signal
   })
@@ -105,27 +133,27 @@ export async function streamPull (model, onEvent, signal) {
 
 // Downloads run detached on the server; start one, then poll getDownloads().
 export async function startDownload ({ repo, files, model }) {
-  const res = await fetch('/api/download', {
+  const res = await fetch(apiUrl('/api/download'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ repo, files, model })
   })
   if (!res.ok) { let m = `${res.status}`; try { m = (await res.json()).error || m } catch {}; throw new Error(m) }
   return res.json()
 }
 export async function getDownloads () {
-  const res = await fetch('/api/downloads')
+  const res = await fetch(apiUrl('/api/downloads'), { headers: authHeaders() })
   return res.ok ? res.json() : []
 }
 export async function cancelDownload (model) {
-  await fetch('/api/download/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model }) })
+  await fetch(apiUrl('/api/download/cancel'), { method: 'POST', headers: authHeaders({ 'content-type': 'application/json' }), body: JSON.stringify({ model }) })
 }
 
 // POST /api/chat streams SSE back on the response body.
 export async function streamChat (sessionId, content, onEvent) {
-  const res = await fetch('/api/chat', {
+  const res = await fetch(apiUrl('/api/chat'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: authHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ sessionId, content })
   })
   if (!res.ok) {
