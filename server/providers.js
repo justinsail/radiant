@@ -4,11 +4,12 @@ import { COMPUTER_TOOL_DEFS, COMPUTER_TOOL_NAMES, COMPUTER_SAFE, runComputerTool
 
 const MAX_ROUNDS = 30
 
-function systemPrompt (cwd, useTools, model, computerControl, skills) {
+function systemPrompt (cwd, useTools, model, computerControl, skills, persona) {
+  const personaText = persona ? `\n\n${persona}` : ''
   const skillText = (skills && skills.length)
     ? `\n\nActive skills (follow these):\n${skills.map(s => `• ${s.name}: ${s.content}`).join('\n')}`
     : ''
-  return `You are a coding agent running inside Radiant, a local coding harness on the user's ${os.type() === 'Darwin' ? 'Mac' : os.type()} (${os.platform()} ${os.release()}). Radiant is the app, not you: you are the model "${model}". If asked what model you are, answer with your actual model name and maker.
+  return `You are a coding agent running inside Radiant, a local coding harness on the user's ${os.type() === 'Darwin' ? 'Mac' : os.type()} (${os.platform()} ${os.release()}). Radiant is the app, not you: you are the model "${model}". If asked what model you are, answer with your actual model name and maker.${personaText}
 Workspace directory: ${cwd}
 ${useTools ? 'You have tools to read, write, and edit files and to run shell commands in the workspace. Use them to investigate before answering and to make changes when asked. Prefer edit_file for small changes and write_file for new files. After making changes, verify them when practical (run the code, run tests).' : 'Tools are disabled for this conversation; answer from knowledge and the conversation only.'}${computerControl ? `
 You can also control the computer. browser_* tools drive an automated browser; screen_* tools control the whole desktop. ALWAYS take a screenshot first (browser_screenshot / screen_screenshot) and look at it before clicking or typing — click coordinates are pixel positions read from the most recent screenshot. Work in small steps: screenshot, act, screenshot again to confirm. Prefer browser_* for web tasks.` : ''}
@@ -236,9 +237,9 @@ async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, too
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, computerControl, skills, emit, requestApproval, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, computerControl, skills, persona, emit, requestApproval, signal }) {
   const cwd = session.cwd || os.homedir()
-  const system = systemPrompt(cwd, useTools, model, computerControl, skills)
+  const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona)
   const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
 

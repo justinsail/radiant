@@ -390,6 +390,7 @@ code, pre, .mono { font-family: var(--font-mono); }
   display: flex; align-items: center; gap: 6px;
 }
 .msg-assistant .who .logo-mark { width: 12px; height: 12px; }
+.who-agent-emoji { font-size: 13px; filter: drop-shadow(0 0 4px oklch(0.6 0.15 var(--ah, 258) / 0.5)); }
 .msg-assistant .md { line-height: 1.6; word-break: break-word; }
 
 /* thinking trace — collapsible, like the reference's "Thought for Ns" */
@@ -704,6 +705,43 @@ input[type='range']::-webkit-slider-thumb {
   border: none; padding: 0; background: none; cursor: pointer; opacity: 0;
 }
 .accent-picker-text { display: flex; flex-direction: column; gap: 2px; }
+
+/* agents */
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.agent-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 12px; border-radius: 12px; text-align: left;
+  border: 1px solid var(--border); background: var(--bg);
+  box-shadow: inset 0 0 0 1px oklch(0.6 0.14 var(--ah, 258) / 0.12);
+}
+.agent-card:hover { border-color: oklch(0.6 0.14 var(--ah, 258)); }
+.agent-avatar {
+  width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 18px; background: oklch(0.6 0.14 var(--ah, 258) / 0.18);
+}
+.agent-card-name { font-weight: 600; font-size: 13px; }
+.agent-card-desc { font-size: 11px; color: var(--text-faint); line-height: 1.4; }
+.agent-card-new { align-items: center; justify-content: center; color: var(--text-muted); border-style: dashed; }
+.agent-card-new .agent-avatar { background: var(--bg-hover); font-size: 20px; }
+
+.agent-editor-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.agent-emoji-input { width: 44px; height: 38px; text-align: center; font-size: 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); }
+.agent-field { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.agent-field .text-input, .agent-field textarea, .agent-field select { margin-top: 5px; width: 100%; }
+.agent-field-row { display: flex; gap: 18px; margin: 4px 0 4px; }
+.agent-skills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.agent-skill-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text); }
+.agent-skill-chk input { accent-color: var(--accent); }
+
+/* welcome-screen agent gallery */
+.welcome-agents { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 560px; margin: 20px auto 0; }
+.welcome-agent {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; width: 96px;
+  padding: 12px 8px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-panel);
+}
+.welcome-agent:hover { border-color: oklch(0.62 0.15 var(--ah, 258)); background: var(--bg-hover); }
+.welcome-agent .agent-avatar { width: 40px; height: 40px; font-size: 21px; }
+.welcome-agent-name { font-size: 12px; font-weight: 500; }
 
 /* skills */
 .skill-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }

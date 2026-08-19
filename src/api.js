@@ -43,7 +43,10 @@ export const api = {
   getUsage: () => json('GET', '/api/usage'),
   addSkill: skill => json('POST', '/api/skills', skill),
   updateSkill: (id, patch) => json('PATCH', `/api/skills/${id}`, patch),
-  deleteSkill: id => json('DELETE', `/api/skills/${id}`)
+  deleteSkill: id => json('DELETE', `/api/skills/${id}`),
+  addAgent: agent => json('POST', '/api/agents', agent),
+  updateAgent: (id, patch) => json('PATCH', `/api/agents/${id}`, patch),
+  deleteAgent: id => json('DELETE', `/api/agents/${id}`)
 }
 
 // POST /api/quantize streams progress lines back on the response body.

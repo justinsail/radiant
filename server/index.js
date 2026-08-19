@@ -103,6 +103,39 @@ app.post('/api/quantize', async (req, res) => {
   }
 })
 
+// ---------- agents ----------
+app.post('/api/agents', (req, res) => {
+  const { name, emoji, hue, persona, model, provider, skills, useTools, computerControl } = req.body
+  if (!name) return res.status(400).json({ error: 'name required' })
+  config.agents = config.agents || []
+  config.agents.push({
+    id: 'ag-' + crypto.randomBytes(4).toString('hex'),
+    name, emoji: emoji || '🤖', hue: hue ?? 258, persona: persona || '',
+    model: model || null, provider: provider || null, skills: skills || [],
+    useTools: useTools !== false, computerControl: Boolean(computerControl)
+  })
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+app.patch('/api/agents/:id', (req, res) => {
+  const a = (config.agents || []).find(x => x.id === req.params.id)
+  if (!a) return res.status(404).json({ error: 'not found' })
+  for (const k of ['name', 'emoji', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl']) {
+    if (k in req.body) a[k] = req.body[k]
+  }
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+app.delete('/api/agents/:id', (req, res) => {
+  const a = (config.agents || []).find(x => x.id === req.params.id)
+  if (a && a.builtin) return res.status(400).json({ error: 'built-in agents cannot be deleted' })
+  config.agents = (config.agents || []).filter(x => x.id !== req.params.id)
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
 // ---------- usage / credits ----------
 app.get('/api/usage', async (req, res) => {
   const out = []
@@ -372,14 +405,17 @@ app.post('/api/pull', async (req, res) => {
 app.get('/api/sessions', (req, res) => res.json(listSessions()))
 
 app.post('/api/sessions', (req, res) => {
+  const agent = req.body.agentId ? (config.agents || []).find(a => a.id === req.body.agentId) : null
   const session = {
     id: crypto.randomUUID(),
     title: req.body.title || 'New session',
-    provider: req.body.provider || null,
-    model: req.body.model || config.settings.defaultModel,
+    agentId: agent ? agent.id : null,
+    // agent picks the model/tools unless the request overrides them
+    provider: req.body.provider || (agent && agent.provider) || null,
+    model: req.body.model || (agent && agent.model) || config.settings.defaultModel,
     cwd: req.body.cwd || config.settings.defaultCwd || os.homedir(),
-    useTools: req.body.useTools !== false,
-    computerControl: Boolean(req.body.computerControl),
+    useTools: req.body.useTools !== undefined ? req.body.useTools !== false : (agent ? agent.useTools !== false : true),
+    computerControl: req.body.computerControl !== undefined ? Boolean(req.body.computerControl) : Boolean(agent && agent.computerControl),
     createdAt: new Date().toISOString(),
     messages: []
   }
@@ -396,7 +432,7 @@ app.get('/api/sessions/:id', (req, res) => {
 app.patch('/api/sessions/:id', (req, res) => {
   const s = loadSession(req.params.id)
   if (!s) return res.status(404).json({ error: 'not found' })
-  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl']) {
+  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'pinned']) {
     if (k in req.body) s[k] = req.body[k]
   }
   saveSession(s)
@@ -421,6 +457,12 @@ app.post('/api/chat', async (req, res) => {
   const apiKey = config.keys[provider.id]
   const hasOAuth = Boolean(config.oauth[provider.id])
   if (provider.auth === 'key' && !apiKey && !hasOAuth) return res.status(400).json({ error: `No API key or subscription sign-in for ${provider.name}. Add one in Settings.` })
+
+  // agent (persona + its skills) plus globally-enabled skills
+  const agent = session.agentId ? (config.agents || []).find(a => a.id === session.agentId) : null
+  const allSkills = config.skills || []
+  const agentSkillIds = new Set(agent?.skills || [])
+  const mergedSkills = allSkills.filter(s => s.enabled || agentSkillIds.has(s.id))
 
   res.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -463,7 +505,8 @@ app.post('/api/chat', async (req, res) => {
       session,
       useTools: session.useTools !== false,
       computerControl: Boolean(session.computerControl),
-      skills: (config.skills || []).filter(s => s.enabled),
+      persona: agent?.persona || '',
+      skills: mergedSkills,
       emit,
       requestApproval,
       signal: controller.signal

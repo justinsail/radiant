@@ -421,6 +421,105 @@ function ModelsPane ({ onModelsChanged }) {
   )
 }
 
+// ---------- Agents ----------
+
+function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
+  const [a, setA] = useState({ ...agent })
+  const set = patch => setA(prev => ({ ...prev, ...patch }))
+  const toggleSkill = id => set({ skills: (a.skills || []).includes(id) ? a.skills.filter(s => s !== id) : [...(a.skills || []), id] })
+  return (
+    <div className='agent-editor'>
+      <div className='agent-editor-head'>
+        <input className='agent-emoji-input' value={a.emoji || ''} maxLength={2} onChange={e => set({ emoji: e.target.value })} />
+        <input className='text-input' style={{ fontFamily: 'inherit', flex: 1 }} placeholder='Agent name' value={a.name} onChange={e => set({ name: e.target.value })} />
+      </div>
+      <label className='agent-field'>Personality / instructions
+        <textarea className='text-input' style={{ fontFamily: 'inherit', minHeight: 90, resize: 'vertical' }} placeholder="e.g. You are a meticulous code reviewer…" value={a.persona || ''} onChange={e => set({ persona: e.target.value })} />
+      </label>
+      <label className='agent-field'>Model
+        <select className='text-input' style={{ fontFamily: 'inherit' }} value={a.model || ''} onChange={e => {
+          const m = models.find(x => x.id === e.target.value)
+          set({ model: e.target.value || null, provider: m ? m.provider : null })
+        }}>
+          <option value=''>Session default (pick per chat)</option>
+          {models.map(m => <option key={m.provider + m.id} value={m.id}>{m.providerName} · {m.id}</option>)}
+        </select>
+      </label>
+      <label className='agent-field'>Color
+        <input type='range' min='0' max='360' className='hue-slider' value={a.hue ?? 258} onChange={e => set({ hue: Number(e.target.value) })} />
+      </label>
+      {skills.length > 0 && (
+        <div className='agent-field'>Skills always on for this agent
+          <div className='agent-skills'>
+            {skills.map(sk => (
+              <label key={sk.id} className='agent-skill-chk'>
+                <input type='checkbox' checked={(a.skills || []).includes(sk.id)} onChange={() => toggleSkill(sk.id)} /> {sk.name}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className='agent-field-row'>
+        <label className='agent-skill-chk'><input type='checkbox' checked={a.useTools !== false} onChange={e => set({ useTools: e.target.checked })} /> Agent tools</label>
+        <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(a.computerControl)} onChange={e => set({ computerControl: e.target.checked })} /> Computer control</label>
+      </div>
+      <div className='row' style={{ marginTop: 10 }}>
+        <button className='small-btn primary' onClick={() => onSave(a)} disabled={!a.name?.trim()}>Save</button>
+        <button className='small-btn' onClick={onClose}>Cancel</button>
+        {!agent.builtin && agent.id && <button className='small-btn danger' style={{ marginLeft: 'auto' }} onClick={() => onDelete(agent.id)}>Delete</button>}
+      </div>
+    </div>
+  )
+}
+
+function AgentsPane ({ config, onConfigChange }) {
+  const agents = config.agents || []
+  const skills = config.skills || []
+  const [models, setModels] = useState([])
+  const [editing, setEditing] = useState(null) // agent object or null
+  useEffect(() => { api.getModels().then(setModels).catch(() => {}) }, [])
+
+  const saveAgent = async a => {
+    const cfg = a.id && agents.find(x => x.id === a.id)
+      ? await api.updateAgent(a.id, a)
+      : await api.addAgent(a)
+    setEditing(null)
+    onConfigChange(cfg)
+  }
+  const del = async id => { onConfigChange(await api.deleteAgent(id)); setEditing(null) }
+
+  if (editing) {
+    return (
+      <div className='set-section'>
+        <h3>{editing.id ? 'Edit agent' : 'New agent'}</h3>
+        <AgentEditor agent={editing} skills={skills} models={models} onSave={saveAgent} onDelete={del} onClose={() => setEditing(null)} />
+      </div>
+    )
+  }
+
+  return (
+    <div className='set-section'>
+      <h3>Agents</h3>
+      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
+        Agents are named bots with their own personality, model, and skills — start a session with one to give the agent a role.
+      </p>
+      <div className='agent-grid'>
+        {agents.map(a => (
+          <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 258 }} onClick={() => setEditing(a)}>
+            <span className='agent-avatar'>{a.emoji || '🤖'}</span>
+            <span className='agent-card-name'>{a.name}</span>
+            <span className='agent-card-desc'>{a.persona ? a.persona.slice(0, 70) + (a.persona.length > 70 ? '…' : '') : 'General assistant'}</span>
+          </button>
+        ))}
+        <button className='agent-card agent-card-new' onClick={() => setEditing({ name: '', emoji: '🤖', hue: 258, persona: '', model: null, provider: null, skills: [], useTools: true })}>
+          <span className='agent-avatar'>+</span>
+          <span className='agent-card-name'>New agent</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ---------- Skills ----------
 
 function SkillsPane ({ config, onConfigChange }) {
@@ -761,9 +860,10 @@ function AboutPane ({ config, onSettings }) {
 const TABS = [
   { id: 'providers', label: 'Providers' },
   { id: 'models', label: 'Models' },
+  { id: 'agents', label: 'Agents' },
   { id: 'skills', label: 'Skills' },
   { id: 'appearance', label: 'Appearance' },
-  { id: 'agent', label: 'Agent' },
+  { id: 'agent', label: 'Automation' },
   { id: 'about', label: 'About' }
 ]
 
@@ -786,6 +886,7 @@ export default function Settings ({ config, initialTab = 'providers', embedded =
         <div className='modal-body'>
           {tab === 'providers' && <ProvidersPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
+          {tab === 'agents' && <AgentsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'skills' && <SkillsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
           {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}

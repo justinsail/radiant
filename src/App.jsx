@@ -66,9 +66,15 @@ export default function App () {
     if (streamingSessionRef.current !== id) { setLive(null); setApproval(null) }
   }
 
-  const newSession = async () => {
-    const best = models[0]
-    const s = await api.createSession(best ? { provider: best.provider, model: best.id } : {})
+  const newSession = async (agentId) => {
+    const agent = agentId ? (config.agents || []).find(a => a.id === agentId) : null
+    const body = agentId ? { agentId } : {}
+    // if the agent has no fixed model, seed with the first available model
+    if (!(agent && agent.model)) {
+      const best = models[0]
+      if (best) { body.provider = best.provider; body.model = best.id }
+    }
+    const s = await api.createSession(body)
     setSession(s)
     setLive(null)
     setApproval(null)
@@ -201,6 +207,7 @@ export default function App () {
       <Chat
         rightOpen={rightOpen}
         onToggleRight={() => setRightOpen(o => !o)}
+        agents={config.agents || []}
         session={session}
         live={live}
         approval={approval}

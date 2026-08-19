@@ -21,6 +21,13 @@ const DEFAULT_CONFIG = {
     { id: 'seed-plan', name: 'Plan before acting', description: 'State a brief plan before non-trivial changes.', content: 'Before making non-trivial changes, state your plan in 1–2 sentences, then carry it out. Keep the user oriented on what you are about to do.', enabled: false },
     { id: 'seed-minimal', name: 'Minimal diffs', description: 'Smallest change that solves the problem.', content: 'Make the smallest change that solves the problem. Match the surrounding code style and conventions. Do not refactor or reformat unrelated code.', enabled: false }
   ],
+  agents: [
+    { id: 'agent-radiant', name: 'Radiant', emoji: '✦', hue: 258, persona: '', model: null, provider: null, skills: [], useTools: true, builtin: true },
+    { id: 'agent-reviewer', name: 'Reviewer', emoji: '🔍', hue: 25, persona: 'You are a meticulous senior code reviewer. Hunt for bugs, edge cases, security issues, race conditions, and unclear code. Be specific — cite files and lines. Prioritize correctness over style, and call out what you are NOT sure about.', model: null, provider: null, skills: [], useTools: true, builtin: true },
+    { id: 'agent-architect', name: 'Architect', emoji: '📐', hue: 200, persona: 'You are a software architect. Before writing code, think about structure, boundaries, data flow, and tradeoffs. Propose a design, note alternatives, and only then implement. Favor simple, evolvable designs.', model: null, provider: null, skills: [], useTools: true, builtin: true },
+    { id: 'agent-explainer', name: 'Explainer', emoji: '💡', hue: 90, persona: 'You explain code and concepts clearly for someone learning. Use plain language, small examples, and analogies. Read the code first, then teach it top-down. Prefer clarity over completeness.', model: null, provider: null, skills: [], useTools: true, builtin: true },
+    { id: 'agent-pair', name: 'Pair', emoji: '🧑‍💻', hue: 300, persona: 'You are a pair-programming partner. Think out loud, suggest approaches before coding, keep changes small and reversible, and check in when a decision has real tradeoffs.', model: null, provider: null, skills: [], useTools: true, builtin: true }
+  ],
   settings: {
     mode: 'dark',
     themeId: 'steel',
@@ -55,6 +62,7 @@ export function loadConfig () {
     cfg.keys = saved.keys || {}
     cfg.oauth = saved.oauth || {}
     if (saved.skills) cfg.skills = saved.skills
+    if (saved.agents) cfg.agents = saved.agents
     cfg.settings = { ...cfg.settings, ...(saved.settings || {}) }
   } catch { /* first run */ }
   return cfg
@@ -74,6 +82,7 @@ export function publicConfig (cfg) {
       signedIn: Boolean(cfg.oauth[p.id])
     })),
     skills: cfg.skills || [],
+    agents: cfg.agents || [],
     settings: cfg.settings
   }
 }

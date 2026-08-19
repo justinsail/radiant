@@ -60,12 +60,13 @@ function ThinkingTrace ({ thinking, active, seconds }) {
   )
 }
 
-function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming, model }) {
+function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming, model, agent }) {
   return (
     <div className='msg msg-assistant'>
       <div className='who'>
-        <span className='logo-mark' aria-hidden />
-        <span className='wordmark who-word'>Radiant</span>
+        {agent
+          ? <><span className='who-agent-emoji' style={{ '--ah': agent.hue ?? 258 }}>{agent.emoji || '🤖'}</span><span className='who-word'>{agent.name}</span></>
+          : <><span className='logo-mark' aria-hidden /><span className='wordmark who-word'>Radiant</span></>}
         {model && <span className='who-model'>{model}</span>}
         {streaming && <span className='who-model'>· working</span>}
       </div>
@@ -190,7 +191,7 @@ function readFileAsAttachment (file) {
   })
 }
 
-export default function Chat ({ session, live, approval, usage, error, models, onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight }) {
+export default function Chat ({ session, live, approval, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight }) {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
@@ -236,9 +237,19 @@ export default function Chat ({ session, live, approval, usage, error, models, o
             <div className='logo-mark big-mark' aria-hidden />
             <div className='wordmark welcome-word'>Radiant</div>
             <div className='welcome-tagline'>A Templeton Technologies Product</div>
-            <p style={{ marginTop: 26 }}>
-              <button className='small-btn primary' onClick={onNew}>Start a session</button>
-            </p>
+            {agents.length > 0
+              ? <>
+                  <p className='hint' style={{ marginTop: 22 }}>Start a session with an agent</p>
+                  <div className='welcome-agents'>
+                    {agents.map(a => (
+                      <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 258 }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
+                        <span className='agent-avatar'>{a.emoji || '🤖'}</span>
+                        <span className='welcome-agent-name'>{a.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              : <p style={{ marginTop: 26 }}><button className='small-btn primary' onClick={() => onNew()}>Start a session</button></p>}
           </div>
         </div>
       </main>
@@ -246,6 +257,7 @@ export default function Chat ({ session, live, approval, usage, error, models, o
   }
 
   const toolsOn = session.useTools !== false
+  const sessionAgent = agents.find(a => a.id === session.agentId) || null
 
   return (
     <main className='main'>
@@ -283,10 +295,11 @@ export default function Chat ({ session, live, approval, usage, error, models, o
                     {m.text}
                   </div>
                 </div>
-              : <AssistantMessage key={i} parts={m.parts || []} model={m.model} />
+              : <AssistantMessage key={i} parts={m.parts || []} model={m.model} agent={sessionAgent} />
           )}
           {live && (
             <AssistantMessage
+              agent={sessionAgent}
               model={session.model}
               parts={live.parts}
               thinking={live.thinking}
