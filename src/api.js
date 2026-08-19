@@ -37,7 +37,8 @@ export const api = {
   oauthStatus: id => json('GET', `/api/oauth/${id}/status`),
   oauthSignout: id => json('POST', `/api/oauth/${id}/signout`),
   getVersion: () => json('GET', '/api/version'),
-  updateCheck: () => json('GET', '/api/update-check')
+  updateCheck: () => json('GET', '/api/update-check'),
+  computerStatus: () => json('GET', '/api/computer-status')
 }
 
 // POST /api/pull streams SSE progress events back on the response body.

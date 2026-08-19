@@ -67,7 +67,7 @@
 html, body, #root { height: 100%; margin: 0; }
 body {
   font-family: var(--font-body);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--ui-scale, 1));
   letter-spacing: -0.01em;
   background: var(--bg);
   color: var(--text);
@@ -174,6 +174,9 @@ code, pre, .mono { font-family: var(--font-mono); }
 .about-ver { color: var(--text-muted); font-size: 12.5px; margin-top: 2px; }
 .update-avail { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--accent-dim); background: var(--accent-wash); border-radius: 10px; font-size: 13px; }
 .update-none { margin-top: 12px; color: var(--text-muted); font-size: 13px; }
+.about-footer { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); text-align: center; }
+.about-footer-text { font-size: 12px; color: var(--text-faint); letter-spacing: 0.02em; margin-bottom: 10px; }
+.about-footer-logo { max-width: 180px; max-height: 56px; opacity: 0.9; }
 .icon-btn {
   padding: 6px 9px; border: 1px solid transparent; border-radius: 8px;
   background: transparent; color: var(--text-muted); font-size: 12.5px;
@@ -418,7 +421,13 @@ code, pre, .mono { font-family: var(--font-mono); }
   border-left: 1px solid var(--border);
   background: var(--bg-panel);
   display: flex; flex-direction: column; min-width: 0;
+  position: relative;
 }
+.right-resize {
+  position: absolute; top: 0; left: -3px; width: 6px; height: 100%;
+  cursor: col-resize; z-index: 20;
+}
+.right-resize:hover { background: var(--accent-dim); }
 .right-tabs { display: flex; gap: 2px; align-items: center; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
 .right-tab {
   padding: 5px 11px; border: 1px solid transparent; background: none;
@@ -501,6 +510,7 @@ code, pre, .mono { font-family: var(--font-mono); }
 .small-btn.primary:hover { background: var(--accent-hot); }
 .small-btn.danger { color: var(--danger); }
 
+.sub-label { font-size: 12px; color: var(--text-muted); margin: 16px 0 8px; }
 .theme-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .theme-swatch {
   display: flex; align-items: center; gap: 8px;
@@ -529,6 +539,8 @@ input[type='range']::-webkit-slider-thumb {
 }
 .mode-row { display: flex; gap: 8px; margin-bottom: 12px; }
 
+.comp-stat { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12.5px; }
+.comp-stat .desc { color: var(--text-faint); font-size: 12px; }
 .check-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
 .check-row input { accent-color: var(--accent); width: 15px; height: 15px; }
 .check-row .desc { color: var(--text-faint); font-size: 12px; }

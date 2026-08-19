@@ -52,6 +52,7 @@
     "dompurify": "^3.4.13",
     "express": "^4.21.2",
     "node-pty": "^1.0.0",
+    "playwright-core": "^1.62.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {

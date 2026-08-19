@@ -157,7 +157,7 @@ function readFileAsAttachment (file) {
   })
 }
 
-export default function Chat ({ session, live, approval, usage, error, models, onSend, onStop, onApproval, onPickModel, onToggleTools, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight }) {
+export default function Chat ({ session, live, approval, usage, error, models, onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight }) {
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
@@ -309,6 +309,13 @@ export default function Chat ({ session, live, approval, usage, error, models, o
             >
               <span className='logo-mark' aria-hidden />
               tools {toolsOn ? 'on' : 'off'}
+            </button>
+            <button
+              className={'pill-toggle' + (session.computerControl ? ' on' : '')}
+              onClick={onToggleComputer}
+              title='When on, the model can control the browser and desktop (needs a vision model and macOS permissions)'
+            >
+              🖥 computer {session.computerControl ? 'on' : 'off'}
             </button>
             <div className='grow' />
             {usage && (usage.input || usage.output) ? (

@@ -21,6 +21,8 @@ const DEFAULT_CONFIG = {
     themeId: 'steel',
     customHue: 45,
     customChroma: 0.19,
+    fontFamily: 'inter',
+    uiScale: 1,
     approveCommands: true,
     autoUpdateCheck: true,
     defaultModel: null,

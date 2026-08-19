@@ -10,6 +10,21 @@ export const THEMES = [
   { id: 'mono', name: 'Graphite', hue: 260, chroma: 0.01 }
 ]
 
+export const FONTS = [
+  { id: 'inter', name: 'Inter', stack: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" },
+  { id: 'system', name: 'System', stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+  { id: 'rounded', name: 'Rounded', stack: "'SF Pro Rounded', 'Avenir Next', 'Segoe UI', sans-serif" },
+  { id: 'serif', name: 'Serif', stack: "'Iowan Old Style', Georgia, 'Times New Roman', serif" },
+  { id: 'mono', name: 'Mono', stack: "'JetBrains Mono', ui-monospace, monospace" }
+]
+
+export const UI_SCALES = [
+  { id: 0.9, name: 'Small' },
+  { id: 1, name: 'Default' },
+  { id: 1.12, name: 'Large' },
+  { id: 1.25, name: 'Larger' }
+]
+
 export function applyTheme (settings) {
   const root = document.documentElement
   const preset = THEMES.find(t => t.id === settings.themeId)
@@ -21,4 +36,7 @@ export function applyTheme (settings) {
   if (window.radiantNative) window.radiantNative.setMode(mode)
   root.style.setProperty('--accent-h', String(hue))
   root.style.setProperty('--accent-c', String(chroma))
+  const font = FONTS.find(f => f.id === settings.fontFamily) || FONTS[0]
+  root.style.setProperty('--font-body', font.stack)
+  root.style.setProperty('--ui-scale', String(settings.uiScale || 1))
 }

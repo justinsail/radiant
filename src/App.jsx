@@ -192,6 +192,7 @@ export default function App () {
         onApproval={answerApproval}
         onPickModel={m => patchSession({ provider: m.provider, model: m.id })}
         onToggleTools={() => patchSession({ useTools: !(session.useTools !== false) })}
+        onToggleComputer={() => patchSession({ computerControl: !session.computerControl })}
         onSetCwd={cwd => patchSession({ cwd })}
         onNew={newSession}
         onRefreshModels={refreshModels}

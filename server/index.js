@@ -64,6 +64,16 @@ app.delete('/api/providers/:id', (req, res) => {
   res.json(publicConfig(config))
 })
 
+// ---------- computer control status ----------
+app.get('/api/computer-status', async (req, res) => {
+  try {
+    const { computerStatus } = await import('./computer-tools.js')
+    res.json(await computerStatus())
+  } catch (e) {
+    res.json({ desktop: false, browser: false, error: e.message })
+  }
+})
+
 // ---------- version & updates ----------
 app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }))
 
@@ -280,6 +290,7 @@ app.post('/api/sessions', (req, res) => {
     model: req.body.model || config.settings.defaultModel,
     cwd: req.body.cwd || config.settings.defaultCwd || os.homedir(),
     useTools: req.body.useTools !== false,
+    computerControl: Boolean(req.body.computerControl),
     createdAt: new Date().toISOString(),
     messages: []
   }
@@ -296,7 +307,7 @@ app.get('/api/sessions/:id', (req, res) => {
 app.patch('/api/sessions/:id', (req, res) => {
   const s = loadSession(req.params.id)
   if (!s) return res.status(404).json({ error: 'not found' })
-  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools']) {
+  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl']) {
     if (k in req.body) s[k] = req.body[k]
   }
   saveSession(s)
@@ -361,6 +372,7 @@ app.post('/api/chat', async (req, res) => {
       getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
       session,
       useTools: session.useTools !== false,
+      computerControl: Boolean(session.computerControl),
       emit,
       requestApproval,
       signal: controller.signal

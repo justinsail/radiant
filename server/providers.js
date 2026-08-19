@@ -1,12 +1,14 @@
 import os from 'os'
 import { TOOL_DEFS, runTool } from './tools.js'
+import { COMPUTER_TOOL_DEFS, COMPUTER_TOOL_NAMES, COMPUTER_SAFE, runComputerTool } from './computer-tools.js'
 
 const MAX_ROUNDS = 30
 
-function systemPrompt (cwd, useTools, model) {
+function systemPrompt (cwd, useTools, model, computerControl) {
   return `You are a coding agent running inside Radiant, a local coding harness on the user's ${os.type() === 'Darwin' ? 'Mac' : os.type()} (${os.platform()} ${os.release()}). Radiant is the app, not you: you are the model "${model}". If asked what model you are, answer with your actual model name and maker.
 Workspace directory: ${cwd}
-${useTools ? 'You have tools to read, write, and edit files and to run shell commands in the workspace. Use them to investigate before answering and to make changes when asked. Prefer edit_file for small changes and write_file for new files. After making changes, verify them when practical (run the code, run tests).' : 'Tools are disabled for this conversation; answer from knowledge and the conversation only.'}
+${useTools ? 'You have tools to read, write, and edit files and to run shell commands in the workspace. Use them to investigate before answering and to make changes when asked. Prefer edit_file for small changes and write_file for new files. After making changes, verify them when practical (run the code, run tests).' : 'Tools are disabled for this conversation; answer from knowledge and the conversation only.'}${computerControl ? `
+You can also control the computer. browser_* tools drive an automated browser; screen_* tools control the whole desktop. ALWAYS take a screenshot first (browser_screenshot / screen_screenshot) and look at it before clicking or typing — click coordinates are pixel positions read from the most recent screenshot. Work in small steps: screenshot, act, screenshot again to confirm. Prefer browser_* for web tasks.` : ''}
 Be direct and concise. Use markdown; fence code blocks with a language tag. When you finish a task, summarize what changed in a sentence or two.`
 }
 
@@ -45,7 +47,14 @@ function toAnthropic (messages) {
     const flush = () => {
       if (pendingTools.length) {
         out.push({ role: 'assistant', content: [...blocks, ...pendingTools.map(t => ({ type: 'tool_use', id: t.id, name: t.name, input: t.args }))] })
-        out.push({ role: 'user', content: pendingTools.map(t => ({ type: 'tool_result', tool_use_id: t.id, content: String(t.result ?? '') })) })
+        out.push({
+          role: 'user',
+          content: pendingTools.map(t => {
+            const c = [{ type: 'text', text: String(t.result ?? '') }]
+            if (t.resultImage) c.push({ type: 'image', source: { type: 'base64', media_type: t.resultImage.mime, data: t.resultImage.dataB64 } })
+            return { type: 'tool_result', tool_use_id: t.id, content: c }
+          })
+        })
         blocks = []; pendingTools = []
       }
     }
@@ -83,6 +92,12 @@ function toOpenAI (messages, system) {
           tool_calls: pendingTools.map(t => ({ id: t.id, type: 'function', function: { name: t.name, arguments: JSON.stringify(t.args) } }))
         })
         for (const t of pendingTools) out.push({ role: 'tool', tool_call_id: t.id, content: String(t.result ?? '') })
+        // OpenAI tool results can't carry images; surface any screenshots as a
+        // follow-up user message so vision models can see them
+        const imgs = pendingTools.filter(t => t.resultImage)
+        if (imgs.length) {
+          out.push({ role: 'user', content: imgs.map(t => ({ type: 'image_url', image_url: { url: `data:${t.resultImage.mime};base64,${t.resultImage.dataB64}` } })) })
+        }
         text = ''; pendingTools = []
       }
     }
@@ -118,7 +133,7 @@ async function * sseEvents (response) {
 }
 
 // ---------- single API round, streaming; returns {parts, stopOnTools} ----------
-async function anthropicRound ({ baseUrl, apiKey, accessToken, model, messages, system, tools, emit, signal }) {
+async function anthropicRound ({ baseUrl, apiKey, accessToken, model, messages, system, tools, toolDefs, emit, signal }) {
   // Subscription (OAuth) requests must present as Claude Code: the first system
   // block is the CLI's identity, auth is Bearer, and the oauth beta is set.
   const CLAUDE_CODE_ID = "You are Claude Code, Anthropic's official CLI for Claude."
@@ -126,7 +141,7 @@ async function anthropicRound ({ baseUrl, apiKey, accessToken, model, messages, 
     ? [{ type: 'text', text: CLAUDE_CODE_ID }, { type: 'text', text: system }]
     : system
   const body = { model, max_tokens: 8192, system: sys, messages, stream: true }
-  if (tools) body.tools = TOOL_DEFS.map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema }))
+  if (tools) body.tools = (toolDefs || TOOL_DEFS).map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema }))
   const headers = { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' }
   if (accessToken) {
     headers.authorization = `Bearer ${accessToken}`
@@ -176,10 +191,10 @@ async function anthropicRound ({ baseUrl, apiKey, accessToken, model, messages, 
   return { parts, stopOnTools: stopReason === 'tool_use' }
 }
 
-async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, tools, emit, signal }) {
+async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, tools, toolDefs, emit, signal }) {
   const body = { model, messages, stream: true }
   if (tools) {
-    body.tools = TOOL_DEFS.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
+    body.tools = (toolDefs || TOOL_DEFS).map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
   }
   const headers = { 'content-type': 'application/json' }
   const bearer = accessToken || apiKey
@@ -218,13 +233,14 @@ async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, too
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, emit, requestApproval, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, computerControl, emit, requestApproval, signal }) {
   const cwd = session.cwd || os.homedir()
-  const system = systemPrompt(cwd, useTools, model)
+  const system = systemPrompt(cwd, useTools, model, computerControl)
   const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
 
   const accessToken = getAccessToken ? await getAccessToken() : null
+  const toolDefs = computerControl ? [...TOOL_DEFS, ...COMPUTER_TOOL_DEFS] : TOOL_DEFS
 
   let toolsEnabled = useTools
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -236,6 +252,7 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, sessio
       model,
       system,
       tools: toolsEnabled,
+      toolDefs,
       emit,
       signal
     }
@@ -264,16 +281,21 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, sessio
       const part = { type: 'tool', id: call.id, name: call.name, args: call.args }
       assistant.parts.push(part)
       emit({ type: 'tool_start', id: call.id, name: call.name, args: call.args })
-      let approved = true
-      if (call.name === 'run_command' && requestApproval) {
-        approved = await requestApproval(call)
-      }
+      const isComputer = COMPUTER_TOOL_NAMES.has(call.name)
+      const needsApproval = requestApproval && (call.name === 'run_command' || (isComputer && !COMPUTER_SAFE.has(call.name)))
+      const approved = needsApproval ? await requestApproval(call) : true
       if (signal.aborted) return
-      part.result = approved
-        ? await runTool(call.name, call.args, cwd)
-        : 'The user declined to run this command. Ask them how they would like to proceed, or try a different approach.'
-      if (!approved) part.denied = true
-      emit({ type: 'tool_result', id: call.id, result: part.result, denied: !approved })
+      if (!approved) {
+        part.denied = true
+        part.result = 'The user declined this action. Ask them how they would like to proceed, or try a different approach.'
+      } else if (isComputer) {
+        const r = await runComputerTool(call.name, call.args)
+        part.result = r.content
+        if (r.image) part.resultImage = r.image
+      } else {
+        part.result = await runTool(call.name, call.args, cwd)
+      }
+      emit({ type: 'tool_result', id: call.id, result: part.result, denied: !approved, hasImage: Boolean(part.resultImage) })
     }
   }
   emit({ type: 'notice', text: `Stopped after ${MAX_ROUNDS} tool rounds.` })

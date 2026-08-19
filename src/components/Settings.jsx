@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { api, streamPull } from '../api.js'
-import { THEMES, applyTheme } from '../theme.js'
+import { THEMES, FONTS, UI_SCALES, applyTheme } from '../theme.js'
 
 // ---------- Providers ----------
 
@@ -384,6 +384,33 @@ function AppearancePane ({ config, onSettings }) {
           </div>
         </>
       )}
+
+      <div className='sub-label'>Font</div>
+      <div className='theme-grid'>
+        {FONTS.map(f => (
+          <button
+            key={f.id}
+            className={'theme-swatch' + ((s.fontFamily || 'inter') === f.id ? ' selected' : '')}
+            style={{ fontFamily: f.stack }}
+            onClick={() => preview({ fontFamily: f.id })}
+          >
+            {f.name}
+          </button>
+        ))}
+      </div>
+
+      <div className='sub-label'>Text size</div>
+      <div className='theme-grid'>
+        {UI_SCALES.map(u => (
+          <button
+            key={u.id}
+            className={'theme-swatch' + ((s.uiScale || 1) === u.id ? ' selected' : '')}
+            onClick={() => preview({ uiScale: u.id })}
+          >
+            {u.name}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -393,6 +420,8 @@ function AppearancePane ({ config, onSettings }) {
 function AgentPane ({ config, onSettings }) {
   const s = config.settings
   const [cwdDraft, setCwdDraft] = useState(s.defaultCwd || '')
+  const [comp, setComp] = useState(null)
+  useEffect(() => { api.computerStatus().then(setComp).catch(() => {}) }, [])
   return (
     <div className='set-section'>
       <h3>Agent</h3>
@@ -412,6 +441,27 @@ function AgentPane ({ config, onSettings }) {
           onChange={e => setCwdDraft(e.target.value)}
           onBlur={() => cwdDraft && onSettings({ defaultCwd: cwdDraft })}
         />
+      </div>
+
+      <h3 style={{ marginTop: 22 }}>Computer control</h3>
+      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
+        Turn on the <strong>computer</strong> toggle in the chat bar to let the agent drive a browser and your desktop.
+        Use a vision-capable model (Claude, GPT-4o, or a local VL model) so it can see what it's doing.
+      </p>
+      <div className='spec-card' style={{ marginTop: 4 }}>
+        <div className='comp-stat'>
+          <span className={comp?.browser ? 'key-ok' : 'fit-badge fit-no'}>{comp?.browser ? '✓' : '—'} Browser control</span>
+          <span className='desc'>drives your system Chrome — ready to use</span>
+        </div>
+        <div className='comp-stat'>
+          <span className={comp?.desktop ? 'key-ok' : 'fit-badge fit-no'}>{comp?.desktop ? '✓' : '—'} Desktop control</span>
+          <span className='desc'>needs macOS permissions granted to Radiant</span>
+        </div>
+        <div className='spec-note' style={{ marginTop: 10 }}>
+          For desktop control, grant Radiant <strong>Screen Recording</strong> (to see the screen) and
+          <strong> Accessibility</strong> (to click and type) in System Settings → Privacy &amp; Security.
+          macOS prompts on first use. Browser control needs no permissions.
+        </div>
       </div>
     </div>
   )
@@ -477,6 +527,16 @@ function AboutPane ({ config, onSettings }) {
       <div className='oauth-note'>
         The desktop app also has <span className='mono'>Radiant → Check for Updates…</span> in the menu bar.
         Auto-install requires a signed build; for now updates are one-click downloads.
+      </div>
+
+      <div className='about-footer'>
+        <div className='about-footer-text'>A Templeton Technologies Product</div>
+        <img
+          className='about-footer-logo'
+          src='/templeton-tech.png'
+          alt='Templeton Technologies'
+          onError={e => { e.currentTarget.style.display = 'none' }}
+        />
       </div>
     </div>
   )
