@@ -249,11 +249,13 @@ code, pre, .mono { font-family: var(--font-mono); }
 
 /* neon grid */
 .m-grid {
-  position: absolute; left: -50%; right: -50%; bottom: -20%; height: 130%;
-  background-image: linear-gradient(oklch(0.7 0.2 var(--accent-h) / 0.5) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.7 0.2 var(--accent-h) / 0.5) 1px, transparent 1px);
-  background-size: 44px 44px; opacity: 0.3;
-  transform: perspective(340px) rotateX(62deg); transform-origin: bottom;
+  position: absolute; left: -50%; right: -50%; bottom: 0; height: 55%;
+  background-image: linear-gradient(oklch(0.72 0.2 var(--accent-h) / 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.72 0.2 var(--accent-h) / 0.6) 1px, transparent 1px);
+  background-size: 44px 44px; opacity: 0.5;
+  transform: perspective(500px) rotateX(68deg); transform-origin: bottom;
+  -webkit-mask: linear-gradient(to top, #000 45%, transparent);
+  mask: linear-gradient(to top, #000 45%, transparent);
   animation: grid-scroll 2.2s linear infinite;
 }
 @keyframes grid-scroll { from { background-position: 0 0; } to { background-position: 0 44px; } }
