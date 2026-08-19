@@ -56,7 +56,7 @@ async function createWindow () {
   await win.loadURL(`http://127.0.0.1:${port}`)
 
   // menu-bar "Check for Updates…" + a quiet auto-check on launch
-  updater = installUpdater({ getPort: () => serverPort, getWindow: () => win })
+  updater = installUpdater({ getWindow: () => win })
   updater.startAutoCheck()
 }
 

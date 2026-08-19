@@ -1,6 +1,6 @@
 {
   "name": "radiant",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Radiant — a local coding harness: chat with coding agents across cloud and local models.",
   "author": "Tony Ricciardi",
@@ -23,6 +23,14 @@
       "output": "release",
       "buildResources": "build"
     },
+    "afterSign": "build/notarize-hook.cjs",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "templetongroup",
+        "repo": "radiant"
+      }
+    ],
     "files": [
       "dist/**",
       "server/**",
@@ -62,12 +70,14 @@
   },
   "dependencies": {
     "dompurify": "^3.4.13",
+    "electron-updater": "^6.8.9",
     "express": "^4.21.2",
     "node-pty": "^1.0.0",
     "playwright-core": "^1.62.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.1",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.1.1",
     "@fontsource/montserrat": "^5.3.0",

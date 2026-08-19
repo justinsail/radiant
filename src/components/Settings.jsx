@@ -591,17 +591,42 @@ function AgentPane ({ config, onSettings }) {
 function AboutPane ({ config, onSettings }) {
   const s = config.settings
   const [version, setVersion] = useState(null)
-  const [status, setStatus] = useState(null) // update-check result or {error}
+  const [status, setStatus] = useState(null) // { hasUpdate, latest, current } | { error }
   const [checking, setChecking] = useState(false)
+  const [phase, setPhase] = useState('idle') // idle | downloading | ready
+  const [progress, setProgress] = useState(0)
+  const native = typeof window !== 'undefined' && window.radiantUpdater
 
   useEffect(() => { api.getVersion().then(v => setVersion(v.version)).catch(() => {}) }, [])
 
+  // listen to auto-updater events in the packaged app
+  useEffect(() => {
+    if (!native) return
+    return native.onEvent(ev => {
+      if (ev.type === 'progress') { setPhase('downloading'); setProgress(ev.data.percent || 0) }
+      else if (ev.type === 'downloaded') setPhase('ready')
+      else if (ev.type === 'error') { setStatus({ error: ev.data.message }); setPhase('idle') }
+    })
+  }, [native])
+
   const check = async () => {
     setChecking(true); setStatus(null)
-    try { setStatus(await api.updateCheck()) } catch (e) { setStatus({ error: e.message }) }
+    try {
+      if (native) {
+        const r = await native.check()
+        if (r.error) setStatus({ error: r.error })
+        else setStatus({ hasUpdate: r.hasUpdate, latest: r.version, current: r.current })
+      } else {
+        const r = await api.updateCheck()
+        setStatus({ hasUpdate: r.hasUpdate, latest: r.latest, current: r.current, dmgUrl: r.dmgUrl })
+      }
+    } catch (e) { setStatus({ error: e.message }) }
     setChecking(false)
   }
-  const download = () => { if (status?.dmgUrl) window.open(status.dmgUrl, '_blank', 'noopener') }
+
+  const startDownload = () => { setPhase('downloading'); setProgress(0); native.download() }
+  const restart = () => native.install()
+  const openReleasePage = () => window.open(status?.dmgUrl || 'https://github.com/templetongroup/radiant/releases/latest', '_blank', 'noopener')
 
   return (
     <div className='set-section'>
@@ -615,7 +640,7 @@ function AboutPane ({ config, onSettings }) {
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <button className='small-btn primary' onClick={check} disabled={checking}>
+        <button className='small-btn primary' onClick={check} disabled={checking || phase !== 'idle'}>
           {checking ? 'Checking…' : 'Check for updates'}
         </button>
       </div>
@@ -624,12 +649,24 @@ function AboutPane ({ config, onSettings }) {
         status.hasUpdate
           ? <div className='update-avail'>
               <div><strong>Radiant {status.latest}</strong> is available (you have {status.current}).</div>
-              <div className='row' style={{ marginTop: 8 }}>
-                <button className='small-btn primary' onClick={download}>Download</button>
-              </div>
-              <div className='oauth-note' style={{ marginTop: 8 }}>
-                Download the new .dmg and drag Radiant into Applications to replace this copy.
-              </div>
+              {native
+                ? (phase === 'ready'
+                    ? <div className='row' style={{ marginTop: 8, alignItems: 'center', gap: 10 }}>
+                        <button className='small-btn primary' onClick={restart}>Restart &amp; install</button>
+                        <span className='oauth-note'>Downloaded — Radiant will relaunch on the new version.</span>
+                      </div>
+                    : phase === 'downloading'
+                      ? <div style={{ marginTop: 10 }}>
+                          <div className='pull-bar' style={{ width: '100%' }}><span style={{ width: progress + '%' }} /></div>
+                          <div className='oauth-note' style={{ marginTop: 6 }}>Downloading… {progress}%</div>
+                        </div>
+                      : <div className='row' style={{ marginTop: 8 }}>
+                          <button className='small-btn primary' onClick={startDownload}>Download &amp; install</button>
+                        </div>)
+                : <div className='row' style={{ marginTop: 8 }}>
+                    <button className='small-btn primary' onClick={openReleasePage}>Download</button>
+                    <span className='oauth-note' style={{ marginLeft: 8 }}>Opens the release page (auto-install works in the installed app).</span>
+                  </div>}
             </div>
           : <div className='update-none'>You're on the latest version ({status.current}).</div>
       )}
@@ -645,7 +682,7 @@ function AboutPane ({ config, onSettings }) {
       </label>
       <div className='oauth-note'>
         The desktop app also has <span className='mono'>Radiant → Check for Updates…</span> in the menu bar.
-        Auto-install requires a signed build; for now updates are one-click downloads.
+        Updates download in the background and install when you restart.
       </div>
 
       <div className='about-footer'>
