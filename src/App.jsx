@@ -6,6 +6,7 @@ import Chat from './components/Chat.jsx'
 import RightPanel from './components/RightPanel.jsx'
 import Settings from './components/Settings.jsx'
 import MotionBackground from './components/MotionBackground.jsx'
+import CommandPalette from './components/CommandPalette.jsx'
 
 export default function App () {
   const [config, setConfig] = useState(null)
@@ -22,6 +23,7 @@ export default function App () {
   const [rightOpen, setRightOpen] = useState(false)
   const [rightTab, setRightTab] = useState('activity')
   const [updateInfo, setUpdateInfo] = useState(null) // {latest, dmgUrl} when an update exists
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
@@ -175,6 +177,19 @@ export default function App () {
   }
 
   const stop = () => { if (session) api.abort(session.id) }
+
+  // global keyboard shortcuts
+  useEffect(() => {
+    const onKey = e => {
+      const meta = e.metaKey || e.ctrlKey
+      if (meta && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen(o => !o) }
+      else if (meta && e.key.toLowerCase() === 'n') { e.preventDefault(); newSession() }
+      else if (meta && e.key === ',') { e.preventDefault(); openSettings() }
+      else if (e.key === 'Escape' && live?.streaming) { stop() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
   const answerApproval = async (id, approved) => {
     setApproval(null)
     await api.approve(id, approved)
@@ -232,6 +247,26 @@ export default function App () {
           cwd={session?.cwd}
           mode={config.settings.mode}
           onClose={() => setRightOpen(false)}
+        />
+      )}
+      {paletteOpen && (
+        <CommandPalette
+          sessions={sessions}
+          agents={config.agents || []}
+          models={models}
+          session={session}
+          onClose={() => setPaletteOpen(false)}
+          actions={{
+            newSession,
+            openSettings,
+            openSession,
+            toggleRight: () => setRightOpen(o => !o),
+            toggleMode: () => {
+              const order = ['light', 'medium', 'dark']
+              saveSettings({ mode: order[(order.indexOf(config.settings.mode) + 1) % 3] || 'dark' })
+            },
+            pickModel: m => session && patchSession({ provider: m.provider, model: m.id })
+          }}
         />
       )}
       {settingsOpen && (
