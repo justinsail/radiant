@@ -182,6 +182,10 @@ code, pre, .mono { font-family: var(--font-mono); }
 }
 [data-tip-below]:hover::after { bottom: auto; top: calc(100% + 7px); }
 [data-tip-below]:hover::before { bottom: auto; top: calc(100% + 2px); border-top-color: transparent; border-bottom-color: var(--border); }
+/* right-anchored — for buttons near the right edge so the bubble doesn't clip */
+[data-tip-end]:hover::after { left: auto; right: 0; transform: none; animation-name: tip-in-end; }
+[data-tip-end]:hover::before { left: auto; right: 8px; transform: none; }
+@keyframes tip-in-end { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 @keyframes tip-in { from { opacity: 0; transform: translateX(-50%) translateY(3px); } to { opacity: 1; } }
 
 /* ---------- app frame ---------- */

@@ -279,7 +279,9 @@ function toResponsesInput (messages) {
 }
 
 async function chatgptRound ({ accessToken, accountId, model, messages, system, tools, toolDefs, emit, signal }) {
-  const body = { model, instructions: system, input: toResponsesInput(messages), store: false, stream: true }
+  // The Codex backend for a ChatGPT account only accepts the Codex model.
+  const useModel = /codex/i.test(model) ? model : 'gpt-5-codex'
+  const body = { model: useModel, instructions: system, input: toResponsesInput(messages), store: false, stream: true }
   if (tools) body.tools = (toolDefs || TOOL_DEFS).map(t => ({ type: 'function', name: t.name, description: t.description, parameters: t.input_schema, strict: false }))
   const headers = {
     'content-type': 'application/json',
@@ -432,9 +434,10 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
 // reachable with an OAuth token (e.g. ChatGPT). Keeps the picker usable.
 const SUBSCRIPTION_MODELS = {
   anthropic: ['claude-opus-4-1', 'claude-sonnet-4-5', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
-  // ChatGPT-subscription traffic goes through the Codex backend, which only serves
-  // the gpt-5 family — gpt-4* models 404 there.
-  openai: ['gpt-5-codex', 'gpt-5', 'gpt-5.1']
+  // ChatGPT-subscription traffic goes through the Codex backend, which for a
+  // ChatGPT account only accepts the Codex model (plain gpt-5 is rejected: 400
+  // "not supported when using Codex with a ChatGPT account").
+  openai: ['gpt-5-codex']
 }
 
 // ---------- model listing ----------

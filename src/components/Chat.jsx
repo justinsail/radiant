@@ -266,7 +266,7 @@ export default function Chat ({ session, live, approval, usage, error, models, a
       <main className='main'>
         <button className='menu-btn' onClick={onMenu} title='Menu' aria-label='Open menu'><MenuIcon /></button>
         <div className='float-toggle'>
-          <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel'} data-tip-below><Icon.panel /></button>
+          <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel'} data-tip-below data-tip-end><Icon.panel /></button>
         </div>
         <div className='chat-scroll'>
           <div className='welcome'>
@@ -313,8 +313,8 @@ export default function Chat ({ session, live, approval, usage, error, models, a
           <Icon.folder size={13} />
           {session.cwd?.replace(/^\/Users\/[^/]+/, '~')}
         </button>
-        <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export this conversation as a Markdown file' data-tip='Export chat as Markdown' data-tip-below><Icon.download /></button>
-        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel\n(tool runs, output, terminal)'} data-tip-below><Icon.panel /></button>
+        <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export this conversation as a Markdown file' data-tip='Export chat as Markdown' data-tip-below data-tip-end><Icon.download /></button>
+        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel\n(tool runs, output, terminal)'} data-tip-below data-tip-end><Icon.panel /></button>
       </div>
 
       <div className='chat-scroll' ref={scrollRef}>
