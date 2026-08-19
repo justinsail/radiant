@@ -81,10 +81,17 @@ export default function App () {
     const sessionId = target.id
     streamingSessionRef.current = sessionId
     setSession(prev => ({ ...prev, messages: [...prev.messages, { role: 'user', text: content }] }))
-    const liveMsg = { parts: [], thinking: '', streaming: true }
+    const liveMsg = { parts: [], thinking: '', thinkingActive: false, thinkingSecs: 0, streaming: true }
     setLive({ ...liveMsg })
 
+    const endThinking = () => {
+      if (liveMsg.thinkingActive) {
+        liveMsg.thinkingActive = false
+        liveMsg.thinkingSecs = Math.max(1, Math.round((Date.now() - liveMsg.thinkingStartedAt) / 1000))
+      }
+    }
     const pushText = text => {
+      endThinking()
       const last = liveMsg.parts[liveMsg.parts.length - 1]
       if (last?.type === 'text') last.text += text
       else liveMsg.parts.push({ type: 'text', text })
@@ -95,8 +102,13 @@ export default function App () {
         if (streamingSessionRef.current !== sessionId) return
         switch (ev.type) {
           case 'text_delta': pushText(ev.text); break
-          case 'thinking_delta': liveMsg.thinking += ev.text; break
+          case 'thinking_delta':
+            if (!liveMsg.thinkingActive && !liveMsg.thinking) liveMsg.thinkingStartedAt = Date.now()
+            liveMsg.thinkingActive = true
+            liveMsg.thinking += ev.text
+            break
           case 'tool_start':
+            endThinking()
             liveMsg.parts.push({ type: 'tool', id: ev.id, name: ev.name, args: ev.args, pending: true })
             setActivity(a => [...a, { id: ev.id, name: ev.name, args: ev.args, at: Date.now() }])
             setRightOpen(true)
