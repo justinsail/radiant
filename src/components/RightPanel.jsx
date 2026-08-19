@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Terminal from './Terminal.jsx'
+import { Icon } from './Icons.jsx'
 
 const MIN_W = 300
 const MAX_W = 720
@@ -43,7 +44,7 @@ export default function RightPanel ({ tab, onTab, activity, cwd, mode, onClose }
         <button className={'right-tab' + (tab === 'activity' ? ' active' : '')} onClick={() => onTab('activity')}>Activity</button>
         <button className={'right-tab' + (tab === 'terminal' ? ' active' : '')} onClick={() => onTab('terminal')}>Terminal</button>
         <div style={{ flex: 1 }} />
-        <button className='icon-btn' onClick={onClose} title='Close panel'>✕</button>
+        <button className='icon-btn' onClick={onClose} title='Close panel'><Icon.close /></button>
       </div>
       <div className='right-body'>
         {tab === 'activity' && (

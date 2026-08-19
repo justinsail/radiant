@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Markdown from './Markdown.jsx'
+import { Icon } from './Icons.jsx'
 
 const TOOL_ICONS = {
   run_command: '⌘',
@@ -228,13 +229,14 @@ export default function Chat ({ session, live, approval, usage, error, models, o
     return (
       <main className='main'>
         <div className='float-toggle'>
-          <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Toggle side panel'>▤</button>
+          <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel'><Icon.panel /></button>
         </div>
         <div className='chat-scroll'>
           <div className='welcome'>
             <div className='logo-mark big-mark' aria-hidden />
             <div className='wordmark welcome-word'>Radiant</div>
-            <p style={{ marginTop: 28 }}>
+            <div className='welcome-tagline'>A Templeton Technologies Product</div>
+            <p style={{ marginTop: 26 }}>
               <button className='small-btn primary' onClick={onNew}>Start a session</button>
             </p>
           </div>
@@ -252,16 +254,17 @@ export default function Chat ({ session, live, approval, usage, error, models, o
         <div className='spacer' />
         <button
           className='cwd-chip'
-          title='Workspace folder — click to change'
+          title={`Workspace folder for this session (the agent reads/writes here):\n${session.cwd}\nClick to change`}
           onClick={() => {
             const next = window.prompt('Workspace folder for this session:', session.cwd)
             if (next) onSetCwd(next)
           }}
         >
+          <Icon.folder size={13} />
           {session.cwd?.replace(/^\/Users\/[^/]+/, '~')}
         </button>
-        <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export conversation as Markdown'>⭳</button>
-        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Toggle side panel'>▤</button>
+        <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export this conversation as a Markdown file'><Icon.download /></button>
+        <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel'><Icon.panel /></button>
       </div>
 
       <div className='chat-scroll' ref={scrollRef}>
@@ -355,7 +358,7 @@ export default function Chat ({ session, live, approval, usage, error, models, o
               ref={fileInputRef} type='file' multiple hidden
               onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
             />
-            <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images'>＋</button>
+            <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images'><Icon.plus size={17} /></button>
             <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
             <button
               className={'pill-toggle' + (toolsOn ? ' on' : '')}
@@ -377,8 +380,8 @@ export default function Chat ({ session, live, approval, usage, error, models, o
               <span className='usage-note'>{usage.input ?? '–'} in · {usage.output ?? '–'} out</span>
             ) : null}
             {streaming
-              ? <button className='send-btn stop' onClick={onStop} title='Stop'>■</button>
-              : <button className='send-btn' onClick={submit} disabled={!draft.trim() && !attachments.length} title='Send'>↑</button>}
+              ? <button className='send-btn stop' onClick={onStop} title='Stop generating'><Icon.stop size={15} /></button>
+              : <button className='send-btn' onClick={submit} disabled={!draft.trim() && !attachments.length} title='Send message'><Icon.arrowUp size={17} /></button>}
           </div>
         </div>
       </div>

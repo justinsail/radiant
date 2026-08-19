@@ -23,6 +23,8 @@ const DEFAULT_CONFIG = {
     customChroma: 0.19,
     fontFamily: 'inter',
     uiScale: 1,
+    customTint: 1,
+    animatedBg: false,
     approveCommands: true,
     autoUpdateCheck: true,
     defaultModel: null,

@@ -165,6 +165,11 @@ export default function App () {
 
   return (
     <div className='app'>
+      {config.settings.animatedBg && (
+        <div className='aurora' aria-hidden>
+          <span className='aurora-blob b1' /><span className='aurora-blob b2' /><span className='aurora-blob b3' />
+        </div>
+      )}
       <Sidebar
         sessions={sessions}
         activeId={session?.id}

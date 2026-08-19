@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { Icon } from './Icons.jsx'
 
 const MIN_W = 190
 const MAX_W = 460
@@ -66,8 +67,10 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         </button>
       )}
       <div className='sidebar-foot'>
-        <button className='icon-btn' onClick={onSettings} title='Settings'>⚙ Settings</button>
-        <button className='icon-btn' onClick={onToggleMode} title='Toggle light/dark'>{mode === 'dark' ? '☀' : '☾'}</button>
+        <button className='icon-btn' onClick={onSettings} title='Open settings'><Icon.settings /> Settings</button>
+        <button className='icon-btn' onClick={onToggleMode} title={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+          {mode === 'light' ? <Icon.moon /> : <Icon.sun />}
+        </button>
       </div>
       <div className='sidebar-resize' onMouseDown={startDrag} title='Drag to resize' />
     </nav>

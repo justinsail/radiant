@@ -12,17 +12,18 @@
 :root {
   --accent-h: 258;
   --accent-c: 0.11;
+  --bg-tint: 1;   /* themes scale this to tint the surfaces more strongly */
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --radius: 10px;
 }
 
 :root[data-mode='dark'] {
-  --bg: oklch(0.19 0.004 var(--accent-h));
-  --bg-panel: oklch(0.215 0.004 var(--accent-h));
-  --bg-raised: oklch(0.25 0.005 var(--accent-h));
-  --bg-hover: oklch(0.28 0.006 var(--accent-h));
-  --bg-input: oklch(0.155 0.004 var(--accent-h));
+  --bg: oklch(0.19 calc(0.006 * var(--bg-tint)) var(--accent-h));
+  --bg-panel: oklch(0.215 calc(0.007 * var(--bg-tint)) var(--accent-h));
+  --bg-raised: oklch(0.25 calc(0.008 * var(--bg-tint)) var(--accent-h));
+  --bg-hover: oklch(0.28 calc(0.010 * var(--bg-tint)) var(--accent-h));
+  --bg-input: oklch(0.155 calc(0.006 * var(--bg-tint)) var(--accent-h));
   --border: oklch(1 0 0 / 0.09);
   --border-strong: oklch(1 0 0 / 0.16);
   --text: oklch(0.945 0.003 var(--accent-h));
@@ -40,12 +41,36 @@
   color-scheme: dark;
 }
 
+/* medium — soft dark grey, not near-black */
+:root[data-mode='medium'] {
+  --bg: oklch(0.30 calc(0.008 * var(--bg-tint)) var(--accent-h));
+  --bg-panel: oklch(0.325 calc(0.009 * var(--bg-tint)) var(--accent-h));
+  --bg-raised: oklch(0.36 calc(0.010 * var(--bg-tint)) var(--accent-h));
+  --bg-hover: oklch(0.40 calc(0.012 * var(--bg-tint)) var(--accent-h));
+  --bg-input: oklch(0.265 calc(0.008 * var(--bg-tint)) var(--accent-h));
+  --border: oklch(1 0 0 / 0.10);
+  --border-strong: oklch(1 0 0 / 0.18);
+  --text: oklch(0.96 0.003 var(--accent-h));
+  --text-muted: oklch(0.72 0.006 var(--accent-h));
+  --text-faint: oklch(0.56 0.005 var(--accent-h));
+  --accent: oklch(0.74 var(--accent-c) var(--accent-h));
+  --accent-hot: oklch(0.80 calc(var(--accent-c) * 1.1) var(--accent-h));
+  --accent-dim: oklch(0.50 calc(var(--accent-c) * 0.6) var(--accent-h));
+  --accent-wash: oklch(0.38 calc(var(--accent-c) * 0.3) var(--accent-h));
+  --on-accent: oklch(0.16 0.02 var(--accent-h));
+  --danger: oklch(0.68 0.19 25);
+  --ok: oklch(0.74 0.14 150);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.25);
+  --shadow-menu: 0 12px 40px oklch(0 0 0 / 0.4);
+  color-scheme: dark;
+}
+
 :root[data-mode='light'] {
-  --bg: oklch(0.97 0.002 var(--accent-h));
-  --bg-panel: oklch(0.955 0.003 var(--accent-h));
-  --bg-raised: oklch(0.995 0.001 var(--accent-h));
-  --bg-hover: oklch(0.925 0.004 var(--accent-h));
-  --bg-input: oklch(0.995 0.001 var(--accent-h));
+  --bg: oklch(0.99 calc(0.0018 * var(--bg-tint)) var(--accent-h));
+  --bg-panel: oklch(0.972 calc(0.0028 * var(--bg-tint)) var(--accent-h));
+  --bg-raised: oklch(1 0 0);
+  --bg-hover: oklch(0.945 calc(0.004 * var(--bg-tint)) var(--accent-h));
+  --bg-input: oklch(1 0 0);
   --border: oklch(0 0 0 / 0.10);
   --border-strong: oklch(0 0 0 / 0.18);
   --text: oklch(0.25 0.008 var(--accent-h));
@@ -89,6 +114,7 @@ code, pre, .mono { font-family: var(--font-mono); }
 }
 .brand-word { font-size: 15px; }
 .welcome-word { font-size: 34px; margin-top: 18px; }
+.welcome-tagline { font-size: 12.5px; color: var(--text-faint); margin-top: 8px; letter-spacing: 0.02em; }
 .who-word { font-size: 10.5px; letter-spacing: 0.06em; }
 .who-model {
   font-family: var(--font-mono); font-size: 10px; font-weight: 400;
@@ -105,7 +131,28 @@ code, pre, .mono { font-family: var(--font-mono); }
 }
 
 /* ---------- app frame ---------- */
-.app { display: flex; height: 100%; }
+.app { display: flex; height: 100%; position: relative; }
+
+/* animated aurora background — sits behind everything, very subtle */
+.aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.app > *:not(.aurora) { position: relative; z-index: 1; }
+.aurora-blob {
+  position: absolute; width: 55vw; height: 55vw; border-radius: 50%;
+  filter: blur(80px); opacity: 0.5; mix-blend-mode: screen;
+}
+:root[data-mode='light'] .aurora-blob { mix-blend-mode: multiply; opacity: 0.35; }
+.aurora-blob.b1 { background: oklch(0.65 0.18 var(--accent-h)); top: -15%; left: -10%; animation: drift1 22s ease-in-out infinite; }
+.aurora-blob.b2 { background: oklch(0.6 0.16 calc(var(--accent-h) + 40)); bottom: -20%; right: -10%; animation: drift2 28s ease-in-out infinite; }
+.aurora-blob.b3 { background: oklch(0.62 0.17 calc(var(--accent-h) - 40)); top: 30%; left: 40%; animation: drift3 25s ease-in-out infinite; }
+@keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(12vw,10vh) scale(1.15); } }
+@keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1.1); } 50% { transform: translate(-10vw,-8vh) scale(0.95); } }
+@keyframes drift3 { 0%,100% { transform: translate(0,0) scale(0.95); } 50% { transform: translate(-8vw,6vh) scale(1.1); } }
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob { animation: none; }
+}
+/* keep surfaces legible over the aurora */
+.aurora ~ * .sidebar, .aurora ~ * .right-panel, .aurora ~ * .topbar,
+.app:has(.aurora) .sidebar, .app:has(.aurora) .right-panel { background: color-mix(in oklab, var(--bg-panel) 88%, transparent); }
 
 /* ---------- sidebar ---------- */
 .sidebar {
@@ -199,11 +246,13 @@ code, pre, .mono { font-family: var(--font-mono); }
 }
 .topbar .spacer { flex: 1; }
 .cwd-chip {
+  display: inline-flex; align-items: center; gap: 5px;
   font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
   border: 1px solid var(--border); border-radius: 999px;
   padding: 3px 10px; background: none; max-width: 260px;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  overflow: hidden; white-space: nowrap;
 }
+.cwd-chip svg { flex-shrink: 0; opacity: 0.7; }
 .cwd-chip:hover { color: var(--text-muted); border-color: var(--border-strong); }
 
 /* model picker (lives in the prompt bar) */
@@ -556,12 +605,40 @@ input[type='range'].chroma-slider {
   flex: 1; -webkit-appearance: none; height: 10px; border-radius: 999px;
   background: linear-gradient(to right, oklch(0.7 0 var(--accent-h)), oklch(0.7 0.25 var(--accent-h)));
 }
+input[type='range'].tint-slider {
+  flex: 1; -webkit-appearance: none; height: 10px; border-radius: 999px;
+  background: linear-gradient(to right, var(--bg-input), oklch(0.5 0.14 var(--accent-h)));
+}
 input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%;
   background: var(--bg-raised); border: 2px solid var(--text);
   box-shadow: var(--shadow-sm);
 }
-.mode-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.mode-row { display: flex; gap: 8px; margin-bottom: 4px; }
+.mode-btn {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+  padding: 6px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-raised); color: var(--text); flex: 1; font-size: 12px;
+}
+.mode-btn.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.mode-btn > span:last-child { text-align: center; }
+.mode-swatch { height: 26px; border-radius: 6px; border: 1px solid var(--border); }
+.mode-swatch[data-mode='light'] { background: linear-gradient(135deg, #f7f7f8, #e9e9ec); }
+.mode-swatch[data-mode='medium'] { background: linear-gradient(135deg, #43454a, #34363b); }
+.mode-swatch[data-mode='dark'] { background: linear-gradient(135deg, #202124, #141517); }
+
+/* accent color picker */
+.accent-picker { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.color-well {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  border: 1px solid var(--border-strong); box-shadow: var(--shadow-sm);
+  cursor: pointer; position: relative; overflow: hidden;
+}
+.color-well input[type='color'] {
+  position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
+  border: none; padding: 0; background: none; cursor: pointer; opacity: 0;
+}
+.accent-picker-text { display: flex; flex-direction: column; gap: 2px; }
 
 .comp-stat { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12.5px; }
 .comp-stat .desc { color: var(--text-faint); font-size: 12px; }

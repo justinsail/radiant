@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { api, streamPull, streamQuantize } from '../api.js'
-import { THEMES, FONTS, UI_SCALES, applyTheme } from '../theme.js'
+import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
+import { Icon } from './Icons.jsx'
 
 // ---------- Providers ----------
 
@@ -415,52 +416,80 @@ function AppearancePane ({ config, onSettings }) {
     applyTheme({ ...s, ...patch })
     onSettings(patch)
   }
+  const pickColor = hex => {
+    const { C, H } = hexToOklch(hex)
+    // clamp chroma into the range the palette expects
+    preview({ themeId: 'custom', customHue: Math.round(H), customChroma: Math.min(0.25, Math.max(0.02, +C.toFixed(3))) })
+  }
+  const currentAccentHex = accentHex(
+    isCustom ? (s.customHue ?? 258) : THEMES.find(t => t.id === s.themeId).hue,
+    isCustom ? (s.customChroma ?? 0.11) : THEMES.find(t => t.id === s.themeId).chroma
+  )
+
   return (
     <div className='set-section'>
       <h3>Appearance</h3>
+
+      <div className='sub-label'>Mode</div>
       <div className='mode-row'>
-        <button className={'small-btn' + (s.mode === 'dark' ? ' primary' : '')} onClick={() => preview({ mode: 'dark' })}>☾ Dark</button>
-        <button className={'small-btn' + (s.mode === 'light' ? ' primary' : '')} onClick={() => preview({ mode: 'light' })}>☀ Light</button>
+        {MODES.map(m => (
+          <button key={m.id} className={'mode-btn' + (s.mode === m.id ? ' selected' : '')} onClick={() => preview({ mode: m.id })}>
+            <span className='mode-swatch' data-mode={m.id} />
+            <span>{m.icon} {m.name}</span>
+          </button>
+        ))}
       </div>
+
+      <div className='sub-label'>Theme</div>
       <div className='theme-grid'>
         {THEMES.map(t => (
           <button
             key={t.id}
             className={'theme-swatch' + (s.themeId === t.id ? ' selected' : '')}
-            onClick={() => preview({ themeId: t.id })}
+            onClick={() => preview({ themeId: t.id, bgTint: t.tint })}
           >
-            <span className='dot' style={{ background: `oklch(0.62 ${t.chroma} ${t.hue})` }} />
+            <span className='dot' style={{ background: accentHex(t.hue, t.chroma) }} />
             {t.name}
           </button>
         ))}
-        <button
-          className={'theme-swatch' + (isCustom ? ' selected' : '')}
-          onClick={() => preview({ themeId: 'custom' })}
-        >
-          <span className='dot' style={{ background: `oklch(0.62 ${s.customChroma} ${s.customHue})` }} />
-          Custom
-        </button>
       </div>
-      {isCustom && (
-        <>
-          <div className='hue-row'>
-            <label htmlFor='hue'>Hue</label>
-            <input
-              id='hue' type='range' min='0' max='360' className='hue-slider'
-              value={s.customHue}
-              onChange={e => preview({ customHue: Number(e.target.value) })}
-            />
-          </div>
-          <div className='hue-row'>
-            <label htmlFor='chroma'>Vividness</label>
-            <input
-              id='chroma' type='range' min='0' max='0.25' step='0.005' className='chroma-slider'
-              value={s.customChroma}
-              onChange={e => preview({ customChroma: Number(e.target.value) })}
-            />
-          </div>
-        </>
-      )}
+
+      <div className='sub-label'>Accent color</div>
+      <div className='accent-picker'>
+        <label className='color-well' style={{ background: currentAccentHex }}>
+          <input type='color' value={currentAccentHex} onChange={e => pickColor(e.target.value)} />
+        </label>
+        <div className='accent-picker-text'>
+          <div className='mono' style={{ fontSize: 12 }}>{currentAccentHex}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-faint)' }}>Click the swatch to open the full palette{isCustom ? ' · custom' : ''}</div>
+        </div>
+        {isCustom && (
+          <input
+            type='range' min='0' max='0.25' step='0.005' className='chroma-slider' style={{ flex: 1 }}
+            value={s.customChroma ?? 0.11}
+            onChange={e => preview({ customChroma: Number(e.target.value) })}
+            title='Accent vividness'
+          />
+        )}
+      </div>
+
+      <div className='sub-label'>Background tint</div>
+      <div className='hue-row'>
+        <label htmlFor='bgtint'>Amount</label>
+        <input
+          id='bgtint' type='range' min='0' max='5' step='0.1' className='tint-slider'
+          value={s.bgTint != null ? s.bgTint : (THEMES.find(t => t.id === s.themeId)?.tint ?? 1)}
+          onChange={e => preview({ bgTint: Number(e.target.value) })}
+        />
+        <span style={{ fontSize: 11.5, color: 'var(--text-faint)', width: 88 }}>
+          {(s.bgTint != null ? s.bgTint : (THEMES.find(t => t.id === s.themeId)?.tint ?? 1)) < 0.4 ? 'neutral' : 'how much the accent colors the background'}
+        </span>
+      </div>
+
+      <label className='check-row' style={{ marginTop: 14 }}>
+        <input type='checkbox' checked={Boolean(s.animatedBg)} onChange={e => preview({ animatedBg: e.target.checked })} />
+        <span>Animated background <span className='desc'>— a slow aurora drift behind the app (respects reduced-motion)</span></span>
+      </label>
 
       <div className='sub-label'>Font</div>
       <div className='theme-grid'>
@@ -636,7 +665,7 @@ export default function Settings ({ config, initialTab = 'providers', onClose, o
       <div className='modal wide' role='dialog' aria-label='Settings'>
         <div className='modal-head'>
           Settings
-          <button className='icon-btn' onClick={onClose}>✕</button>
+          <button className='icon-btn' onClick={onClose} title='Close settings'><Icon.close /></button>
         </div>
         <div className='modal-split'>
           <nav className='set-nav'>
