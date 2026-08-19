@@ -4,8 +4,13 @@ import { THEMES, applyTheme } from '../theme.js'
 
 // ---------- Providers ----------
 
-function ProviderRow ({ provider, onConfig }) {
+function ProviderRow ({ provider, oauthInfo, onConfig }) {
   const [draft, setDraft] = useState('')
+  const [signingIn, setSigningIn] = useState(false)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const pollRef = useRef(null)
+
   const save = async () => {
     if (!draft.trim()) return
     const cfg = await api.setKey(provider.id, draft.trim())
@@ -14,28 +19,81 @@ function ProviderRow ({ provider, onConfig }) {
   }
   const clear = async () => onConfig(await api.setKey(provider.id, ''))
   const remove = async () => onConfig(await api.removeProvider(provider.id))
+  const signOut = async () => onConfig(await api.oauthSignout(provider.id))
+
+  const startSignIn = async () => {
+    setBusy(true)
+    try {
+      const { url, mode } = await api.oauthStart(provider.id)
+      window.open(url, '_blank', 'noopener')
+      if (mode === 'paste') {
+        setSigningIn(true)
+      } else {
+        // loopback: poll until the vendor redirect lands on our local listener
+        pollRef.current = setInterval(async () => {
+          const { signedIn } = await api.oauthStatus(provider.id)
+          if (signedIn) {
+            clearInterval(pollRef.current)
+            onConfig(await api.getConfig())
+            setBusy(false)
+          }
+        }, 1500)
+      }
+    } catch (e) { window.alert('Sign-in failed to start: ' + e.message); setBusy(false) }
+  }
+  const finishSignIn = async () => {
+    if (!code.trim()) return
+    try {
+      const cfg = await api.oauthComplete(provider.id, code.trim())
+      onConfig(cfg)
+      setSigningIn(false); setCode(''); setBusy(false)
+    } catch (e) { window.alert('Sign-in failed: ' + e.message) }
+  }
+  useEffect(() => () => clearInterval(pollRef.current), [])
+
   return (
-    <div className='provider-row'>
-      <div className='p-name'>{provider.name}</div>
-      <div className='p-url'>{provider.baseUrl}</div>
-      {provider.auth === 'none'
-        ? <span className='key-ok'>no key needed</span>
-        : provider.hasKey
+    <div className='provider-row-wrap'>
+      <div className='provider-row'>
+        <div className='p-name'>{provider.name}</div>
+        <div className='p-url'>{provider.baseUrl}</div>
+        {provider.signedIn
           ? <>
-              <span className='key-ok'>✓ key saved</span>
-              <button className='small-btn' onClick={clear}>Remove key</button>
+              <span className='key-ok'>✓ subscription</span>
+              <button className='small-btn' onClick={signOut}>Sign out</button>
             </>
-          : <>
-              <input
-                type='password'
-                placeholder='Paste API key'
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && save()}
-              />
-              <button className='small-btn primary' onClick={save} disabled={!draft.trim()}>Save</button>
-            </>}
-      {provider.removable && <button className='small-btn danger' onClick={remove}>✕</button>}
+          : provider.auth === 'none'
+            ? <span className='key-ok'>no key needed</span>
+            : provider.hasKey
+              ? <>
+                  <span className='key-ok'>✓ key saved</span>
+                  <button className='small-btn' onClick={clear}>Remove key</button>
+                </>
+              : <>
+                  <input
+                    type='password'
+                    placeholder='Paste API key'
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && save()}
+                  />
+                  <button className='small-btn primary' onClick={save} disabled={!draft.trim()}>Save</button>
+                </>}
+        {provider.removable && <button className='small-btn danger' onClick={remove}>✕</button>}
+      </div>
+      {oauthInfo && !provider.signedIn && !provider.hasKey && (
+        <div className='provider-oauth'>
+          {!signingIn
+            ? <button className='small-btn subscribe' onClick={startSignIn} disabled={busy}>
+                {busy ? 'Waiting for browser…' : `Sign in with ${oauthInfo.label} subscription`}
+              </button>
+            : <span className='oauth-paste'>
+                <input placeholder='Paste the code from the page' value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && finishSignIn()} />
+                <button className='small-btn primary' onClick={finishSignIn} disabled={!code.trim()}>Finish</button>
+                <button className='small-btn' onClick={() => { setSigningIn(false); setBusy(false) }}>Cancel</button>
+              </span>}
+          <span className='oauth-note'>Uses your paid plan — unofficial, may break, small account risk.</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -43,6 +101,14 @@ function ProviderRow ({ provider, onConfig }) {
 function ProvidersPane ({ config, onConfigChange }) {
   const [newName, setNewName] = useState('')
   const [newUrl, setNewUrl] = useState('')
+  const [oauthMap, setOauthMap] = useState({})
+  useEffect(() => {
+    api.oauthProviders().then(list => {
+      const m = {}
+      for (const o of list) m[o.id] = o
+      setOauthMap(m)
+    }).catch(() => {})
+  }, [])
   const addProvider = async () => {
     if (!newName.trim() || !newUrl.trim()) return
     const cfg = await api.addProvider({ name: newName.trim(), baseUrl: newUrl.trim(), type: 'openai', auth: 'key' })
@@ -53,7 +119,7 @@ function ProvidersPane ({ config, onConfigChange }) {
     <div className='set-section'>
       <h3>Providers &amp; keys</h3>
       {config.providers.map(p => (
-        <ProviderRow key={p.id} provider={p} onConfig={onConfigChange} />
+        <ProviderRow key={p.id} provider={p} oauthInfo={oauthMap[p.id]} onConfig={onConfigChange} />
       ))}
       <div className='add-provider'>
         <input placeholder='Name (e.g. Groq)' value={newName} onChange={e => setNewName(e.target.value)} />

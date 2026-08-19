@@ -1,8 +1,42 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+
+const MIN_W = 190
+const MAX_W = 460
 
 export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onSettings, mode, onToggleMode }) {
+  const [width, setWidth] = useState(() => {
+    const saved = Number(localStorage.getItem('radiant.sidebarWidth'))
+    return saved >= MIN_W && saved <= MAX_W ? saved : 248
+  })
+  const dragging = useRef(false)
+
+  useEffect(() => {
+    const move = e => {
+      if (!dragging.current) return
+      const w = Math.min(MAX_W, Math.max(MIN_W, e.clientX))
+      setWidth(w)
+    }
+    const up = () => {
+      if (dragging.current) {
+        dragging.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        localStorage.setItem('radiant.sidebarWidth', String(width))
+      }
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
+  }, [width])
+
+  const startDrag = () => {
+    dragging.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
   return (
-    <nav className='sidebar'>
+    <nav className='sidebar' style={{ width }}>
       <div className='brand'>
         <div className={'logo-mark brand-mark' + (working ? ' working' : '')} aria-hidden />
         <span className='wordmark brand-word'>Radiant</span>
@@ -30,6 +64,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         <button className='icon-btn' onClick={onSettings} title='Settings'>⚙ Settings</button>
         <button className='icon-btn' onClick={onToggleMode} title='Toggle light/dark'>{mode === 'dark' ? '☀' : '☾'}</button>
       </div>
+      <div className='sidebar-resize' onMouseDown={startDrag} title='Drag to resize' />
     </nav>
   )
 }

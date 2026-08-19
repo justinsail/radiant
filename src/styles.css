@@ -113,7 +113,13 @@ code, pre, .mono { font-family: var(--font-mono); }
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
+  position: relative;
 }
+.sidebar-resize {
+  position: absolute; top: 0; right: -3px; width: 6px; height: 100%;
+  cursor: col-resize; z-index: 20;
+}
+.sidebar-resize:hover { background: var(--accent-dim); }
 .brand {
   display: flex; align-items: center; gap: 9px;
   padding: 16px 16px 12px;
@@ -597,6 +603,44 @@ button.hf-head:hover { background: var(--bg-hover); }
   background: var(--bg-hover); overflow: hidden; display: inline-block;
 }
 .pull-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
+
+/* subscription sign-in */
+.provider-row-wrap { border-bottom: 1px solid var(--border); }
+.provider-row-wrap .provider-row { border-bottom: none; }
+.provider-oauth { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 0 10px 160px; }
+.small-btn.subscribe { border-color: var(--accent-dim); color: var(--accent); }
+.small-btn.subscribe:hover { background: var(--accent-wash); }
+.oauth-paste { display: inline-flex; gap: 6px; align-items: center; }
+.oauth-paste input {
+  width: 240px; padding: 6px 10px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); outline: none;
+}
+.oauth-paste input:focus { border-color: var(--accent); }
+.oauth-note { font-size: 11px; color: var(--text-faint); }
+
+/* composer attachments */
+.composer-box.drag-over { border-color: var(--accent); background: var(--accent-wash); }
+.attach-strip { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 2px 4px; }
+.attach-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 6px 4px 4px; max-width: 200px;
+}
+.attach-chip img { width: 28px; height: 28px; border-radius: 5px; object-fit: cover; }
+.attach-file { font-size: 16px; padding: 0 3px; }
+.attach-name { font-size: 11px; color: var(--text-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.attach-x { border: none; background: none; color: var(--text-faint); font-size: 11px; padding: 0 2px; }
+.attach-x:hover { color: var(--danger); }
+.attach-btn {
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-panel);
+  color: var(--text-muted); font-size: 16px; line-height: 1;
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.attach-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+.msg-attach { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.msg-attach img { max-width: 220px; max-height: 220px; border-radius: 8px; border: 1px solid var(--border); }
+.msg-attach-file { font-size: 12px; color: var(--text-muted); background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
 
 /* floating panel toggle on the welcome screen */
 .float-toggle { position: absolute; top: 10px; right: 12px; z-index: 5; }

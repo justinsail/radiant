@@ -15,6 +15,7 @@ const DEFAULT_CONFIG = {
     { id: 'openrouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1', auth: 'key', removable: false }
   ],
   keys: {},
+  oauth: {},
   settings: {
     mode: 'dark',
     themeId: 'steel',
@@ -42,6 +43,7 @@ export function loadConfig () {
       if (!cfg.providers.find(d => d.id === p.id)) cfg.providers.push(p)
     }
     cfg.keys = saved.keys || {}
+    cfg.oauth = saved.oauth || {}
     cfg.settings = { ...cfg.settings, ...(saved.settings || {}) }
   } catch { /* first run */ }
   return cfg
@@ -55,7 +57,11 @@ export function saveConfig (cfg) {
 // Public view: never expose key material to the browser.
 export function publicConfig (cfg) {
   return {
-    providers: cfg.providers.map(p => ({ ...p, hasKey: p.auth === 'none' || Boolean(cfg.keys[p.id]) })),
+    providers: cfg.providers.map(p => ({
+      ...p,
+      hasKey: p.auth === 'none' || Boolean(cfg.keys[p.id]),
+      signedIn: Boolean(cfg.oauth[p.id])
+    })),
     settings: cfg.settings
   }
 }

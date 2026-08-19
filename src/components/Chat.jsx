@@ -137,8 +137,31 @@ function ModelPicker ({ session, models, onPick, onRefresh }) {
   )
 }
 
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+
+function readFileAsAttachment (file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataB64 = String(reader.result).split(',')[1]
+      const isImage = IMAGE_TYPES.includes(file.type)
+      resolve({
+        name: file.name,
+        mime: file.type || 'application/octet-stream',
+        kind: isImage ? 'image' : 'text',
+        dataB64
+      })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function Chat ({ session, live, approval, usage, error, models, onSend, onStop, onApproval, onPickModel, onToggleTools, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight }) {
   const [draft, setDraft] = useState('')
+  const [attachments, setAttachments] = useState([])
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef(null)
   const scrollRef = useRef(null)
   const streaming = Boolean(live?.streaming)
 
@@ -147,11 +170,18 @@ export default function Chat ({ session, live, approval, usage, error, models, o
     if (el) el.scrollTop = el.scrollHeight
   }, [session?.messages?.length, live, approval])
 
+  const addFiles = async fileList => {
+    const files = Array.from(fileList).slice(0, 8)
+    const next = await Promise.all(files.map(readFileAsAttachment))
+    setAttachments(a => [...a, ...next].slice(0, 8))
+  }
+
   const submit = () => {
     const text = draft.trim()
-    if (!text || streaming || !session) return
+    if ((!text && !attachments.length) || streaming || !session) return
     setDraft('')
-    onSend(text)
+    onSend({ text, attachments })
+    setAttachments([])
   }
 
   if (!session) {
@@ -197,7 +227,18 @@ export default function Chat ({ session, live, approval, usage, error, models, o
         <div className='chat-inner'>
           {session.messages.map((m, i) =>
             m.role === 'user'
-              ? <div key={i} className='msg msg-user'><div className='bubble'>{m.text}</div></div>
+              ? <div key={i} className='msg msg-user'>
+                  <div className='bubble'>
+                    {(m.attachments || []).length > 0 && (
+                      <div className='msg-attach'>
+                        {m.attachments.map((a, j) => a.kind === 'image'
+                          ? <img key={j} src={`data:${a.mime};base64,${a.dataB64}`} alt={a.name} />
+                          : <span key={j} className='msg-attach-file'>📄 {a.name}</span>)}
+                      </div>
+                    )}
+                    {m.text}
+                  </div>
+                </div>
               : <AssistantMessage key={i} parts={m.parts || []} model={m.model} />
           )}
           {live && (
@@ -225,17 +266,41 @@ export default function Chat ({ session, live, approval, usage, error, models, o
       </div>
 
       <div className='composer'>
-        <div className='composer-box'>
+        <div
+          className={'composer-box' + (dragOver ? ' drag-over' : '')}
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files) }}
+        >
+          {attachments.length > 0 && (
+            <div className='attach-strip'>
+              {attachments.map((a, i) => (
+                <div key={i} className='attach-chip' title={a.name}>
+                  {a.kind === 'image'
+                    ? <img src={`data:${a.mime};base64,${a.dataB64}`} alt={a.name} />
+                    : <span className='attach-file'>📄</span>}
+                  <span className='attach-name'>{a.name}</span>
+                  <button className='attach-x' onClick={() => setAttachments(list => list.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
           <textarea
             rows={2}
-            placeholder={toolsOn ? 'Ask the agent to build, fix, or explain something…' : 'Chat (tools off)…'}
+            placeholder={dragOver ? 'Drop files to attach…' : toolsOn ? 'Ask the agent to build, fix, or explain something…' : 'Chat (tools off)…'}
             value={draft}
             onChange={e => setDraft(e.target.value)}
+            onPaste={e => { const files = [...e.clipboardData.files]; if (files.length) { e.preventDefault(); addFiles(files) } }}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() }
             }}
           />
           <div className='composer-row'>
+            <input
+              ref={fileInputRef} type='file' multiple hidden
+              onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
+            />
+            <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images'>＋</button>
             <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
             <button
               className={'pill-toggle' + (toolsOn ? ' on' : '')}
@@ -251,7 +316,7 @@ export default function Chat ({ session, live, approval, usage, error, models, o
             ) : null}
             {streaming
               ? <button className='send-btn stop' onClick={onStop} title='Stop'>■</button>
-              : <button className='send-btn' onClick={submit} disabled={!draft.trim()} title='Send'>↑</button>}
+              : <button className='send-btn' onClick={submit} disabled={!draft.trim() && !attachments.length} title='Send'>↑</button>}
           </div>
         </div>
       </div>

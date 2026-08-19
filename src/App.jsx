@@ -71,6 +71,9 @@ export default function App () {
 
   const send = async content => {
     if (!session || live?.streaming) return
+    // content is { text, attachments } from the composer
+    const text = typeof content === 'string' ? content : content.text
+    const attachments = (typeof content === 'object' && content.attachments) || []
     let target = session
     if (!target.provider || !target.model) {
       setError('Pick a model first (top right).')
@@ -80,7 +83,7 @@ export default function App () {
     setUsage(null)
     const sessionId = target.id
     streamingSessionRef.current = sessionId
-    setSession(prev => ({ ...prev, messages: [...prev.messages, { role: 'user', text: content }] }))
+    setSession(prev => ({ ...prev, messages: [...prev.messages, { role: 'user', text, attachments }] }))
     const liveMsg = { parts: [], thinking: '', thinkingActive: false, thinkingSecs: 0, streaming: true }
     setLive({ ...liveMsg })
 

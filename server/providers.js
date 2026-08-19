@@ -11,12 +11,35 @@ Be direct and concise. Use markdown; fence code blocks with a language tag. When
 }
 
 // ---------- internal message format -> provider wire formats ----------
-// session.messages: [{role:'user', text} | {role:'assistant', parts:[{type:'text',text}|{type:'tool',id,name,args,result}]}]
+// session.messages: [{role:'user', text, attachments} | {role:'assistant', parts:[{type:'text',text}|{type:'tool',id,name,args,result}]}]
+// attachment: { name, mime, dataB64, kind:'image'|'text' }
+
+// text-file attachments get inlined into the prompt; images stay as data.
+function userText (m) {
+  let t = m.text || ''
+  for (const a of m.attachments || []) {
+    if (a.kind === 'text') {
+      const body = Buffer.from(a.dataB64, 'base64').toString('utf8')
+      t += `\n\n--- attached file: ${a.name} ---\n${body}`
+    }
+  }
+  return t
+}
+const imageAttachments = m => (m.attachments || []).filter(a => a.kind === 'image')
 
 function toAnthropic (messages) {
   const out = []
   for (const m of messages) {
-    if (m.role === 'user') { out.push({ role: 'user', content: [{ type: 'text', text: m.text }] }); continue }
+    if (m.role === 'user') {
+      const content = []
+      const txt = userText(m)
+      if (txt) content.push({ type: 'text', text: txt })
+      for (const a of imageAttachments(m)) {
+        content.push({ type: 'image', source: { type: 'base64', media_type: a.mime, data: a.dataB64 } })
+      }
+      out.push({ role: 'user', content: content.length ? content : [{ type: 'text', text: '(empty)' }] })
+      continue
+    }
     let blocks = []
     let pendingTools = []
     const flush = () => {
@@ -39,7 +62,17 @@ function toAnthropic (messages) {
 function toOpenAI (messages, system) {
   const out = [{ role: 'system', content: system }]
   for (const m of messages) {
-    if (m.role === 'user') { out.push({ role: 'user', content: m.text }); continue }
+    if (m.role === 'user') {
+      const imgs = imageAttachments(m)
+      if (imgs.length) {
+        const content = [{ type: 'text', text: userText(m) }]
+        for (const a of imgs) content.push({ type: 'image_url', image_url: { url: `data:${a.mime};base64,${a.dataB64}` } })
+        out.push({ role: 'user', content })
+      } else {
+        out.push({ role: 'user', content: userText(m) })
+      }
+      continue
+    }
     let text = ''
     let pendingTools = []
     const flush = () => {
@@ -85,12 +118,25 @@ async function * sseEvents (response) {
 }
 
 // ---------- single API round, streaming; returns {parts, stopOnTools} ----------
-async function anthropicRound ({ baseUrl, apiKey, model, messages, system, tools, emit, signal }) {
-  const body = { model, max_tokens: 8192, system, messages, stream: true }
+async function anthropicRound ({ baseUrl, apiKey, accessToken, model, messages, system, tools, emit, signal }) {
+  // Subscription (OAuth) requests must present as Claude Code: the first system
+  // block is the CLI's identity, auth is Bearer, and the oauth beta is set.
+  const CLAUDE_CODE_ID = "You are Claude Code, Anthropic's official CLI for Claude."
+  const sys = accessToken
+    ? [{ type: 'text', text: CLAUDE_CODE_ID }, { type: 'text', text: system }]
+    : system
+  const body = { model, max_tokens: 8192, system: sys, messages, stream: true }
   if (tools) body.tools = TOOL_DEFS.map(t => ({ name: t.name, description: t.description, input_schema: t.input_schema }))
+  const headers = { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' }
+  if (accessToken) {
+    headers.authorization = `Bearer ${accessToken}`
+    headers['anthropic-beta'] = 'oauth-2025-04-20,claude-code-20250219'
+  } else {
+    headers['x-api-key'] = apiKey
+  }
   const res = await fetch(`${baseUrl}/v1/messages`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    headers,
     body: JSON.stringify(body),
     signal
   })
@@ -130,13 +176,14 @@ async function anthropicRound ({ baseUrl, apiKey, model, messages, system, tools
   return { parts, stopOnTools: stopReason === 'tool_use' }
 }
 
-async function openaiRound ({ baseUrl, apiKey, model, messages, tools, emit, signal }) {
+async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, tools, emit, signal }) {
   const body = { model, messages, stream: true }
   if (tools) {
     body.tools = TOOL_DEFS.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
   }
   const headers = { 'content-type': 'application/json' }
-  if (apiKey) headers.authorization = `Bearer ${apiKey}`
+  const bearer = accessToken || apiKey
+  if (bearer) headers.authorization = `Bearer ${bearer}`
   const res = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers, body: JSON.stringify(body), signal })
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
 
@@ -171,11 +218,13 @@ async function openaiRound ({ baseUrl, apiKey, model, messages, tools, emit, sig
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, session, useTools, emit, requestApproval, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, session, useTools, emit, requestApproval, signal }) {
   const cwd = session.cwd || os.homedir()
   const system = systemPrompt(cwd, useTools, model)
   const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
+
+  const accessToken = getAccessToken ? await getAccessToken() : null
 
   let toolsEnabled = useTools
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -183,6 +232,7 @@ export async function runTurn ({ provider, model, apiKey, session, useTools, emi
     const args = {
       baseUrl: provider.baseUrl,
       apiKey,
+      accessToken,
       model,
       system,
       tools: toolsEnabled,

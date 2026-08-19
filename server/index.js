@@ -11,6 +11,7 @@ import { execSync } from 'child_process'
 import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
 import { runTurn, listModels } from './providers.js'
 import { CATALOG } from './catalog.js'
+import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken } from './oauth.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
@@ -55,6 +56,49 @@ app.delete('/api/providers/:id', (req, res) => {
     delete config.keys[p.id]
     saveConfig(config)
   }
+  res.json(publicConfig(config))
+})
+
+// ---------- subscription sign-in (OAuth) ----------
+app.get('/api/oauth/providers', (req, res) => {
+  res.json(Object.entries(OAUTH_PROVIDERS).map(([id, p]) => ({ id, label: p.label, mode: p.mode })))
+})
+
+// begin a sign-in: returns the URL to open in a browser
+app.post('/api/oauth/:id/start', (req, res) => {
+  try {
+    const { url, mode } = buildAuthUrl(req.params.id)
+    if (mode === 'loopback') {
+      startLoopback(req.params.id, (err, tok) => {
+        if (!err && tok) { config.oauth[req.params.id] = tok; saveConfig(config) }
+      })
+    }
+    res.json({ url, mode })
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
+// finish a paste-mode sign-in with the code from the callback page
+app.post('/api/oauth/:id/complete', async (req, res) => {
+  try {
+    const tok = await completePaste(req.params.id, req.body.code)
+    config.oauth[req.params.id] = tok
+    saveConfig(config)
+    res.json(publicConfig(config))
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
+// poll whether a loopback sign-in has landed
+app.get('/api/oauth/:id/status', (req, res) => {
+  res.json({ signedIn: Boolean(config.oauth[req.params.id]) })
+})
+
+app.post('/api/oauth/:id/signout', (req, res) => {
+  delete config.oauth[req.params.id]
+  saveConfig(config)
   res.json(publicConfig(config))
 })
 
@@ -255,7 +299,8 @@ app.post('/api/chat', async (req, res) => {
   const provider = config.providers.find(p => p.id === session.provider)
   if (!provider) return res.status(400).json({ error: 'Pick a model first — no provider set on this session.' })
   const apiKey = config.keys[provider.id]
-  if (provider.auth === 'key' && !apiKey) return res.status(400).json({ error: `No API key saved for ${provider.name}. Add one in Settings.` })
+  const hasOAuth = Boolean(config.oauth[provider.id])
+  if (provider.auth === 'key' && !apiKey && !hasOAuth) return res.status(400).json({ error: `No API key or subscription sign-in for ${provider.name}. Add one in Settings.` })
 
   res.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -264,9 +309,12 @@ app.post('/api/chat', async (req, res) => {
   })
   const emit = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`)
 
-  session.messages.push({ role: 'user', text: content })
+  // content is either a string or { text, attachments:[{name,mime,dataB64,kind}] }
+  const text = typeof content === 'string' ? content : (content.text || '')
+  const attachments = (typeof content === 'object' && content.attachments) || []
+  session.messages.push({ role: 'user', text, attachments })
   if (session.messages.length === 1) {
-    session.title = content.length > 48 ? content.slice(0, 48) + '…' : content
+    session.title = text.length > 48 ? text.slice(0, 48) + '…' : (text || `${attachments.length} file(s)`)
     emit({ type: 'title', title: session.title })
   }
   saveSession(session)
@@ -291,6 +339,7 @@ app.post('/api/chat', async (req, res) => {
       provider,
       model: session.model,
       apiKey,
+      getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
       session,
       useTools: session.useTools !== false,
       emit,

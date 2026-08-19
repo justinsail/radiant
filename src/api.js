@@ -31,7 +31,12 @@ export const api = {
   getLocalModels: () => json('GET', '/api/local-models'),
   deleteLocalModel: name => json('DELETE', `/api/local-models/${encodeURIComponent(name)}`),
   registrySearch: q => json('GET', `/api/registry-search?q=${encodeURIComponent(q)}`),
-  registryFiles: repo => json('GET', `/api/registry-files?repo=${encodeURIComponent(repo)}`)
+  registryFiles: repo => json('GET', `/api/registry-files?repo=${encodeURIComponent(repo)}`),
+  oauthProviders: () => json('GET', '/api/oauth/providers'),
+  oauthStart: id => json('POST', `/api/oauth/${id}/start`),
+  oauthComplete: (id, code) => json('POST', `/api/oauth/${id}/complete`, { code }),
+  oauthStatus: id => json('GET', `/api/oauth/${id}/status`),
+  oauthSignout: id => json('POST', `/api/oauth/${id}/signout`)
 }
 
 // POST /api/pull streams SSE progress events back on the response body.
