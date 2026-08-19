@@ -103,6 +103,33 @@ app.post('/api/quantize', async (req, res) => {
   }
 })
 
+// ---------- workspace file search (for @-mentions) ----------
+const FILE_SKIP = new Set(['node_modules', '.git', 'dist', 'release', '.next', 'build', '.cache', 'vendor', '__pycache__'])
+app.get('/api/files', (req, res) => {
+  const cwd = String(req.query.cwd || os.homedir())
+  const q = String(req.query.q || '').toLowerCase()
+  const out = []
+  const walk = (dir, rel, depth) => {
+    if (out.length >= 60 || depth > 6) return
+    let entries
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      if (out.length >= 60) return
+      if (e.name.startsWith('.') && e.name !== '.env') continue
+      const rp = rel ? rel + '/' + e.name : e.name
+      if (e.isDirectory()) {
+        if (!FILE_SKIP.has(e.name)) walk(path.join(dir, e.name), rp, depth + 1)
+      } else if (!q || rp.toLowerCase().includes(q)) {
+        out.push(rp)
+      }
+    }
+  }
+  walk(cwd, '', 0)
+  // prioritise shallower + name matches
+  out.sort((a, b) => a.split('/').length - b.split('/').length || a.length - b.length)
+  res.json(out.slice(0, 30))
+})
+
 // ---------- agents ----------
 app.post('/api/agents', (req, res) => {
   const { name, emoji, hue, persona, model, provider, skills, useTools, computerControl } = req.body

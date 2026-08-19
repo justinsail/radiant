@@ -90,6 +90,17 @@ export default function App () {
     refreshSessions()
   }
 
+  const renameSession = async (id, title) => {
+    await api.patchSession(id, { title })
+    if (session?.id === id) setSession(prev => ({ ...prev, title }))
+    refreshSessions()
+  }
+
+  const pinSession = async (id, pinned) => {
+    await api.patchSession(id, { pinned })
+    refreshSessions()
+  }
+
   const patchSession = async patch => {
     if (!session) return
     const s = await api.patchSession(session.id, patch)
@@ -209,6 +220,9 @@ export default function App () {
         onOpen={openSession}
         onNew={newSession}
         onDelete={removeSession}
+        onRename={renameSession}
+        onPin={pinSession}
+        agents={config.agents || []}
         onSettings={openSettings}
         mode={config.settings.mode}
         onToggleMode={() => {

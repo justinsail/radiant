@@ -95,11 +95,11 @@ export function listSessions () {
     .map(f => {
       try {
         const s = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, f), 'utf8'))
-        return { id: s.id, title: s.title, model: s.model, provider: s.provider, cwd: s.cwd, updatedAt: s.updatedAt, messageCount: s.messages.length }
+        return { id: s.id, title: s.title, model: s.model, provider: s.provider, cwd: s.cwd, agentId: s.agentId || null, pinned: Boolean(s.pinned), updatedAt: s.updatedAt, messageCount: s.messages.length }
       } catch { return null }
     })
     .filter(Boolean)
-    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+    .sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt || '').localeCompare(a.updatedAt || ''))
 }
 
 export function loadSession (id) {

@@ -41,6 +41,7 @@ export const api = {
   computerStatus: () => json('GET', '/api/computer-status'),
   quantizeCandidates: () => json('GET', '/api/quantize/candidates'),
   getUsage: () => json('GET', '/api/usage'),
+  searchFiles: (cwd, q) => json('GET', `/api/files?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(q)}`),
   addSkill: skill => json('POST', '/api/skills', skill),
   updateSkill: (id, patch) => json('PATCH', `/api/skills/${id}`, patch),
   deleteSkill: id => json('DELETE', `/api/skills/${id}`),

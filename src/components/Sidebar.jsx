@@ -28,7 +28,8 @@ function UsageChip () {
 const MIN_W = 190
 const MAX_W = 460
 
-export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onSettings, mode, onToggleMode, updateInfo, onUpdate }) {
+export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate }) {
+  const agentOf = id => agents.find(a => a.id === id)
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem('radiant.sidebarWidth'))
     return saved >= MIN_W && saved <= MAX_W ? saved : 248
@@ -68,21 +69,28 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
       </div>
       <button className='new-session' onClick={onNew}>+ New session</button>
       <div className='session-list'>
-        {sessions.map(s => (
-          <button
-            key={s.id}
-            className={'session-item' + (s.id === activeId ? ' active' : '')}
-            onClick={() => onOpen(s.id)}
-            onContextMenu={e => {
-              e.preventDefault()
-              if (window.confirm(`Delete "${s.title}"?`)) onDelete(s.id)
-            }}
-            title={`${s.title}\n(right-click to delete)`}
-          >
-            {s.title}
-            <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
-          </button>
-        ))}
+        {sessions.map(s => {
+          const ag = agentOf(s.agentId)
+          return (
+            <div
+              key={s.id}
+              className={'session-item' + (s.id === activeId ? ' active' : '') + (s.pinned ? ' pinned' : '')}
+              onClick={() => onOpen(s.id)}
+              title={s.title}
+            >
+              <div className='session-title'>
+                {ag && <span className='session-agent'>{ag.emoji || '🤖'}</span>}
+                <span className='session-title-text'>{s.title}</span>
+              </div>
+              <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
+              <div className='session-actions'>
+                <button title={s.pinned ? 'Unpin' : 'Pin to top'} onClick={e => { e.stopPropagation(); onPin(s.id, !s.pinned) }}>{s.pinned ? '★' : '☆'}</button>
+                <button title='Rename' onClick={e => { e.stopPropagation(); const t = window.prompt('Rename session:', s.title); if (t && t.trim()) onRename(s.id, t.trim()) }}>✎</button>
+                <button title='Delete' onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${s.title}"?`)) onDelete(s.id) }}>✕</button>
+              </div>
+            </div>
+          )
+        })}
         {!sessions.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
       </div>
       {updateInfo && (

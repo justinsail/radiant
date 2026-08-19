@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Markdown from './Markdown.jsx'
 import { Icon } from './Icons.jsx'
+import { api } from '../api.js'
 
 const TOOL_ICONS = {
   run_command: '⌘',
@@ -207,6 +208,20 @@ export default function Chat ({ session, live, approval, usage, error, models, a
     setTimeout(() => textareaRef.current?.focus(), 0)
   }
 
+  // @-mention workspace files
+  const atMatch = draft.match(/@([\w./-]*)$/)
+  const [fileMatches, setFileMatches] = useState([])
+  useEffect(() => {
+    if (!atMatch || !session?.cwd) { setFileMatches([]); return }
+    const t = setTimeout(() => api.searchFiles(session.cwd, atMatch[1]).then(setFileMatches).catch(() => setFileMatches([])), 150)
+    return () => clearTimeout(t)
+  }, [draft, session?.cwd])
+  const applyFile = path => {
+    setDraft(d => d.replace(/@[\w./-]*$/, '@' + path + ' '))
+    setFileMatches([])
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
+
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
@@ -216,6 +231,27 @@ export default function Chat ({ session, live, approval, usage, error, models, a
     const files = Array.from(fileList).slice(0, 8)
     const next = await Promise.all(files.map(readFileAsAttachment))
     setAttachments(a => [...a, ...next].slice(0, 8))
+  }
+
+  // voice dictation via the Web Speech API
+  const [listening, setListening] = useState(false)
+  const recogRef = useRef(null)
+  const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
+  const toggleVoice = () => {
+    if (!SpeechRec) return
+    if (listening) { recogRef.current?.stop(); return }
+    const r = new SpeechRec()
+    r.continuous = true; r.interimResults = true; r.lang = 'en-US'
+    let base = draft ? draft + ' ' : ''
+    r.onresult = e => {
+      let txt = ''
+      for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript
+      setDraft(base + txt)
+    }
+    r.onend = () => setListening(false)
+    r.onerror = () => setListening(false)
+    recogRef.current = r
+    r.start(); setListening(true)
   }
 
   const submit = () => {
@@ -352,6 +388,16 @@ export default function Chat ({ session, live, approval, usage, error, models, a
               ))}
             </div>
           )}
+          {atMatch && fileMatches.length > 0 && (
+            <div className='slash-menu'>
+              {fileMatches.map(f => (
+                <button key={f} className='slash-item' onMouseDown={e => { e.preventDefault(); applyFile(f) }}>
+                  <span className='slash-cmd' style={{ minWidth: 0 }}>@</span>
+                  <span className='slash-desc mono' style={{ fontSize: 12 }}>{f}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             rows={2}
@@ -372,6 +418,9 @@ export default function Chat ({ session, live, approval, usage, error, models, a
               onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
             />
             <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images'><Icon.plus size={17} /></button>
+            {SpeechRec && (
+              <button className={'attach-btn' + (listening ? ' listening' : '')} onClick={toggleVoice} title={listening ? 'Stop dictation' : 'Dictate with your voice'}><Icon.mic size={16} /></button>
+            )}
             <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
             <button
               className={'pill-toggle' + (toolsOn ? ' on' : '')}
