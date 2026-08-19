@@ -10,7 +10,6 @@ import pty from 'node-pty'
 import { execSync } from 'child_process'
 import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession } from './config.js'
 import { runTurn, listModels } from './providers.js'
-import { CATALOG } from './catalog.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken } from './oauth.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
@@ -131,13 +130,13 @@ app.get('/api/system', (req, res) => {
   })
 })
 
-app.get('/api/catalog', (req, res) => res.json(CATALOG))
-
 // live registry search: GGUF repos on Hugging Face, pullable via `ollama pull hf.co/{repo}:{quant}`
 app.get('/api/registry-search', async (req, res) => {
   const q = String(req.query.q || '').slice(0, 100)
+  const SORTS = { downloads: 'downloads', likes: 'likes', trending: 'trendingScore', updated: 'lastModified', created: 'createdAt' }
+  const sort = SORTS[req.query.sort] || 'downloads'
   try {
-    const url = `https://huggingface.co/api/models?filter=gguf&sort=downloads&direction=-1&limit=30${q ? `&search=${encodeURIComponent(q)}` : ''}`
+    const url = `https://huggingface.co/api/models?filter=gguf&sort=${sort}&direction=-1&limit=30${q ? `&search=${encodeURIComponent(q)}` : ''}`
     const r = await fetch(url, { signal: AbortSignal.timeout(10000) })
     if (!r.ok) throw new Error(`registry ${r.status}`)
     const data = await r.json()
@@ -163,6 +162,9 @@ app.get('/api/registry-files', async (req, res) => {
     for (const s of data.siblings || []) {
       const f = s.rfilename
       if (!/\.gguf$/i.test(f)) continue
+      // skip vision projectors / adapters — they're companion files, not weights,
+      // and their tiny size mislabels the quant list (e.g. a 0.9 GB "F16")
+      if (/mmproj|projector|\bproj\b|lora|adapter/i.test(f)) continue
       const parts = f.split('/')
       let label = null
       if (parts.length > 1 && /^(i?q\d|f16|f32|bf16)/i.test(parts[0])) label = parts[0]

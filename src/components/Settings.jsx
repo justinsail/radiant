@@ -144,31 +144,6 @@ function fitClass (ramGB, systemRam) {
 }
 const FIT_LABEL = { 'fit-ok': 'runs well', 'fit-tight': 'tight fit', 'fit-no': 'too big' }
 
-function VariantRow ({ variant, installed, pull, onPull, onDelete, systemRam }) {
-  const fit = fitClass(variant.ramGB, systemRam)
-  const pct = pull && pull.total ? Math.round((pull.completed / pull.total) * 100) : null
-  return (
-    <div className='variant-row'>
-      <span className='v-tag mono'>{variant.tag}</span>
-      <span className='v-meta'>{variant.params} · {variant.dlGB} GB download · ~{variant.ramGB} GB RAM</span>
-      <span className={'fit-badge ' + fit}>{FIT_LABEL[fit] || ''}</span>
-      <span className='v-action'>
-        {installed
-          ? <>
-              <span className='key-ok'>✓ installed</span>
-              <button className='small-btn danger' title='Remove from disk' onClick={() => onDelete(variant.tag)}>✕</button>
-            </>
-          : pull
-            ? <span className='pull-progress'>
-                <span className='pull-bar'><span style={{ width: (pct ?? 5) + '%' }} /></span>
-                {pct != null ? pct + '%' : (pull.status || 'starting…')}
-              </span>
-            : <button className='small-btn' onClick={() => onPull(variant.tag)} disabled={fit === 'fit-no'}>Download</button>}
-      </span>
-    </div>
-  )
-}
-
 function ramNeededGB (fileSizeGB) {
   return Math.round(fileSizeGB * 1.15 + 1.5)
 }
@@ -229,11 +204,9 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, systemRam }) {
 
 function ModelsPane ({ onModelsChanged }) {
   const [system, setSystem] = useState(null)
-  const [catalog, setCatalog] = useState([])
   const [local, setLocal] = useState({ running: true, models: [] })
   const [q, setQ] = useState('')
-  const [cat, setCat] = useState('all')
-  const [source, setSource] = useState('curated') // 'curated' | 'hf'
+  const [sort, setSort] = useState('downloads')
   const [hfResults, setHfResults] = useState(null)
   const [hfError, setHfError] = useState(null)
   const [pulls, setPulls] = useState({}) // tag -> {status, completed, total}
@@ -241,19 +214,18 @@ function ModelsPane ({ onModelsChanged }) {
   const hfTimer = useRef(null)
 
   useEffect(() => {
-    if (source !== 'hf') return
     clearTimeout(hfTimer.current)
     hfTimer.current = setTimeout(() => {
+      setHfResults(null)
       setHfError(null)
-      api.registrySearch(q).then(setHfResults).catch(e => setHfError(e.message))
+      api.registrySearch(q, sort).then(setHfResults).catch(e => setHfError(e.message))
     }, q ? 400 : 0)
     return () => clearTimeout(hfTimer.current)
-  }, [q, source])
+  }, [q, sort])
 
   const refreshLocal = () => api.getLocalModels().then(setLocal).catch(() => {})
   useEffect(() => {
     api.getSystem().then(setSystem).catch(() => {})
-    api.getCatalog().then(setCatalog).catch(() => {})
     refreshLocal()
   }, [])
 
@@ -288,12 +260,6 @@ function ModelsPane ({ onModelsChanged }) {
     onModelsChanged()
   }
 
-  const cats = ['all', 'general', 'coding', 'reasoning', 'vision', 'embedding']
-  const filtered = catalog.filter(f =>
-    (cat === 'all' || f.category === cat) &&
-    (f.family + f.desc + f.variants.map(v => v.tag).join(' ')).toLowerCase().includes(q.toLowerCase())
-  )
-
   return (
     <div className='set-section'>
       <h3>Local models</h3>
@@ -313,64 +279,52 @@ function ModelsPane ({ onModelsChanged }) {
       {!local.running && (
         <div className='error-note'>⚠ Ollama isn't running — start it to download and run local models.</div>
       )}
+
+      {local.models.length > 0 && (
+        <div className='installed-block'>
+          <div className='installed-label'>On this Mac · {local.models.length} installed</div>
+          {local.models.map(m => (
+            <div key={m.name} className='installed-row'>
+              <span className='v-tag mono'>{m.name}</span>
+              <span className='v-meta'>{m.sizeGB} GB</span>
+              <button className='small-btn danger' title='Remove from disk' onClick={() => remove(m.name)}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className='model-filter-row'>
         <input
           className='text-input' style={{ fontFamily: 'inherit' }}
-          placeholder={source === 'hf' ? 'Search all of Hugging Face…' : 'Search models…'}
+          placeholder='Search Hugging Face for downloadable models…'
           value={q} onChange={e => setQ(e.target.value)}
         />
-        <button className={'pill-toggle' + (source === 'curated' ? ' on' : '')} onClick={() => setSource('curated')}>curated</button>
-        <button className={'pill-toggle' + (source === 'hf' ? ' on' : '')} onClick={() => setSource('hf')}>hugging face</button>
       </div>
-      {source === 'curated' && (
-        <>
-          <div className='model-filter-row'>
-            {cats.map(c => (
-              <button key={c} className={'pill-toggle' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>{c}</button>
-            ))}
-          </div>
-          <div className='model-catalog'>
-            {filtered.map(f => (
-              <div key={f.family} className='model-family'>
-                <div className='mf-head'>
-                  <span className='mf-name'>{f.family}</span>
-                  <span className='mf-cat'>{f.category}</span>
-                  <span className='mf-desc'>{f.desc}</span>
-                </div>
-                {f.variants.map(v => (
-                  <VariantRow
-                    key={v.tag}
-                    variant={v}
-                    installed={isInstalled(v.tag)}
-                    pull={pulls[v.tag]}
-                    onPull={startPull}
-                    onDelete={remove}
-                    systemRam={system?.ramGB}
-                  />
-                ))}
-              </div>
-            ))}
-            {!filtered.length && <div className='activity-empty'>No models match.</div>}
-          </div>
-        </>
-      )}
-      {source === 'hf' && (
-        <div className='model-catalog'>
-          {hfError && <div className='error-note'>⚠ Registry search failed: {hfError}</div>}
-          {!hfResults && !hfError && <div className='activity-empty'>Searching the registry…</div>}
-          {hfResults && hfResults.map(r => (
-            <HFRepoRow
-              key={r.id}
-              repo={r}
-              installedCheck={tag => isInstalled(tag)}
-              pulls={pulls}
-              onPull={startPull}
-              systemRam={system?.ramGB}
-            />
-          ))}
-          {hfResults && !hfResults.length && <div className='activity-empty'>No GGUF models match.</div>}
-        </div>
-      )}
+      <div className='model-filter-row'>
+        <span className='sort-label'>Sort</span>
+        {[['downloads', 'Most downloaded'], ['likes', 'Most liked'], ['trending', 'Trending'], ['updated', 'Recently updated'], ['created', 'Newest']].map(([id, label]) => (
+          <button key={id} className={'pill-toggle' + (sort === id ? ' on' : '')} onClick={() => setSort(id)}>{label}</button>
+        ))}
+      </div>
+      <div className='hf-note'>
+        Downloads come from Hugging Face (the same source LM Studio and Unsloth use), pulled through Ollama.
+        Expand a model to pick a quantization.
+      </div>
+      <div className='model-catalog'>
+        {hfError && <div className='error-note'>⚠ Registry search failed: {hfError}</div>}
+        {!hfResults && !hfError && <div className='activity-empty'>Searching Hugging Face…</div>}
+        {hfResults && hfResults.map(r => (
+          <HFRepoRow
+            key={r.id}
+            repo={r}
+            installedCheck={tag => isInstalled(tag)}
+            pulls={pulls}
+            onPull={startPull}
+            systemRam={system?.ramGB}
+          />
+        ))}
+        {hfResults && !hfResults.length && <div className='activity-empty'>No GGUF models match.</div>}
+      </div>
     </div>
   )
 }
