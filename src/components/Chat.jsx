@@ -324,7 +324,7 @@ function GroupPicker ({ agents, onStart, onCancel }) {
   )
 }
 
-export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
   const [groupPicker, setGroupPicker] = useState(false)
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
@@ -452,6 +452,12 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
                     )}
                     {m.text}
                   </div>
+                  {onTruncate && !live && (
+                    <button className='rewind-btn' title='Rewind — edit this and retry (removes messages after it)' onClick={async () => {
+                      if (!window.confirm('Rewind to here? This removes the messages after this point so you can edit and retry.')) return
+                      await onTruncate(i); setDraft(m.text); setTimeout(() => textareaRef.current?.focus(), 0)
+                    }}>↺ edit &amp; retry</button>
+                  )}
                 </div>
               : <AssistantMessage key={i} parts={m.parts || []} model={m.model} agent={m.agentId ? agents.find(a => a.id === m.agentId) || sessionAgent : sessionAgent} />
           )}

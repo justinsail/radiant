@@ -833,6 +833,18 @@ app.delete('/api/sessions/:id', (req, res) => {
   res.json({ ok: true })
 })
 
+// rewind: drop all messages from `index` onward (branch the conversation)
+app.post('/api/sessions/:id/truncate', (req, res) => {
+  const s = loadSession(req.params.id)
+  if (!s) return res.status(404).json({ error: 'not found' })
+  const idx = Number(req.body?.index)
+  if (Number.isInteger(idx) && idx >= 0 && idx <= s.messages.length) {
+    s.messages = s.messages.slice(0, idx)
+    saveSession(s)
+  }
+  res.json(s)
+})
+
 // ---------- chat (SSE) ----------
 app.post('/api/chat', async (req, res) => {
   config = loadConfig() // see the latest keys/oauth before the turn

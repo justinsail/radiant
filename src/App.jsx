@@ -106,6 +106,15 @@ export default function App () {
     refreshSessions()
   }
 
+  const truncateSession = async index => {
+    if (!session) return
+    const s = await api.truncateSession(session.id, index)
+    setSession(s); setLive(null); setApproval(null); setStats(s.stats || null); setTodos(s.todos || []); setError(null)
+    streamingSessionRef.current = null
+    refreshSessions()
+    return s
+  }
+
   const removeSession = async id => {
     await api.deleteSession(id)
     if (session?.id === id) setSession(null)
@@ -278,6 +287,7 @@ export default function App () {
         onToggleRight={() => setRightOpen(o => !o)}
         onMenu={() => setNavOpen(true)}
         onNewGroup={newGroup}
+        onTruncate={truncateSession}
         agents={config.agents || []}
         session={session}
         todos={todos}
