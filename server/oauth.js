@@ -36,6 +36,14 @@ export const OAUTH_PROVIDERS = {
     tokenUrl: 'https://portal.nousresearch.com/api/oauth/token',
     clientId: 'hermes-cli',
     scope: 'inference:invoke'
+  },
+  xai: {
+    label: 'xAI (Grok)',
+    mode: 'device', // xAI's auth.x.ai OIDC server supports the device-code grant
+    deviceCodeUrl: 'https://auth.x.ai/oauth2/device/code',
+    tokenUrl: 'https://auth.x.ai/oauth2/token',
+    clientId: 'b1a00492-073a-47ea-816f-4c329264a828', // public client id used by the grok CLI
+    scope: 'openid profile email offline_access grok-cli:access api:access'
   }
 }
 
@@ -195,6 +203,24 @@ export async function pollDevice (providerId) {
   throw new Error(j.error_description || j.error || `sign-in failed (${res.status})`)
 }
 
+// Standard OIDC refresh for device-code providers (form-encoded, per RFC 6749).
+async function refreshDevice (providerId, tok) {
+  const p = OAUTH_PROVIDERS[providerId]
+  const res = await fetch(p.tokenUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tok.refresh, client_id: p.clientId })
+  })
+  if (!res.ok) throw new Error(`${p.label} session expired — sign in again (${res.status})`)
+  const j = await res.json()
+  return {
+    access: j.access_token,
+    refresh: j.refresh_token || tok.refresh,
+    idToken: j.id_token || tok.idToken || null,
+    expires: Date.now() + (j.expires_in ? j.expires_in * 1000 : 3600_000)
+  }
+}
+
 // Nous rotates a single-use refresh token and passes it in a custom header.
 async function refreshNous (tok) {
   const p = OAUTH_PROVIDERS.nousresearch
@@ -215,7 +241,11 @@ export async function validAccessToken (providerId, config, saveConfig) {
   // Nous invoke JWTs are short-lived; refresh with a wider skew and its own flow.
   const skew = providerId === 'nousresearch' ? 130_000 : 60_000
   if (tok.expires - Date.now() > skew) return tok.access
-  const fresh = providerId === 'nousresearch' ? await refreshNous(tok) : await refreshToken(providerId, tok)
+  const fresh = providerId === 'nousresearch'
+    ? await refreshNous(tok)
+    : OAUTH_PROVIDERS[providerId]?.mode === 'device'
+      ? await refreshDevice(providerId, tok)
+      : await refreshToken(providerId, tok)
   config.oauth[providerId] = fresh
   saveConfig(config)
   return fresh.access
