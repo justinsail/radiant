@@ -254,6 +254,7 @@ function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, stre
 function ModelPicker ({ session, models, onPick, onRefresh }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [collapsed, setCollapsed] = useState({}) // providerName -> explicit collapse override
   const ref = useRef(null)
 
   useEffect(() => {
@@ -266,6 +267,11 @@ function ModelPicker ({ session, models, onPick, onRefresh }) {
   const groups = {}
   for (const m of filtered) (groups[m.providerName] = groups[m.providerName] || []).push(m)
   const current = models.find(m => m.id === session?.model && m.provider === session?.provider)
+  const currentProvider = current?.providerName || session?.provider
+  const searching = q.trim().length > 0
+  // collapsed by default except the current provider; search expands everything
+  const isCollapsed = g => !searching && (g in collapsed ? collapsed[g] : g !== currentProvider)
+  const toggleGroup = g => setCollapsed(c => ({ ...c, [g]: !(g in c ? c[g] : g !== currentProvider) }))
 
   return (
     <div ref={ref} style={{ display: 'contents' }}>
@@ -282,20 +288,27 @@ function ModelPicker ({ session, models, onPick, onRefresh }) {
         <div className='model-menu'>
           <input autoFocus placeholder='Search models…' value={q} onChange={e => setQ(e.target.value)} />
           <div className='model-groups'>
-            {Object.entries(groups).map(([g, ms]) => (
-              <div key={g}>
-                <div className='model-group-label'>{g}</div>
-                {ms.map(m => (
-                  <button
-                    key={m.provider + m.id}
-                    className={'model-option' + (m.id === session?.model && m.provider === session?.provider ? ' selected' : '')}
-                    onClick={() => { onPick(m); setOpen(false) }}
-                  >
-                    {m.id}
+            {Object.entries(groups).map(([g, ms]) => {
+              const col = isCollapsed(g)
+              return (
+                <div key={g}>
+                  <button className='model-group-label' onClick={() => toggleGroup(g)}>
+                    <span className='mg-caret'>{col ? '▸' : '▾'}</span>
+                    <span className='mg-name'>{g}</span>
+                    <span className='mg-count'>{ms.length}</span>
                   </button>
-                ))}
-              </div>
-            ))}
+                  {!col && ms.map(m => (
+                    <button
+                      key={m.provider + m.id}
+                      className={'model-option' + (m.id === session?.model && m.provider === session?.provider ? ' selected' : '')}
+                      onClick={() => { onPick(m); setOpen(false) }}
+                    >
+                      {m.id}
+                    </button>
+                  ))}
+                </div>
+              )
+            })}
             {!filtered.length && (
               <div className='empty'>
                 No models. Add an API key in Settings, or start Ollama / LM Studio for local models.

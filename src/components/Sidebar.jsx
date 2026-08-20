@@ -27,7 +27,7 @@ function UsageChip () {
   }
   const subTitle = s => {
     if (!s.windows?.length) return `${s.label}: signed in (usage not reported)`
-    return `${s.label}:\n` + s.windows.map(w => `  ${w.name}: ${w.usedPct != null ? w.usedPct + '% used' : 'active'}${w.resetAt ? ` · resets ${fmtReset(w.resetAt)}` : ''}`).join('\n')
+    return `${s.label}:\n` + s.windows.map(w => `  ${w.name}: ${w.usedPct != null ? Math.max(0, 100 - w.usedPct) + '% left' : 'active'}${w.resetAt ? ` · resets ${fmtReset(w.resetAt)}` : ''}`).join('\n')
   }
   return (
     <div className='usage-chip' title={credits ? `${credits.label}: $${credits.remaining} left of $${credits.total} ($${credits.used} used)` : ''}>
@@ -35,12 +35,13 @@ function UsageChip () {
       {subs.map(s => {
         const primary = s.windows?.[0]
         const pct = primary?.usedPct
+        const left = pct != null ? Math.max(0, 100 - pct) : null
         const reset = primary?.resetAt ? resetShort(primary.resetAt) : ''
         return (
           <span key={s.provider} className='usage-line sub' title={subTitle(s)}>
-            <span className={'usage-dot' + (pct != null && pct >= 90 ? ' warn' : ' ok')} /> {s.label}
+            <span className={'usage-dot' + (left != null && left <= 10 ? ' warn' : ' ok')} /> {s.label}
             <span className='usage-sub'>
-              {pct != null ? `${pct}%` : 'plan'}{reset ? <span className='usage-reset'> · ↻ {reset}</span> : ''}
+              {left != null ? `${left}% left` : 'plan'}{reset ? <span className='usage-reset'> · ↻ {reset}</span> : ''}
             </span>
           </span>
         )
