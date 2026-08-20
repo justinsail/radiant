@@ -14,8 +14,20 @@ const DEFAULT_CONFIG = {
     { id: 'lmstudio', name: 'LM Studio (local)', type: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', auth: 'none', removable: false },
     { id: 'openrouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1', auth: 'key', removable: false },
     { id: 'nousresearch', name: 'Nous Portal', type: 'openai', baseUrl: 'https://inference-api.nousresearch.com/v1', auth: 'key', removable: false, hint: 'Sign in with your Nous Portal subscription below — or paste an API key from portal.nousresearch.com → API Keys.' },
-    { id: 'xai', name: 'xAI (Grok)', type: 'openai', baseUrl: 'https://api.x.ai/v1', auth: 'key', removable: false, hint: 'Sign in with your Grok subscription below (SuperGrok / Premium+) — or paste an xAI API key from console.x.ai.' }
+    { id: 'xai', name: 'xAI (Grok)', type: 'openai', baseUrl: 'https://api.x.ai/v1', auth: 'key', removable: false, hint: 'Sign in with your Grok subscription below (SuperGrok / Premium+) — or paste an xAI API key from console.x.ai.' },
+    // Pre-configured API-key services (OpenAI-compatible). Removable — hide any you don't use.
+    { id: 'deepseek', name: 'DeepSeek', type: 'openai', baseUrl: 'https://api.deepseek.com', auth: 'key', removable: true, preset: true, hint: 'deepseek-chat & deepseek-reasoner. Key at platform.deepseek.com.' },
+    { id: 'moonshot', name: 'Kimi (Moonshot)', type: 'openai', baseUrl: 'https://api.moonshot.ai/v1', auth: 'key', removable: true, preset: true, hint: 'Kimi models. Key at platform.moonshot.ai.' },
+    { id: 'zai', name: 'GLM (Z.ai)', type: 'openai', baseUrl: 'https://api.z.ai/api/paas/v4', auth: 'key', removable: true, preset: true, hint: 'GLM-4.6 / 4.5. Key at z.ai — works with the GLM Coding Plan.' },
+    { id: 'mistral', name: 'Mistral', type: 'openai', baseUrl: 'https://api.mistral.ai/v1', auth: 'key', removable: true, preset: true, hint: 'Key at console.mistral.ai.' },
+    { id: 'groq', name: 'Groq', type: 'openai', baseUrl: 'https://api.groq.com/openai/v1', auth: 'key', removable: true, preset: true, hint: 'Very fast inference. Key at console.groq.com.' },
+    { id: 'together', name: 'Together', type: 'openai', baseUrl: 'https://api.together.xyz/v1', auth: 'key', removable: true, preset: true, hint: 'Open models. Key at api.together.ai.' },
+    { id: 'fireworks', name: 'Fireworks', type: 'openai', baseUrl: 'https://api.fireworks.ai/inference/v1', auth: 'key', removable: true, preset: true, hint: 'Open models. Key at fireworks.ai.' },
+    { id: 'cerebras', name: 'Cerebras', type: 'openai', baseUrl: 'https://api.cerebras.ai/v1', auth: 'key', removable: true, preset: true, hint: 'Very fast inference. Key at cloud.cerebras.ai.' },
+    { id: 'perplexity', name: 'Perplexity', type: 'openai', baseUrl: 'https://api.perplexity.ai', auth: 'key', removable: true, preset: true, hint: 'Sonar models. Key at perplexity.ai/settings/api.' },
+    { id: 'vercel', name: 'Vercel AI Gateway', type: 'openai', baseUrl: 'https://ai-gateway.vercel.sh/v1', auth: 'key', removable: true, preset: true, hint: 'Routes to many models. Key from your Vercel dashboard.' }
   ],
+  removedProviders: [],
   keys: {},
   oauth: {},
   mcpServers: [],
@@ -79,6 +91,11 @@ export function loadConfig () {
     cfg.providers = cfg.providers.map(p => ({ ...p, ...(byId[p.id] ? { baseUrl: byId[p.id].baseUrl } : {}) }))
     for (const p of saved.providers || []) {
       if (!cfg.providers.find(d => d.id === p.id)) cfg.providers.push(p)
+    }
+    // presets/defaults the user has removed stay removed across restarts
+    if (saved.removedProviders) {
+      cfg.removedProviders = saved.removedProviders
+      cfg.providers = cfg.providers.filter(p => !saved.removedProviders.includes(p.id))
     }
     cfg.keys = saved.keys || {}
     cfg.oauth = saved.oauth || {}

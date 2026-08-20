@@ -153,6 +153,11 @@ app.delete('/api/providers/:id', (req, res) => {
   if (p && p.removable) {
     config.providers = config.providers.filter(x => x.id !== p.id)
     delete config.keys[p.id]
+    // remember removed built-in/preset providers so the merge doesn't re-add them
+    if (!p.id.startsWith('custom-')) {
+      config.removedProviders = config.removedProviders || []
+      if (!config.removedProviders.includes(p.id)) config.removedProviders.push(p.id)
+    }
     saveConfig(config)
   }
   res.json(publicConfig(config))
