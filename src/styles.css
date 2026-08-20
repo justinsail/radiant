@@ -496,8 +496,9 @@ code, pre, .mono { font-family: var(--font-mono); }
   padding: 4px 10px;
   border: 1px solid var(--border); border-radius: 999px;
   background: transparent; color: var(--text-muted);
-  font-size: 12px; font-weight: 500; max-width: 300px;
+  font-size: 12px; font-weight: 500; max-width: 300px; min-width: 0; flex-shrink: 1;
 }
+.model-btn .provider-tag { flex: none; }
 .model-btn:hover { background: var(--bg-hover); color: var(--text); }
 .model-btn .provider-tag { color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; }
 .model-btn .model-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 11.5px; }
@@ -729,10 +730,10 @@ code, pre, .mono { font-family: var(--font-mono); }
   border: none; outline: none; background: none; resize: none;
   line-height: 1.5; max-height: 200px; padding: 2px 4px;
 }
-.composer-row { display: flex; align-items: center; gap: 8px; }
-.composer-row .grow { flex: 1; }
+.composer-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.composer-row .grow { flex: 1 1 0; min-width: 0; }
 .pill-toggle {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 6px; flex: none; white-space: nowrap;
   padding: 4px 10px; border-radius: 999px;
   border: 1px solid var(--border);
   background: none; color: var(--text-faint); font-size: 12px;
@@ -756,7 +757,7 @@ code, pre, .mono { font-family: var(--font-mono); }
 .queued-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queued-x { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 11px; padding: 0 2px; }
 .queued-x:hover { color: var(--danger); }
-.usage-note { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); }
+.usage-note { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); white-space: nowrap; flex: none; }
 
 /* drop-up menu anchor inside the prompt bar */
 .composer-box .model-menu { position: absolute; bottom: calc(100% + 8px); left: 8px; }
