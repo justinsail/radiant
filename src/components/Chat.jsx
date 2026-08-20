@@ -587,6 +587,22 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
         <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel\n(tool runs, output, terminal)'} data-tip-below data-tip-end><Icon.panel /></button>
       </div>
 
+      {session.group && Array.isArray(session.participants) && session.participants.length > 0 && (
+        <div className='group-roster' title='Agents in this group chat'>
+          <span className='group-roster-label'>👥 Group</span>
+          {session.participants.map(id => {
+            const a = agents.find(x => x.id === id)
+            if (!a) return null
+            return (
+              <span key={id} className='group-roster-chip'>
+                <span className='group-roster-ico' style={{ color: `oklch(0.7 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={13} /></span>
+                {a.name}
+              </span>
+            )
+          })}
+        </div>
+      )}
+
       <div className='chat-scroll' ref={scrollRef}>
         <div className='chat-inner'>
           {session.messages.map((m, i) =>

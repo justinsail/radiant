@@ -41,6 +41,22 @@ function userText (m) {
 }
 const imageAttachments = m => (m.attachments || []).filter(a => a.kind === 'image')
 
+const messageText = m => (m.parts || []).filter(p => p.type === 'text').map(p => p.text).join('\n').trim()
+
+// In a group chat every agent's reply is stored as an assistant message. When it's
+// agent X's turn, the OTHER agents' replies must be shown to X as user-role input
+// (name-tagged) — otherwise the request ends on an assistant message and models
+// reject it ("must end with a user message" / no assistant prefill).
+function groupFlatten (messages, speakerId, names) {
+  return messages.map(m => {
+    if (m.role === 'assistant' && m.agentId && m.agentId !== speakerId) {
+      const t = messageText(m)
+      return t ? { role: 'user', text: `[${names[m.agentId] || 'Agent'}]: ${t}` } : null
+    }
+    return m
+  }).filter(Boolean)
+}
+
 function toAnthropic (messages) {
   const out = []
   for (const m of messages) {
@@ -465,7 +481,7 @@ async function compactSession (session, keepRecent, summarize, emit) {
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, memory, agentId, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, memory, agentId, groupSpeakerId, groupNames, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
   const cwd = session.cwd || os.homedir()
   const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona, planMode, memory)
   // proactive compaction before a very long turn
@@ -518,11 +534,12 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
     let result
     const roundStart = Date.now()
     try {
+      const reqMsgs = groupSpeakerId ? groupFlatten(session.messages, groupSpeakerId, groupNames || {}) : session.messages
       result = provider.type === 'anthropic'
-        ? await anthropicRound({ ...args, messages: toAnthropic(session.messages) })
+        ? await anthropicRound({ ...args, messages: toAnthropic(reqMsgs) })
         : useChatgpt
-          ? await chatgptRound({ ...args, accountId, messages: session.messages })
-          : await openaiRound({ ...args, messages: toOpenAI(session.messages, system) })
+          ? await chatgptRound({ ...args, accountId, messages: reqMsgs })
+          : await openaiRound({ ...args, messages: toOpenAI(reqMsgs, system) })
       stats.llmMs += Date.now() - roundStart
     } catch (e) {
       // Model doesn't support tools (common with local models) -> retry once without them.

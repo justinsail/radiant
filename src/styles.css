@@ -476,6 +476,10 @@ code, pre, .mono { font-family: var(--font-mono); }
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .topbar .spacer { flex: 1; }
+.group-roster { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 7px 16px; border-bottom: 1px solid var(--border); background: var(--bg-panel); }
+.group-roster-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-right: 2px; }
+.group-roster-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-raised); font-size: 12px; color: var(--text); }
+.group-roster-ico { display: inline-flex; }
 .cwd-chip {
   display: inline-flex; align-items: center; gap: 5px;
   font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);

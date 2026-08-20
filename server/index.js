@@ -1044,13 +1044,14 @@ app.post('/api/chat', async (req, res) => {
     if (participants && participants.length) {
       // group chat: each participant agent responds in turn, seeing the others' replies
       const names = participants.map(id => (config.agents || []).find(a => a.id === id)?.name).filter(Boolean)
+      const groupNames = Object.fromEntries(participants.map(id => [id, (config.agents || []).find(a => a.id === id)?.name || 'Agent']))
       for (const pid of participants) {
         if (controller.signal.aborted) break
         const ag = (config.agents || []).find(a => a.id === pid)
         if (!ag) continue
         emit({ type: 'agent_turn', agentId: pid, name: ag.name })
-        const groupPersona = `${ag.persona || ''}\n\nThis is a group discussion between ${names.join(', ')}. You are ${ag.name}. Speak only as yourself, in the first person, briefly. Add something new — build on or respectfully challenge what the others said; do not repeat them or role-play the other participants.`
-        await runTurn({ ...common, agentId: pid, persona: groupPersona, skills: [], useTools: false, computerControl: false })
+        const groupPersona = `${ag.persona || ''}\n\nThis is a group discussion between ${names.join(', ')}. You are ${ag.name}. The other participants' messages are shown to you tagged like "[Name]: …". Speak only as yourself, in the first person, briefly. Add something new — build on or respectfully challenge what the others said; do not repeat them or role-play the other participants.`
+        await runTurn({ ...common, agentId: pid, groupSpeakerId: pid, groupNames, persona: groupPersona, skills: [], useTools: false, computerControl: false })
       }
     } else {
       await runTurn({
