@@ -625,8 +625,8 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose, onDupl
           {' '}
           {docker == null ? 'Checking Docker…'
             : docker.running ? <span className='key-ok'>✓ Docker is running — ready.</span>
-              : docker.installed ? <span className='fit-badge fit-tight'>Docker is installed but not running — start Docker Desktop or Colima.</span>
-                : <span className='fit-badge fit-no'>Requires Docker Desktop (or Colima) — not detected.</span>}
+              : docker.installed ? <span className='sandbox-req-warn'>Docker is installed but not running — start Docker Desktop or Colima.</span>
+                : <span className='sandbox-req-warn'>Requires Docker Desktop (or Colima) — not detected.</span>}
         </div>
         <div className='sandbox-note' style={{ color: 'var(--text-faint)' }}>
           Requirements: Docker running · a one-time ~2 GB Linux desktop download · ~1–2 GB RAM while active. The sandbox desktop is provisioned the first time the agent uses its computer.

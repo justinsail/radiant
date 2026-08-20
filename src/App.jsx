@@ -58,6 +58,7 @@ export default function App () {
   }
 
   const openSettings = () => {
+    setNavOpen(false) // close the mobile drawer so it doesn't cover the settings panel
     if (window.radiantNative?.openSettings) window.radiantNative.openSettings()
     else setSettingsOpen(true)
   }
@@ -290,7 +291,7 @@ export default function App () {
           saveSettings({ mode: next })
         }}
         updateInfo={updateInfo}
-        onUpdate={() => { if (window.radiantNative?.openSettings) window.radiantNative.openSettings('about'); else { setSettingsTab('about'); setSettingsOpen(true) } }}
+        onUpdate={() => { setNavOpen(false); if (window.radiantNative?.openSettings) window.radiantNative.openSettings('about'); else { setSettingsTab('about'); setSettingsOpen(true) } }}
       />
       <Chat
         rightOpen={rightOpen}

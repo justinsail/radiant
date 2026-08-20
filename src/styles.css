@@ -1162,6 +1162,7 @@ input[type='range']::-webkit-slider-thumb {
 .skill-drop svg { color: var(--text-faint); }
 .skill-drop-hint { font-size: 11px; color: var(--text-faint); }
 .skill-list-head { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin: 14px 0 2px; }
+.sandbox-req-warn { color: var(--danger); font-weight: 500; }
 .skill-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .skill-toggle { flex-shrink: 0; padding-top: 2px; }
 .skill-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
