@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import crypto from 'crypto'
 
 export const RADIANT_DIR = path.join(os.homedir(), '.radiant')
 export const SESSIONS_DIR = path.join(RADIANT_DIR, 'sessions')
@@ -33,6 +34,8 @@ const DEFAULT_CONFIG = {
   removedProviders: [],
   keys: {},
   oauth: {},
+  accounts: {},
+  activeAccount: {},
   mcpServers: [],
   skills: [
     { id: 'seed-commits', name: 'Conventional commits', description: 'Commit messages in Conventional Commits format.', content: 'When writing git commit messages, use Conventional Commits format (feat:, fix:, docs:, refactor:, chore:, test:) — a concise summary line, and a short body only when it adds value.', enabled: false },
@@ -102,6 +105,8 @@ export function loadConfig () {
     }
     cfg.keys = saved.keys || {}
     cfg.oauth = saved.oauth || {}
+    cfg.accounts = saved.accounts || {}
+    cfg.activeAccount = saved.activeAccount || {}
     if (saved.skills) cfg.skills = saved.skills
     if (saved.agents) {
       // built-in agents now follow the accent colour (hue: null); null out any that
@@ -136,6 +141,7 @@ export function loadConfig () {
     }
     cfg.settings = { ...cfg.settings, ...(saved.settings || {}) }
   } catch { /* first run */ }
+  migrateAccounts(cfg)
   return cfg
 }
 
@@ -144,13 +150,82 @@ export function saveConfig (cfg) {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), { mode: 0o600 })
 }
 
+// ---- multiple accounts per provider ----
+// accounts[providerId] holds every saved credential (incl. the active one);
+// activeAccount[providerId] names the active one. config.keys / config.oauth
+// always mirror the active account, so the whole request path is unchanged.
+function jwtEmail (tok) {
+  const jwt = tok?.idToken || tok?.access
+  try { const c = JSON.parse(Buffer.from(String(jwt).split('.')[1], 'base64').toString('utf8')); return c.email || null } catch { return null }
+}
+function autoLabel (cred, n) {
+  if (cred.oauth) return jwtEmail(cred.oauth) || `Account ${n}`
+  if (cred.key) return 'Key ••••' + String(cred.key).slice(-4)
+  return `Account ${n}`
+}
+// write the active account's credential into config.keys / config.oauth
+export function syncActiveAccount (config, providerId) {
+  const list = config.accounts?.[providerId] || []
+  const act = list.find(a => a.id === config.activeAccount?.[providerId]) || list[0]
+  if (!act) { delete config.keys[providerId]; delete config.oauth[providerId]; return }
+  config.activeAccount = config.activeAccount || {}
+  config.activeAccount[providerId] = act.id
+  if (act.key) config.keys[providerId] = act.key; else delete config.keys[providerId]
+  if (act.oauth) config.oauth[providerId] = act.oauth; else delete config.oauth[providerId]
+}
+// add a new account (or replace the active one's credential when newAccount is false)
+export function upsertCredential (config, providerId, cred, { label, newAccount } = {}) {
+  config.accounts = config.accounts || {}
+  config.activeAccount = config.activeAccount || {}
+  const list = config.accounts[providerId] = config.accounts[providerId] || []
+  const active = list.find(a => a.id === config.activeAccount[providerId])
+  if (!newAccount && active) {
+    active.key = cred.key; active.oauth = cred.oauth
+    if (label) active.label = label
+  } else {
+    const acct = { id: 'acct-' + crypto.randomBytes(4).toString('hex'), label: label || autoLabel(cred, list.length + 1), key: cred.key, oauth: cred.oauth }
+    list.push(acct)
+    config.activeAccount[providerId] = acct.id
+  }
+  syncActiveAccount(config, providerId)
+}
+export function activateAccount (config, providerId, acctId) {
+  config.activeAccount = config.activeAccount || {}
+  config.activeAccount[providerId] = acctId
+  syncActiveAccount(config, providerId)
+}
+export function removeAccount (config, providerId, acctId) {
+  const list = config.accounts?.[providerId] || []
+  config.accounts[providerId] = list.filter(a => a.id !== acctId)
+  if (config.activeAccount?.[providerId] === acctId) {
+    config.activeAccount[providerId] = config.accounts[providerId][0]?.id
+  }
+  syncActiveAccount(config, providerId)
+}
+// backfill accounts for installs whose keys/tokens predate multi-account
+function migrateAccounts (config) {
+  config.accounts = config.accounts || {}
+  config.activeAccount = config.activeAccount || {}
+  const ids = new Set([...Object.keys(config.keys || {}), ...Object.keys(config.oauth || {})])
+  for (const id of ids) {
+    if (config.accounts[id]?.length) continue
+    const cred = { key: config.keys?.[id], oauth: config.oauth?.[id] }
+    if (!cred.key && !cred.oauth) continue
+    const acct = { id: 'acct-' + crypto.randomBytes(4).toString('hex'), label: autoLabel(cred, 1), key: cred.key, oauth: cred.oauth }
+    config.accounts[id] = [acct]
+    config.activeAccount[id] = acct.id
+  }
+}
+
 // Public view: never expose key material to the browser.
 export function publicConfig (cfg) {
   return {
     providers: cfg.providers.map(p => ({
       ...p,
       hasKey: p.auth === 'none' || Boolean(cfg.keys[p.id]),
-      signedIn: Boolean(cfg.oauth[p.id])
+      signedIn: Boolean(cfg.oauth[p.id]),
+      // account roster (labels only — never any key or token material)
+      accounts: (cfg.accounts?.[p.id] || []).map(a => ({ id: a.id, label: a.label, kind: a.oauth ? 'subscription' : 'key', active: a.id === cfg.activeAccount?.[p.id] }))
     })),
     skills: cfg.skills || [],
     skillSuggestions: cfg.skillSuggestions || [],

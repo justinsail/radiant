@@ -1183,6 +1183,19 @@ button.hf-head:hover { background: var(--bg-hover); }
 }
 .oauth-paste input:focus { border-color: var(--accent); }
 .oauth-note { font-size: 11px; color: var(--text-faint); flex-basis: 100%; }
+.account-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 2px 0 10px 160px; }
+.account-chip { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--bg-panel); }
+.account-chip.active { border-color: var(--accent-dim); background: var(--accent-wash); }
+.account-switch { border: none; background: none; color: var(--text-muted); font-size: 11.5px; padding: 3px 4px 3px 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.account-chip.active .account-switch { color: var(--accent); }
+.account-switch:hover { color: var(--text); }
+.account-dot { font-size: 8px; }
+.account-x { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 10px; padding: 3px 8px 3px 3px; }
+.account-x:hover { color: var(--danger); }
+.account-add { border: 1px dashed var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-size: 11.5px; padding: 3px 10px; cursor: pointer; }
+.account-add:hover { border-color: var(--accent-dim); color: var(--accent); }
+.account-add-key { display: inline-flex; align-items: center; gap: 6px; }
+.account-add-key input { width: 200px; }
 .oauth-device { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); }
 .device-code { font-family: var(--font-mono); font-size: 14px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); background: var(--bg-input); padding: 2px 8px; border-radius: 6px; user-select: all; }
 

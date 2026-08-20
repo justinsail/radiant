@@ -21,21 +21,26 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
   const [device, setDevice] = useState(null) // { userCode, verificationUrl } for device-code sign-in
   const pollRef = useRef(null)
 
-  const save = async () => {
+  const [addingKey, setAddingKey] = useState(false) // paste-a-second-key mode
+  const accounts = provider.accounts || []
+
+  const save = async (newAccount) => {
     if (!draft.trim()) return
-    const cfg = await api.setKey(provider.id, draft.trim())
-    setDraft('')
+    const cfg = await api.setKey(provider.id, draft.trim(), { newAccount })
+    setDraft(''); setAddingKey(false)
     onConfig(cfg)
   }
   const clear = async () => onConfig(await api.setKey(provider.id, ''))
   const remove = async () => onConfig(await api.removeProvider(provider.id))
   const signOut = async () => onConfig(await api.oauthSignout(provider.id))
+  const switchAccount = async id => onConfig(await api.activateAccount(provider.id, id))
+  const removeAcct = async id => onConfig(await api.removeAccount(provider.id, id))
 
-  const startSignIn = async () => {
+  const startSignIn = async (newAccount) => {
     setBusy(true)
     try {
       if (oauthInfo.mode === 'device') {
-        const d = await api.oauthDeviceStart(provider.id)
+        const d = await api.oauthDeviceStart(provider.id, { newAccount })
         setDevice(d)
         window.open(d.verificationUrl, '_blank', 'noopener')
         const started = Date.now()
@@ -48,7 +53,7 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
         }, (d.interval || 5) * 1000)
         return
       }
-      const { url, mode } = await api.oauthStart(provider.id)
+      const { url, mode } = await api.oauthStart(provider.id, { newAccount })
       window.open(url, '_blank', 'noopener')
       if (mode === 'paste') {
         setSigningIn(true)
@@ -102,10 +107,29 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
                     onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && save()}
                   />
-                  <button className='small-btn primary' onClick={save} disabled={!draft.trim()}>Save</button>
+                  <button className='small-btn primary' onClick={() => save()} disabled={!draft.trim()}>Save</button>
                 </>}
         {provider.removable && <button className='small-btn danger' onClick={remove}>✕</button>}
       </div>
+      {(provider.hasKey || provider.signedIn) && accounts.length > 0 && (
+        <div className='account-row'>
+          {accounts.map(a => (
+            <span key={a.id} className={'account-chip' + (a.active ? ' active' : '')}>
+              <button className='account-switch' onClick={() => !a.active && switchAccount(a.id)} title={a.active ? 'Active account' : 'Switch to this account'}>
+                <span className='account-dot'>{a.active ? '●' : '○'}</span>{a.label}
+              </button>
+              <button className='account-x' onClick={() => removeAcct(a.id)} title='Remove this account'>✕</button>
+            </span>
+          ))}
+          {addingKey && provider.auth !== 'oauth'
+            ? <span className='account-add-key'>
+                <input autoFocus type='password' placeholder='Paste another key' value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && save(true)} />
+                <button className='small-btn primary' onClick={() => save(true)} disabled={!draft.trim()}>Add</button>
+                <button className='small-btn' onClick={() => { setAddingKey(false); setDraft('') }}>Cancel</button>
+              </span>
+            : !device && !signingIn && <button className='account-add' onClick={() => oauthInfo ? startSignIn(true) : setAddingKey(true)} disabled={busy}>+ Add account</button>}
+        </div>
+      )}
       {provider.hint && !provider.hasKey && !provider.signedIn && <div className='provider-hint'>{provider.hint}</div>}
       {oauthInfo && !provider.signedIn && !provider.hasKey && (
         <div className='provider-oauth'>
@@ -117,7 +141,7 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
                 <button className='small-btn' onClick={() => { clearInterval(pollRef.current); setDevice(null); setBusy(false) }}>Cancel</button>
               </span>
             : !signingIn
-              ? <button className='small-btn subscribe' onClick={startSignIn} disabled={busy}>
+              ? <button className='small-btn subscribe' onClick={() => startSignIn()} disabled={busy}>
                   {busy ? 'Waiting…' : `Sign in with ${oauthInfo.label} subscription`}
                 </button>
               : <span className='oauth-paste'>

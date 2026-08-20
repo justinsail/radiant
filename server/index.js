@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
 import { execSync, spawn } from 'child_process'
-import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession, searchSessions } from './config.js'
+import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession, searchSessions, upsertCredential, activateAccount, removeAccount } from './config.js'
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken, startDevice, pollDevice } from './oauth.js'
 import { checkForUpdate } from './updater.js'
@@ -132,9 +132,22 @@ app.post('/api/share', (req, res) => {
 })
 
 app.post('/api/providers/:id/key', (req, res) => {
-  const { key } = req.body
-  if (key) config.keys[req.params.id] = key
-  else delete config.keys[req.params.id]
+  const { key, newAccount, label } = req.body
+  if (key) upsertCredential(config, req.params.id, { key }, { label, newAccount })
+  else { const a = config.activeAccount?.[req.params.id]; if (a) removeAccount(config, req.params.id, a); else delete config.keys[req.params.id] }
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+// which providers are mid-way through adding a NEW account (vs replacing active)
+const addingAccount = new Set()
+app.post('/api/providers/:id/accounts/activate', (req, res) => {
+  activateAccount(config, req.params.id, req.body.accountId)
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+app.delete('/api/providers/:id/accounts/:acctId', (req, res) => {
+  removeAccount(config, req.params.id, req.params.acctId)
   saveConfig(config)
   res.json(publicConfig(config))
 })
@@ -474,10 +487,11 @@ app.get('/api/oauth/providers', (req, res) => {
 // begin a sign-in: returns the URL to open in a browser
 app.post('/api/oauth/:id/start', (req, res) => {
   try {
+    if (req.body?.newAccount) addingAccount.add(req.params.id)
     const { url, mode } = buildAuthUrl(req.params.id)
     if (mode === 'loopback') {
       startLoopback(req.params.id, (err, tok) => {
-        if (!err && tok) { config.oauth[req.params.id] = tok; saveConfig(config) }
+        if (!err && tok) { upsertCredential(config, req.params.id, { oauth: tok }, { newAccount: addingAccount.delete(req.params.id) }); saveConfig(config) }
       })
     }
     res.json({ url, mode })
@@ -490,7 +504,7 @@ app.post('/api/oauth/:id/start', (req, res) => {
 app.post('/api/oauth/:id/complete', async (req, res) => {
   try {
     const tok = await completePaste(req.params.id, req.body.code)
-    config.oauth[req.params.id] = tok
+    upsertCredential(config, req.params.id, { oauth: tok }, { newAccount: addingAccount.delete(req.params.id) })
     saveConfig(config)
     res.json(publicConfig(config))
   } catch (e) {
@@ -501,6 +515,7 @@ app.post('/api/oauth/:id/complete', async (req, res) => {
 // device-code sign-in (Nous): start returns a code + URL to open
 app.post('/api/oauth/:id/device/start', async (req, res) => {
   try {
+    if (req.body?.newAccount) addingAccount.add(req.params.id)
     res.json(await startDevice(req.params.id))
   } catch (e) {
     res.status(400).json({ error: e.message })
@@ -511,7 +526,7 @@ app.post('/api/oauth/:id/device/start', async (req, res) => {
 app.post('/api/oauth/:id/device/poll', async (req, res) => {
   try {
     const r = await pollDevice(req.params.id)
-    if (r.done) { config.oauth[req.params.id] = r.token; saveConfig(config) }
+    if (r.done) { upsertCredential(config, req.params.id, { oauth: r.token }, { newAccount: addingAccount.delete(req.params.id) }); saveConfig(config) }
     res.json({ done: r.done, config: r.done ? publicConfig(config) : undefined })
   } catch (e) {
     res.status(400).json({ error: e.message })
@@ -524,7 +539,9 @@ app.get('/api/oauth/:id/status', (req, res) => {
 })
 
 app.post('/api/oauth/:id/signout', (req, res) => {
-  delete config.oauth[req.params.id]
+  const activeId = config.activeAccount?.[req.params.id]
+  if (activeId) removeAccount(config, req.params.id, activeId)
+  else delete config.oauth[req.params.id]
   saveConfig(config)
   res.json(publicConfig(config))
 })
