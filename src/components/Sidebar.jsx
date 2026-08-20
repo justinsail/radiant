@@ -18,9 +18,12 @@ function UsageChip () {
   const fmtReset = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) }
   const resetShort = iso => {
     const d = new Date(iso); if (isNaN(d)) return ''
-    const now = new Date()
-    const time = d.toLocaleTimeString([], { hour: 'numeric', minute: d.getMinutes() ? '2-digit' : undefined })
-    return d.toDateString() === now.toDateString() ? time : d.toLocaleDateString([], { weekday: 'short' }) + ' ' + time
+    const mins = Math.round((d.getTime() - Date.now()) / 60000)
+    if (mins <= 0) return 'now'
+    if (mins < 60) return `in ${mins}m`
+    const h = Math.floor(mins / 60), m = mins % 60
+    if (h < 24) return m ? `in ${h}h${m}m` : `in ${h}h`
+    return `in ${Math.round(h / 24)}d`
   }
   const subTitle = s => {
     if (!s.windows?.length) return `${s.label}: signed in (usage not reported)`

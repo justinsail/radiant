@@ -361,6 +361,28 @@ app.post('/api/open', (req, res) => {
   try { spawn('open', [p], { detached: true, stdio: 'ignore' }).unref(); res.json({ ok: true }) } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ---------- recipes (parameterized task templates) ----------
+app.post('/api/recipes', (req, res) => {
+  const { name, desc, template, params } = req.body
+  if (!name || !template) return res.status(400).json({ error: 'name and template required' })
+  config.recipes = config.recipes || []
+  config.recipes.push({ id: 'rec-' + crypto.randomBytes(4).toString('hex'), name, desc: desc || '', template, params: Array.isArray(params) ? params : [] })
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+app.patch('/api/recipes/:id', (req, res) => {
+  const r = (config.recipes || []).find(x => x.id === req.params.id)
+  if (!r) return res.status(404).json({ error: 'not found' })
+  for (const k of ['name', 'desc', 'template', 'params']) if (k in req.body) r[k] = req.body[k]
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+app.delete('/api/recipes/:id', (req, res) => {
+  config.recipes = (config.recipes || []).filter(x => x.id !== req.params.id)
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
 // ---------- memory ----------
 app.get('/api/memory', (req, res) => res.json({ facts: listFacts() }))
 app.post('/api/memory', (req, res) => { addFactManual(String(req.body?.text || '')); res.json({ facts: listFacts() }) })

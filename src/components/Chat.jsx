@@ -301,6 +301,53 @@ function StatsChip ({ stats }) {
   )
 }
 
+// reusable parameterized task templates, from the composer
+function RecipeMenu ({ recipes, onUse }) {
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(null)
+  const [vals, setVals] = useState({})
+  const ref = useRef(null)
+  useEffect(() => {
+    const close = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setActive(null) } }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+  if (!recipes?.length) return null
+  const render = r => r.template.replace(/\{(\w+)\}/g, (_, k) => vals[k] || `{${k}}`)
+  const use = r => {
+    if (r.params?.length && r.params.some(p => !(vals[p.name] || '').trim())) return
+    onUse(r.params?.length ? render(r) : r.template); setOpen(false); setActive(null); setVals({})
+  }
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'flex' }}>
+      <button className='attach-btn' title='Recipes — reusable task templates' onClick={() => { setOpen(o => !o); setActive(null) }}><Icon.sparkle size={16} /></button>
+      {open && (
+        <div className='recipe-menu'>
+          {!active ? recipes.map(r => (
+            <button key={r.id} className='recipe-item' onClick={() => { if (r.params?.length) { setActive(r); setVals({}) } else { onUse(r.template); setOpen(false) } }}>
+              <span className='recipe-name'>{r.name}</span>
+              <span className='recipe-desc'>{r.desc}</span>
+            </button>
+          )) : (
+            <div className='recipe-form'>
+              <div className='recipe-form-title'>{active.name}</div>
+              {active.params.map((p, i) => (
+                <label key={p.name} className='recipe-field'>{p.label}
+                  <input autoFocus={i === 0} placeholder={p.placeholder} value={vals[p.name] || ''} onChange={e => setVals(v => ({ ...v, [p.name]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && use(active)} />
+                </label>
+              ))}
+              <div className='row' style={{ marginTop: 8 }}>
+                <button className='small-btn primary' onClick={() => use(active)}>Use</button>
+                <button className='small-btn' onClick={() => setActive(null)}>Back</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GroupPicker ({ agents, onStart, onCancel }) {
   const [sel, setSel] = useState([])
   const toggle = id => setSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
@@ -324,7 +371,7 @@ function GroupPicker ({ agents, onStart, onCancel }) {
   )
 }
 
-export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
   const [groupPicker, setGroupPicker] = useState(false)
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
@@ -548,6 +595,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
               onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
             />
             <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images' data-tip='Attach files or images'><Icon.plus size={17} /></button>
+            <RecipeMenu recipes={recipes} onUse={text => { setDraft(text); setTimeout(() => textareaRef.current?.focus(), 0) }} />
             <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
             <button
               className={'pill-toggle' + (toolsOn ? ' on' : '')}

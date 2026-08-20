@@ -38,6 +38,14 @@ const DEFAULT_CONFIG = {
     { id: 'agent-data', name: 'Data', emoji: '📊', icon: 'flask', hue: 175, persona: 'You are a data analyst. Explore data, write correct SQL and analysis code, verify your assumptions, and explain findings plainly with their caveats and confidence. Prefer reproducible analysis; when you make a chart, keep it simple and labeled.', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-docs', name: 'Docs', emoji: '📖', icon: 'book', hue: 65, persona: 'You are a technical writer. Produce clear, accurate documentation — READMEs, API references, guides, and inline comments. Read the code first, write for the reader\'s level, use examples, and keep it concise and well-structured with good headings.', model: null, provider: null, skills: [], useTools: true, builtin: true }
   ],
+  recipes: [
+    { id: 'rec-review', name: 'Review code / PR', desc: 'Thorough code review', params: [{ name: 'target', label: 'File, folder, or PR', placeholder: 'e.g. src/auth.js' }], template: 'Review {target} thoroughly for bugs, edge cases, security issues, and unclear code. Cite specific files and lines, and prioritize correctness over style.', builtin: true },
+    { id: 'rec-tests', name: 'Write tests', desc: 'Add tests for some code', params: [{ name: 'target', label: 'What to test', placeholder: 'e.g. the login function' }], template: 'Write thorough tests for {target}. Cover happy paths, edge cases, and error handling. Then run the tests and fix any failures.', builtin: true },
+    { id: 'rec-scaffold', name: 'Scaffold a project', desc: 'Start a new app', params: [{ name: 'stack', label: 'Framework / stack', placeholder: 'e.g. Vite + React + TS' }, { name: 'desc', label: 'What it does', placeholder: 'e.g. a todo app' }], template: 'Scaffold a new {stack} project: {desc}. Set up the structure, install dependencies, and get it running. Show me how to start it.', builtin: true },
+    { id: 'rec-explain', name: 'Explain code', desc: 'Understand a file or system', params: [{ name: 'target', label: 'File or topic', placeholder: 'e.g. how auth works' }], template: 'Explain {target}, starting from the entry point. Read the relevant files first, then walk me through it top-down in plain language.', builtin: true },
+    { id: 'rec-debug', name: 'Debug an issue', desc: 'Find & fix a bug', params: [{ name: 'symptom', label: 'The bug / symptom', placeholder: 'e.g. login returns a 500' }], template: 'Debug this: {symptom}. Reproduce it, find the root cause by reading the code and any logs, fix it, and verify the fix works.', builtin: true },
+    { id: 'rec-refactor', name: 'Refactor', desc: 'Clean up without changing behavior', params: [{ name: 'target', label: 'What to refactor', placeholder: 'e.g. the settings module' }], template: 'Refactor {target} for clarity and simplicity without changing its behavior. Keep changes small and verify nothing breaks (run tests if present).', builtin: true }
+  ],
   settings: {
     mode: 'dark',
     themeId: 'steel',
@@ -91,6 +99,12 @@ export function loadConfig () {
       for (const def of Object.values(defById)) if (!haveIds.has(def.id)) cfg.agents.push(def)
     }
     if (saved.mcpServers) cfg.mcpServers = saved.mcpServers
+    if (saved.recipes) {
+      const seeded = cfg.recipes
+      cfg.recipes = saved.recipes
+      const have = new Set(cfg.recipes.map(r => r.id))
+      for (const r of seeded) if (r.builtin && !have.has(r.id)) cfg.recipes.push(r)
+    }
     cfg.settings = { ...cfg.settings, ...(saved.settings || {}) }
   } catch { /* first run */ }
   return cfg
@@ -111,6 +125,7 @@ export function publicConfig (cfg) {
     })),
     skills: cfg.skills || [],
     agents: cfg.agents || [],
+    recipes: cfg.recipes || [],
     mcpServers: cfg.mcpServers || [],
     settings: cfg.settings
   }

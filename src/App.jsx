@@ -288,6 +288,7 @@ export default function App () {
         onMenu={() => setNavOpen(true)}
         onNewGroup={newGroup}
         onTruncate={truncateSession}
+        recipes={config.recipes || []}
         agents={config.agents || []}
         session={session}
         todos={todos}

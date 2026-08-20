@@ -169,6 +169,17 @@ code, pre, .mono { font-family: var(--font-mono); }
 .seg-btn { padding: 5px 12px; border: none; border-radius: 6px; background: none; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; }
 .seg-btn.on { background: var(--bg-raised); color: var(--text); box-shadow: var(--shadow-sm); }
 
+.recipe-menu { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 60; width: 260px; max-height: 340px; overflow-y: auto; background: var(--bg-raised); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-menu); padding: 6px; }
+.recipe-item { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 7px 10px; border: none; background: none; border-radius: 8px; cursor: pointer; text-align: left; }
+.recipe-item:hover { background: var(--bg-hover); }
+.recipe-name { font-size: 12.5px; font-weight: 500; color: var(--text); }
+.recipe-desc { font-size: 11px; color: var(--text-faint); }
+.recipe-form { padding: 8px 10px; }
+.recipe-form-title { font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }
+.recipe-field { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px; }
+.recipe-field input { padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text); outline: none; font-size: 12.5px; }
+.recipe-field input:focus { border-color: var(--accent); }
+
 .msg-user { position: relative; }
 .rewind-btn { display: none; margin-top: 4px; margin-left: auto; background: none; border: none; color: var(--text-faint); font-size: 11px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
 .msg-user:hover .rewind-btn { display: block; }
