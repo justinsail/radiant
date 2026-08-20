@@ -389,12 +389,64 @@ const EXIT_PLAN_TOOL = {
   }
 }
 
+// ---------- auto-compaction ----------
+// Long sessions eventually exceed a model's context window. When that happens (or
+// proactively past a high estimate) we summarize the older messages into one
+// checkpoint and keep the most recent few verbatim, so the session can continue.
+const PROACTIVE_TOKENS = 180_000 // rough safety net for huge-context models
+function estimateTokens (messages) {
+  let chars = 0
+  for (const m of messages) {
+    chars += (m.text || '').length
+    for (const p of m.parts || []) {
+      if (p.text) chars += p.text.length
+      if (p.result) chars += String(p.result).length
+      if (p.args) chars += JSON.stringify(p.args).length
+    }
+  }
+  return Math.round(chars / 4)
+}
+function isContextError (msg) {
+  return /context length|context window|maximum context|too many tokens|prompt is too long|reduce the length|token.{0,4}limit|exceeds? the maximum|input is too long|maximum.{0,20}tokens/i.test(String(msg || ''))
+}
+function renderForSummary (messages) {
+  return messages.map(m => {
+    if (m.role === 'user') return `User: ${m.text || ''}`
+    const parts = (m.parts || []).map(p => {
+      if (p.type === 'text') return p.text
+      if (p.type === 'tool') return `[used ${p.name}(${JSON.stringify(p.args || {}).slice(0, 120)}) → ${String(p.result || '').slice(0, 200)}]`
+      return ''
+    }).filter(Boolean).join('\n')
+    return `Assistant: ${parts}`
+  }).join('\n\n')
+}
+async function compactSession (session, keepRecent, summarize, emit) {
+  const msgs = session.messages
+  if (msgs.length <= keepRecent + 2) return false
+  const older = msgs.slice(0, msgs.length - keepRecent)
+  const recent = msgs.slice(msgs.length - keepRecent)
+  let summary = ''
+  try { summary = (await summarize(renderForSummary(older).slice(-50_000))).trim() } catch {}
+  if (!summary) return false
+  session.messages = [
+    { role: 'user', text: `[Summary of the earlier conversation — the full history was compacted to save context. Continue from here.]\n\n${summary}`, compacted: true },
+    ...recent
+  ]
+  emit({ type: 'compacted', summarized: older.length, kept: recent.length })
+  return true
+}
+
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, emit, requestApproval, requestUserChoice, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
   const cwd = session.cwd || os.homedir()
   const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona, planMode)
+  // proactive compaction before a very long turn
+  if (autoCompact && summarize && estimateTokens(session.messages) > PROACTIVE_TOKENS) {
+    await compactSession(session, 4, summarize, emit)
+  }
   const assistant = { role: 'assistant', model, parts: [] }
   session.messages.push(assistant)
+  let compacted = false
 
   const accessToken = getAccessToken ? await getAccessToken() : null
   const accountId = getAccountId ? await getAccountId() : null
@@ -448,6 +500,15 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
         toolsEnabled = false
         emit({ type: 'notice', text: 'This model does not support tools — continuing in chat-only mode.' })
         continue
+      }
+      // Ran out of context -> summarize older messages and retry this round.
+      if (isContextError(e.message) && autoCompact && summarize && !compacted) {
+        compacted = true
+        const i = session.messages.indexOf(assistant)
+        if (i >= 0) session.messages.splice(i, 1)
+        const did = await compactSession(session, 4, summarize, emit)
+        session.messages.push(assistant)
+        if (did) { emit({ type: 'notice', text: 'The conversation was getting long — summarized earlier messages to free up room, and continued.' }); continue }
       }
       throw e
     }

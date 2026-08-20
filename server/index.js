@@ -922,6 +922,23 @@ app.post('/api/chat', async (req, res) => {
     return `${target.name} says:\n${answer.trim() || '(no answer)'}`
   }
 
+  // one-shot summarizer used by auto-compaction (runs on the session's model, no tools)
+  const summarize = async text => {
+    const tmp = { cwd: session.cwd, messages: [{ role: 'user', text: `Summarize this conversation so it can continue without losing context. Preserve: decisions made, files created or edited, the current task and its state, and any open questions or next steps. Be concise but complete; use short bullet points.\n\n${text}` }] }
+    let out = ''
+    try {
+      await runTurn({
+        provider, model: session.model, apiKey,
+        getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
+        getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
+        session: tmp, useTools: false, computerControl: false, persona: '', skills: [],
+        emit: ev => { if (ev.type === 'text_delta') out += ev.text },
+        requestApproval: null, signal: controller.signal
+      })
+    } catch {}
+    return out
+  }
+
   try {
     await runTurn({
       provider,
@@ -930,6 +947,8 @@ app.post('/api/chat', async (req, res) => {
       getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
       getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
       session,
+      summarize,
+      autoCompact: config.settings.autoCompact !== false,
       useTools: session.useTools !== false,
       computerControl: Boolean(session.computerControl),
       persona: agent?.persona || '',

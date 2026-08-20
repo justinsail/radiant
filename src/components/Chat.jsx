@@ -84,6 +84,19 @@ function QuestionCard ({ question, onAnswer }) {
   )
 }
 
+// a collapsed marker for auto-compacted (summarized) earlier history
+function CompactedMarker ({ text }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className='compacted-marker'>
+      <button className='compacted-head' onClick={() => setOpen(o => !o)}>
+        <span className='compacted-line' /> ⋯ earlier conversation summarized {open ? '▾' : '▸'} <span className='compacted-line' />
+      </button>
+      {open && <div className='compacted-body'><Markdown text={text} /></div>}
+    </div>
+  )
+}
+
 const TOOL_ICONS = {
   run_command: '⌘',
   read_file: '≡',
@@ -398,7 +411,9 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
       <div className='chat-scroll' ref={scrollRef}>
         <div className='chat-inner'>
           {session.messages.map((m, i) =>
-            m.role === 'user'
+            m.compacted
+              ? <CompactedMarker key={i} text={m.text} />
+              : m.role === 'user'
               ? <div key={i} className='msg msg-user'>
                   <div className='bubble'>
                     {(m.attachments || []).length > 0 && (

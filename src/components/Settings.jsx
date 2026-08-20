@@ -852,6 +852,14 @@ function AgentPane ({ config, onSettings }) {
         />
         <span>Ask before running shell commands <span className='desc'>— recommended; file edits stay automatic</span></span>
       </label>
+      <label className='check-row'>
+        <input
+          type='checkbox'
+          checked={s.autoCompact !== false}
+          onChange={e => onSettings({ autoCompact: e.target.checked })}
+        />
+        <span>Auto-compact long conversations <span className='desc'>— when a chat fills the model's context, summarize older messages so it can keep going</span></span>
+      </label>
       <div style={{ marginTop: 10 }}>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Default workspace folder for new sessions</div>
         <input

@@ -160,6 +160,11 @@ code, pre, .mono { font-family: var(--font-mono); }
 
 .stats-chip { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-raised); white-space: nowrap; }
 
+.compacted-marker { margin: 14px auto; max-width: 760px; }
+.compacted-head { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; cursor: pointer; color: var(--text-faint); font-size: 11px; }
+.compacted-line { flex: 1; height: 1px; background: var(--border); }
+.compacted-body { margin-top: 8px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 10px; background: var(--bg-panel); font-size: 12.5px; color: var(--text-muted); }
+
 .guide-section { margin-top: 18px; }
 .guide-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 8px; }
 .guide-item { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 7px 0; border-top: 1px solid var(--border); align-items: baseline; }
