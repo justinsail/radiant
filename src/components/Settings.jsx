@@ -844,14 +844,19 @@ function AgentPane ({ config, onSettings }) {
   return (
     <div className='set-section'>
       <h3>Agent</h3>
-      <label className='check-row'>
-        <input
-          type='checkbox'
-          checked={s.approveCommands}
-          onChange={e => onSettings({ approveCommands: e.target.checked })}
-        />
-        <span>Ask before running shell commands <span className='desc'>— recommended; file edits stay automatic</span></span>
-      </label>
+      <div style={{ marginBottom: 4 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>Shell command approval</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 8px' }}>File edits always run automatically. This is about <em>shell commands</em>.</div>
+        <div className='seg-control'>
+          {[['ask', 'Ask every time'], ['auto', 'Auto (risky only)'], ['off', 'Never ask']].map(([id, label]) => {
+            const cur = s.approvalMode || (s.approveCommands === false ? 'off' : 'ask')
+            return <button key={id} className={'seg-btn' + (cur === id ? ' on' : '')} onClick={() => onSettings({ approvalMode: id, approveCommands: id !== 'off' })}>{label}</button>
+          })}
+        </div>
+        <div style={{ fontSize: 11.5, color: 'var(--text-faint)', marginTop: 6 }}>
+          <strong>Auto</strong> runs safe commands (ls, grep, tests, git status…) silently and only asks before risky ones — deletes, sudo, network fetches, pushes, chmod.
+        </div>
+      </div>
       <label className='check-row'>
         <input
           type='checkbox'

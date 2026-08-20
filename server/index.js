@@ -13,6 +13,7 @@ import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken, startDevice, pollDevice } from './oauth.js'
 import { checkForUpdate } from './updater.js'
 import { ollamaBin, SPAWN_ENV } from './ollama.js'
+import { commandRisk } from './util.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
@@ -882,7 +883,15 @@ app.post('/api/chat', async (req, res) => {
   res.on('close', () => { if (!res.writableEnded) controller.abort() })
 
   const requestApproval = call => new Promise(resolve => {
-    if (!config.settings.approveCommands) return resolve(true)
+    // approval mode: 'ask' = confirm every command, 'auto' = only risky ones, 'off' = never
+    const mode = config.settings.approvalMode || (config.settings.approveCommands === false ? 'off' : 'ask')
+    if (mode === 'off') return resolve(true)
+    // in Auto mode, run low-risk shell commands silently (a quick notice); still ask
+    // for risky commands and always for MCP / desktop control.
+    if (mode === 'auto' && call.name === 'run_command' && commandRisk(call.args?.command) === 'low') {
+      emit({ type: 'notice', text: `Ran: ${call.args.command}` })
+      return resolve(true)
+    }
     pendingApprovals.set(call.id, resolve)
     emit({ type: 'approval_request', id: call.id, name: call.name, args: call.args })
     setTimeout(() => {
