@@ -717,20 +717,29 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
   const importAgents = async fileList => {
-    let cfg = null; let added = 0
+    let cfg = null; let added = 0; let skipped = 0
+    const have = new Set(agents.map(a => (a.name || '').trim().toLowerCase())) // dedupe by name so re-import doesn't clone
+    let found = 0
     for (const file of Array.from(fileList).slice(0, 5)) {
       try {
         const data = JSON.parse(await file.text())
         const list = Array.isArray(data) ? data : (data.agents || [])
         for (const a of list) {
           if (!a || !a.name) continue
+          found++
+          const key = a.name.trim().toLowerCase()
+          if (have.has(key)) { skipped++; continue }
+          have.add(key)
           const { id, builtin, ...clean } = a
           cfg = await api.addAgent({ ...clean, skills: clean.skills || [] }); added++
         }
       } catch {}
     }
     if (cfg) onConfigChange(cfg)
-    window.alert(added ? `Imported ${added} agent${added === 1 ? '' : 's'}.` : 'No agents found in that file.')
+    const msg = !found
+      ? 'No agents found in that file.'
+      : `Imported ${added} agent${added === 1 ? '' : 's'}.` + (skipped ? ` Skipped ${skipped} already in your list (same name).` : '')
+    window.alert(msg)
   }
 
   return (
