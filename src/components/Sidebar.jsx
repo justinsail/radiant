@@ -108,7 +108,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         title={s.title}
       >
         <div className='session-title'>
-          {showAgent && ag && <span className='session-agent' style={{ color: `oklch(0.7 0.15 ${ag.hue ?? 258})` }}><AgentGlyph agent={ag} size={13} /></span>}
+          {showAgent && ag && <span className='session-agent' style={{ color: `oklch(0.7 0.15 ${ag.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={ag} size={13} /></span>}
           <span className='session-title-text'>{s.title}</span>
         </div>
         <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
@@ -165,7 +165,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                 <div className='bot-head'>
                   <button className='bot-head-toggle' onClick={() => toggleGroup(a.id)} title={isCollapsed ? 'Show sessions' : 'Hide sessions'}>
                     <span className='bot-head-caret'>{own.length ? (isCollapsed ? '▸' : '▾') : ''}</span>
-                    <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={16} /></span>
+                    <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={16} /></span>
                     <span className='bot-head-name'>{a.name}</span>
                     <span className='bot-head-count'>{own.length}</span>
                   </button>

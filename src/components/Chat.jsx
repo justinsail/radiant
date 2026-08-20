@@ -10,11 +10,24 @@ const AGENT_BLURBS = {
   'agent-reviewer': 'Finds bugs, edge cases & security issues',
   'agent-architect': 'Designs the structure before writing code',
   'agent-explainer': 'Explains code in plain language',
-  'agent-pair': 'Writes and ships working code'
+  'agent-pair': 'Writes and ships working code',
+  'agent-security': 'Audits for vulnerabilities & unsafe code',
+  'agent-sales': 'Drafts outreach, proposals & sales copy',
+  'agent-design': 'Shapes UI, layout & visual polish',
+  'agent-education': 'Teaches concepts step by step',
+  'agent-finance': 'Models numbers, budgets & forecasts',
+  'agent-devops': 'Handles CI, deploys & infrastructure',
+  'agent-data': 'Wrangles, queries & analyzes data',
+  'agent-docs': 'Writes clear docs & references'
+}
+// strip a leading "You are (a|an|the) …" so descriptions read as a role, not a command
+function cleanDesc (s) {
+  let t = (s || '').trim().replace(/^you(?:'re| are)\s+(?:an?|the)?\s*/i, '')
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t
 }
 function agentBlurb (a) {
   if (AGENT_BLURBS[a.id]) return AGENT_BLURBS[a.id]
-  const p = (a.persona || '').trim()
+  const p = cleanDesc(a.persona)
   if (!p) return 'General assistant'
   const first = p.split(/(?<=[.!?])\s/)[0]
   return first.length > 64 ? first.slice(0, 61).trimEnd() + '…' : first
@@ -160,7 +173,7 @@ function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, stre
     <div className='msg msg-assistant'>
       <div className='who'>
         {agent
-          ? <><span className='who-agent-emoji' style={{ '--ah': agent.hue ?? 258, color: `oklch(0.7 0.16 ${agent.hue ?? 258})` }}><AgentGlyph agent={agent} size={14} /></span><span className='who-word'>{agent.name}</span></>
+          ? <><span className='who-agent-emoji' style={{ '--ah': agent.hue ?? 'var(--accent-h)', color: `oklch(0.7 0.16 ${agent.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={agent} size={14} /></span><span className='who-word'>{agent.name}</span></>
           : <><span className='logo-mark' aria-hidden /><span className='wordmark who-word'>Radiant</span></>}
         {model && <span className='who-model'>{model}</span>}
         {streaming && <span className='who-model'>· working</span>}
@@ -356,9 +369,9 @@ function GroupPicker ({ agents, onStart, onCancel }) {
       <div className='group-picker-title'>Pick 2 or more agents for a group chat</div>
       <div className='group-picker-list'>
         {agents.map(a => (
-          <label key={a.id} className={'group-pick' + (sel.includes(a.id) ? ' on' : '')} style={{ '--ah': a.hue ?? 258 }}>
+          <label key={a.id} className={'group-pick' + (sel.includes(a.id) ? ' on' : '')} style={{ '--ah': a.hue ?? 'var(--accent-h)' }}>
             <input type='checkbox' checked={sel.includes(a.id)} onChange={() => toggle(a.id)} />
-            <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={16} /></span>
+            <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={16} /></span>
             {a.name}
           </label>
         ))}
@@ -375,11 +388,27 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
   const [groupPicker, setGroupPicker] = useState(false)
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
+  const [queued, setQueued] = useState([]) // messages typed mid-turn, sent as one follow-up when the turn settles
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
   const textareaRef = useRef(null)
   const scrollRef = useRef(null)
   const streaming = Boolean(live?.streaming)
+
+  // drain the mid-turn queue once the agent's turn settles (finished OR stopped)
+  const wasStreaming = useRef(streaming)
+  useEffect(() => {
+    if (wasStreaming.current && !streaming && queued.length && session) {
+      const text = queued.map(q => q.text).filter(Boolean).join('\n\n')
+      const attachments = queued.flatMap(q => q.attachments || []).slice(0, 8)
+      setQueued([])
+      onSend({ text, attachments })
+    }
+    wasStreaming.current = streaming
+  }, [streaming, queued, session])
+
+  // a session switch abandons anything still queued for the old turn
+  useEffect(() => { setQueued([]) }, [session?.id])
 
   const slashQuery = /^\/[\w-]*$/.test(draft) ? draft : null
   const slashMatches = slashQuery ? SLASH_COMMANDS.filter(c => c.cmd.startsWith(slashQuery)) : []
@@ -416,7 +445,14 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
   // voice dictation via the Web Speech API
   const submit = () => {
     const text = draft.trim()
-    if ((!text && !attachments.length) || streaming || !session) return
+    if ((!text && !attachments.length) || !session) return
+    // mid-turn: park the message instead of blocking; it sends when the turn settles
+    if (streaming) {
+      setQueued(q => [...q, { text, attachments }])
+      setDraft('')
+      setAttachments([])
+      return
+    }
     setDraft('')
     onSend({ text, attachments })
     setAttachments([])
@@ -439,10 +475,12 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
                   <p className='hint' style={{ marginTop: 22 }}>Start a session with an agent</p>
                   <div className='welcome-agents'>
                     {agents.map(a => (
-                      <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 258 }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
-                        <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={21} /></span>
-                        <span className='welcome-agent-name'>{a.name}</span>
-                        <span className='welcome-agent-desc'>{agentBlurb(a)}</span>
+                      <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
+                        <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={18} /></span>
+                        <span className='welcome-agent-text'>
+                          <span className='welcome-agent-name'>{a.name}</span>
+                          <span className='welcome-agent-desc'>{agentBlurb(a)}</span>
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -536,6 +574,17 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
 
       <div className='composer'>
         <TodoChecklist todos={todos} />
+        {queued.length > 0 && (
+          <div className='queued-strip' title='Sends as one follow-up when the agent finishes this turn'>
+            <span className='queued-label'>↳ Queued</span>
+            {queued.map((q, i) => (
+              <span key={i} className='queued-chip'>
+                <span className='queued-text'>{q.text || `${q.attachments?.length || 0} attachment(s)`}</span>
+                <button className='queued-x' onClick={() => setQueued(list => list.filter((_, j) => j !== i))} title='Remove'>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
         <div
           className={'composer-box' + (dragOver ? ' drag-over' : '')}
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
@@ -578,7 +627,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
           <textarea
             ref={textareaRef}
             rows={2}
-            placeholder={dragOver ? 'Drop files to attach…' : toolsOn ? 'Ask the agent to build, fix, or explain something…  (type / for commands)' : 'Chat (tools off)…'}
+            placeholder={dragOver ? 'Drop files to attach…' : streaming ? 'Type a follow-up — it queues and sends when the agent finishes…' : toolsOn ? 'Ask the agent to build, fix, or explain something…  (type / for commands)' : 'Chat (tools off)…'}
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onPaste={e => { const files = [...e.clipboardData.files]; if (files.length) { e.preventDefault(); addFiles(files) } }}
@@ -624,7 +673,10 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
               <span className='usage-note'>{usage.input ?? '–'} in · {usage.output ?? '–'} out</span>
             ) : null}
             {streaming
-              ? <button className='send-btn stop' onClick={onStop} title='Stop generating'><Icon.stop size={15} /></button>
+              ? <>
+                  {(draft.trim() || attachments.length) ? <button className='send-btn queue' onClick={submit} title='Queue this — sends when the agent finishes'><Icon.arrowUp size={17} /></button> : null}
+                  <button className='send-btn stop' onClick={onStop} title='Stop generating'><Icon.stop size={15} /></button>
+                </>
               : <button className='send-btn' onClick={submit} disabled={!draft.trim() && !attachments.length} title='Send message'><Icon.arrowUp size={17} /></button>}
           </div>
         </div>

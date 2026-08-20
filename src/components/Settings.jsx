@@ -5,6 +5,12 @@ import { MOTIONS } from './MotionBackground.jsx'
 import { Icon } from './Icons.jsx'
 import { AGENT_ICONS, AGENT_ICON_IDS, AgentGlyph } from './AgentIcons.jsx'
 
+// strip a leading "You are (a|an|the) …" so descriptions read as a role, not a command
+function cleanDesc (s) {
+  const t = (s || '').trim().replace(/^you(?:'re| are)\s+(?:an?|the)?\s*/i, '')
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t
+}
+
 // ---------- Providers ----------
 
 function ProviderRow ({ provider, oauthInfo, onConfig }) {
@@ -515,17 +521,18 @@ function McpPane ({ config, onConfigChange }) {
 function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
   const [a, setA] = useState({ ...agent })
   const set = patch => setA(prev => ({ ...prev, ...patch }))
+  const accentHue = Math.round(Number(getComputedStyle(document.documentElement).getPropertyValue('--accent-h')) || 258)
   const toggleSkill = id => set({ skills: (a.skills || []).includes(id) ? a.skills.filter(s => s !== id) : [...(a.skills || []), id] })
   return (
     <div className='agent-editor'>
       <div className='agent-editor-head'>
-        <span className='agent-emoji-input' style={{ color: `oklch(0.65 0.15 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={22} /></span>
+        <span className='agent-emoji-input' style={{ color: `oklch(0.65 0.15 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={22} /></span>
         <input className='text-input' style={{ fontFamily: 'inherit', flex: 1 }} placeholder='Agent name' value={a.name} onChange={e => set({ name: e.target.value })} />
       </div>
       <div className='agent-field'>Icon
         <div className='icon-picker'>
           {AGENT_ICON_IDS.map(id => (
-            <button key={id} type='button' className={'icon-choice' + (a.icon === id ? ' sel' : '')} style={{ '--ah': a.hue ?? 258 }} onClick={() => set({ icon: id })} title={id}>
+            <button key={id} type='button' className={'icon-choice' + (a.icon === id ? ' sel' : '')} style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => set({ icon: id })} title={id}>
               {AGENT_ICONS[id]({ size: 18 })}
             </button>
           ))}
@@ -553,7 +560,13 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
         </select>
       </label>
       <label className='agent-field'>Color
-        <input type='range' min='0' max='360' className='hue-slider' value={a.hue ?? 258} onChange={e => set({ hue: Number(e.target.value) })} />
+        <span className='agent-color-row'>
+          <input type='range' min='0' max='360' className='hue-slider' value={a.hue ?? accentHue} onChange={e => set({ hue: Number(e.target.value) })} />
+          <span className='agent-color-dot' style={{ background: `oklch(0.7 0.16 ${a.hue ?? 'var(--accent-h)'})` }} />
+          {a.hue == null
+            ? <span className='agent-color-note'>Accent</span>
+            : <button type='button' className='agent-color-reset' onClick={() => set({ hue: null })}>Use accent</button>}
+        </span>
       </label>
       {skills.length > 0 && (
         <div className='agent-field'>Skills always on for this agent
@@ -613,13 +626,13 @@ function AgentsPane ({ config, onConfigChange }) {
       </p>
       <div className='agent-grid'>
         {agents.map(a => (
-          <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 258 }} onClick={() => setEditing(a)}>
-            <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={20} /></span>
+          <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => setEditing(a)}>
+            <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={20} /></span>
             <span className='agent-card-name'>{a.name}</span>
-            <span className='agent-card-desc'>{a.persona ? a.persona.slice(0, 70) + (a.persona.length > 70 ? '…' : '') : 'General assistant'}</span>
+            <span className='agent-card-desc'>{(() => { const d = cleanDesc(a.persona); return d ? d.slice(0, 70) + (d.length > 70 ? '…' : '') : 'General assistant' })()}</span>
           </button>
         ))}
-        <button className='agent-card agent-card-new' onClick={() => setEditing({ name: '', emoji: '🤖', hue: 258, persona: '', model: null, provider: null, skills: [], useTools: true })}>
+        <button className='agent-card agent-card-new' onClick={() => setEditing({ name: '', emoji: '🤖', hue: null, persona: '', model: null, provider: null, skills: [], useTools: true })}>
           <span className='agent-avatar'>+</span>
           <span className='agent-card-name'>New agent</span>
         </button>

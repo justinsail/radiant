@@ -259,7 +259,7 @@ app.post('/api/agents', (req, res) => {
   config.agents = config.agents || []
   config.agents.push({
     id: 'ag-' + crypto.randomBytes(4).toString('hex'),
-    name, emoji: emoji || '🤖', icon: icon || null, hue: hue ?? 258, persona: persona || '',
+    name, emoji: emoji || '🤖', icon: icon || null, hue: hue ?? null, persona: persona || '',
     model: model || null, provider: provider || null, skills: skills || [],
     useTools: useTools !== false, computerControl: Boolean(computerControl),
     plannerModel: plannerModel || null, plannerProvider: plannerProvider || null

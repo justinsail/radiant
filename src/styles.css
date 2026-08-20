@@ -697,6 +697,14 @@ code, pre, .mono { font-family: var(--font-mono); }
 .send-btn:hover { background: var(--accent-hot); }
 .send-btn:disabled { background: var(--bg-hover); color: var(--text-faint); cursor: default; }
 .send-btn.stop { background: var(--danger); color: white; }
+.send-btn.queue { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
+.send-btn.queue:hover { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.queued-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 4px 6px 8px; }
+.queued-label { font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.queued-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 320px; padding: 3px 6px 3px 10px; border-radius: 999px; border: 1px dashed var(--border); background: var(--bg-panel); font-size: 12px; color: var(--text-muted); }
+.queued-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queued-x { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 11px; padding: 0 2px; }
+.queued-x:hover { color: var(--danger); }
 .usage-note { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); }
 
 /* drop-up menu anchor inside the prompt bar */
@@ -851,6 +859,11 @@ input[type='range'].hue-slider {
     oklch(0.7 0.16 0), oklch(0.7 0.16 60), oklch(0.7 0.16 120),
     oklch(0.7 0.16 180), oklch(0.7 0.16 240), oklch(0.7 0.16 300), oklch(0.7 0.16 360));
 }
+.agent-color-row { display: flex; align-items: center; gap: 8px; }
+.agent-color-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border); }
+.agent-color-note { font-size: 11px; color: var(--text-faint); }
+.agent-color-reset { font-size: 11px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer; }
+.agent-color-reset:hover { background: var(--bg-hover); }
 input[type='range'].chroma-slider {
   flex: 1; -webkit-appearance: none; height: 10px; border-radius: 999px;
   background: linear-gradient(to right, oklch(0.7 0 var(--accent-h)), oklch(0.7 0.25 var(--accent-h)));
@@ -928,16 +941,17 @@ input[type='range']::-webkit-slider-thumb {
 .agent-skill-chk input { accent-color: var(--accent); }
 
 /* welcome-screen agent gallery */
-.welcome-agents { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 740px; margin: 20px auto 0; }
+.welcome-agents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-width: 620px; margin: 20px auto 0; }
 .welcome-agent {
-  display: flex; flex-direction: column; align-items: center; gap: 5px; width: 132px;
-  padding: 14px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-panel);
-  text-align: center;
+  display: flex; flex-direction: row; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-panel);
+  text-align: left;
 }
 .welcome-agent:hover { border-color: oklch(0.62 0.15 var(--ah, 258)); background: var(--bg-hover); }
-.welcome-agent .agent-avatar { width: 40px; height: 40px; font-size: 21px; }
+.welcome-agent .agent-avatar { flex: none; width: 30px; height: 30px; font-size: 18px; }
+.welcome-agent-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .welcome-agent-name { font-size: 12.5px; font-weight: 600; }
-.welcome-agent-desc { font-size: 10.5px; line-height: 1.3; color: var(--text-faint); }
+.welcome-agent-desc { font-size: 10.5px; line-height: 1.3; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .group-chat-btn { margin-top: 18px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-panel); color: var(--text-muted); font-size: 12.5px; cursor: pointer; }
 .group-chat-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
 .group-picker { margin: 18px auto 0; max-width: 460px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-panel); }
@@ -1161,8 +1175,7 @@ button.hf-head:hover { background: var(--bg-hover); }
   /* chat + composer spacing, iOS safe area */
   .chat-inner { padding: 16px 14px 10px; }
   .composer { padding: 8px 12px calc(14px + env(safe-area-inset-bottom)); }
-  .welcome-agents { max-width: 100%; gap: 8px; }
-  .welcome-agent { width: calc(50% - 6px); }
+  .welcome-agents { max-width: 100%; grid-template-columns: 1fr; gap: 8px; }
 
   /* settings → full-screen sheet with horizontal tab bar */
   .modal, .modal.wide { width: 100vw; max-width: 100vw; height: 100%; max-height: 100%; border-radius: 0; }
