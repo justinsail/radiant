@@ -1399,7 +1399,7 @@ button.hf-head:hover { background: var(--bg-hover); }
   .modal-split { flex-direction: column; min-height: 0; }
   .set-nav { width: 100%; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 8px 12px; border-right: none; border-bottom: 1px solid var(--border); flex-shrink: 0; }
   .set-nav-item { white-space: nowrap; flex: 0 0 auto; padding: 6px 12px; }
-  .modal-body, .modal-split .modal-body { padding-left: 14px; padding-right: 14px; }
+  .modal-body, .modal-split .modal-body { padding-left: 14px; padding-right: 14px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 
   /* Settings provider rows: stack instead of one cramped line */
   .provider-row { flex-wrap: wrap; gap: 6px 10px; }
