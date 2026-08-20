@@ -602,11 +602,13 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose, onDupl
         </span>
       </label>
       {skills.length > 0 && (
-        <div className='agent-field'>Skills always on for this agent
+        <div className='agent-field'>Skills for this agent
+          <span className='agent-field-hint'>Turns a skill on for just this agent. Ones tagged “all agents” are already on everywhere (from Settings → Skills).</span>
           <div className='agent-skills'>
             {skills.map(sk => (
               <label key={sk.id} className='agent-skill-chk'>
                 <input type='checkbox' checked={(a.skills || []).includes(sk.id)} onChange={() => toggleSkill(sk.id)} /> {sk.name}
+                {sk.enabled && <span className='skill-global-tag' title='Enabled globally in Settings → Skills'>all agents</span>}
               </label>
             ))}
           </div>
@@ -833,8 +835,9 @@ function SkillsPane ({ config, onConfigChange }) {
     <div className='set-section'>
       <h3>Skills</h3>
       <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
-        Skills are reusable instructions the agent follows when enabled — coding conventions, a house
-        style, a workflow. Turn them on to add them to every session's guidance.
+        Skills are reusable instructions an agent follows — coding conventions, a house style, a workflow.
+        Checking a skill here turns it on for <strong>every</strong> agent and session. To use one with a
+        single agent only, leave it off here and enable it in that agent's settings instead.
       </p>
 
       {suggestions.length > 0 && (
@@ -876,9 +879,10 @@ function SkillsPane ({ config, onConfigChange }) {
         <div className='skill-drop-hint'>Markdown (.md) files with optional <span className='mono'>name:</span> / <span className='mono'>description:</span> frontmatter</div>
       </div>
 
+      {skills.length > 0 && <div className='skill-list-head'>On for all agents</div>}
       {skills.map(sk => (
         <div key={sk.id} className='skill-row'>
-          <label className='skill-toggle'>
+          <label className='skill-toggle' title='On for every agent and session'>
             <input type='checkbox' checked={Boolean(sk.enabled)} onChange={e => toggle(sk.id, e.target.checked)} />
           </label>
           <div className='skill-main'>
