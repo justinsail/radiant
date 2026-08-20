@@ -51,6 +51,8 @@ export const api = {
   removeProvider: id => json('DELETE', `/api/providers/${id}`),
   activateAccount: (providerId, accountId) => json('POST', `/api/providers/${providerId}/accounts/activate`, { accountId }),
   removeAccount: (providerId, acctId) => json('DELETE', `/api/providers/${providerId}/accounts/${acctId}`),
+  designOpen: url => json('POST', '/api/design/open', { url }),
+  designPick: () => json('POST', '/api/design/pick'),
   getModels: () => json('GET', '/api/models'),
   listSessions: () => json('GET', '/api/sessions'),
   searchSessions: q => json('GET', `/api/sessions-search?q=${encodeURIComponent(q)}`),

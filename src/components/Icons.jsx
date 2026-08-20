@@ -24,5 +24,6 @@ export const Icon = {
   close: p => <Svg {...p}><path d='M18 6 6 18M6 6l12 12' /></Svg>,
   folder: p => <Svg {...p}><path d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' /></Svg>,
   trash: p => <Svg {...p}><path d='M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14' /></Svg>,
-  mic: p => <Svg {...p}><rect x='9' y='2' width='6' height='12' rx='3' /><path d='M5 11a7 7 0 0 0 14 0M12 18v4' /></Svg>
+  mic: p => <Svg {...p}><rect x='9' y='2' width='6' height='12' rx='3' /><path d='M5 11a7 7 0 0 0 14 0M12 18v4' /></Svg>,
+  target: p => <Svg {...p}><circle cx='12' cy='12' r='7' /><path d='M12 2v3M12 19v3M2 12h3M19 12h3' /><circle cx='12' cy='12' r='1.5' /></Svg>
 }

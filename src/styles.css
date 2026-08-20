@@ -764,6 +764,14 @@ code, pre, .mono { font-family: var(--font-mono); }
 .queued-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queued-x { border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 11px; padding: 0 2px; }
 .queued-x:hover { color: var(--danger); }
+.design-capture { display: flex; align-items: center; gap: 10px; margin: 0 6px 8px; padding: 6px 8px; border: 1px solid var(--accent-dim); border-radius: 10px; background: var(--accent-wash); }
+.design-capture-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-panel); flex: none; }
+.design-capture-body { flex: 1; min-width: 0; }
+.design-capture-title { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text); }
+.design-capture-title svg { color: var(--accent); }
+.design-capture-sub { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.design-capture-x { flex: none; border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 12px; padding: 2px 4px; }
+.design-capture-x:hover { color: var(--danger); }
 .usage-note { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); white-space: nowrap; flex: none; }
 
 /* drop-up menu anchor inside the prompt bar */

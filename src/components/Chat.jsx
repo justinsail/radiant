@@ -462,6 +462,8 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [queued, setQueued] = useState([]) // messages typed mid-turn, sent as one follow-up when the turn settles
+  const [designCapture, setDesignCapture] = useState(null) // {tag, outerHTML, css, screenshot, url} from Design Mode
+  const [designBusy, setDesignBusy] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
   const textareaRef = useRef(null)
@@ -515,20 +517,39 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
     setAttachments(a => [...a, ...next].slice(0, 8))
   }
 
-  // voice dictation via the Web Speech API
   const submit = () => {
-    const text = draft.trim()
-    if ((!text && !attachments.length) || !session) return
+    let text = draft.trim()
+    let atts = attachments
+    // a Design-Mode capture rides along as context + a screenshot attachment
+    if (designCapture) {
+      const cssLines = Object.entries(designCapture.css || {}).map(([k, v]) => `  ${k}: ${v};`).join('\n')
+      const ctx = `[Design capture from ${designCapture.url}]\nElement: <${designCapture.tag}>${designCapture.text ? `  — “${designCapture.text.trim().slice(0, 80)}”` : ''}\n\nHTML:\n\`\`\`html\n${designCapture.outerHTML}\n\`\`\`\n\nComputed styles:\n${cssLines}`
+      text = text ? `${ctx}\n\n${text}` : `${ctx}\n\nRebuild this element in my project (match the styles above).`
+      if (designCapture.screenshot) atts = [...atts, { kind: 'image', mime: designCapture.screenshot.mime, dataB64: designCapture.screenshot.dataB64, name: 'design-capture.png' }].slice(0, 8)
+    }
+    if ((!text && !atts.length) || !session) return
     // mid-turn: park the message instead of blocking; it sends when the turn settles
     if (streaming) {
-      setQueued(q => [...q, { text, attachments }])
-      setDraft('')
-      setAttachments([])
+      setQueued(q => [...q, { text, attachments: atts }])
+      setDraft(''); setAttachments([]); setDesignCapture(null)
       return
     }
     setDraft('')
-    onSend({ text, attachments })
-    setAttachments([])
+    onSend({ text, attachments: atts })
+    setAttachments([]); setDesignCapture(null)
+  }
+
+  // Design Mode: open a page in the controlled browser, then let the user click an element
+  const startDesign = async () => {
+    const url = window.prompt('Open a page to capture a design from (URL):', designCapture?.url || 'https://')
+    if (!url || !url.trim()) return
+    setDesignBusy(true)
+    try {
+      await api.designOpen(url.trim())
+      const { capture } = await api.designPick() // blocks until the user clicks an element
+      if (capture) setDesignCapture(capture)
+    } catch (e) { window.alert('Design capture failed: ' + e.message) }
+    setDesignBusy(false)
   }
 
   // clicking an option in a decision-card widget sends it as the answer
@@ -683,6 +704,16 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
       )}
       <div className='composer'>
         <TodoChecklist todos={todos} />
+        {designCapture && (
+          <div className='design-capture'>
+            {designCapture.screenshot && <img className='design-capture-thumb' src={`data:${designCapture.screenshot.mime};base64,${designCapture.screenshot.dataB64}`} alt='captured element' />}
+            <div className='design-capture-body'>
+              <div className='design-capture-title'><Icon.target size={12} /> Design capture · <span className='mono'>&lt;{designCapture.tag}&gt;</span></div>
+              <div className='design-capture-sub'>{(designCapture.url || '').replace(/^https?:\/\//, '').slice(0, 60)} — sends with your next message as HTML + CSS + screenshot</div>
+            </div>
+            <button className='design-capture-x' onClick={() => setDesignCapture(null)} title='Discard capture'>✕</button>
+          </div>
+        )}
         {queued.length > 0 && (
           <div className='queued-strip' title='Sends as one follow-up when the agent finishes this turn'>
             <span className='queued-label'>↳ Queued</span>
@@ -753,6 +784,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
               onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
             />
             <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images' data-tip='Attach files or images'><Icon.plus size={17} /></button>
+            <button className={'attach-btn' + (designBusy ? ' listening' : '')} onClick={startDesign} disabled={designBusy} title='Design Mode' data-tip={'Design Mode — open a web page and click\nan element to capture its HTML, CSS &\na screenshot as context'}><Icon.target size={16} /></button>
             <RecipeMenu recipes={recipes} onUse={text => { setDraft(text); setTimeout(() => textareaRef.current?.focus(), 0) }} />
             <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
             <button

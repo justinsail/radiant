@@ -468,6 +468,21 @@ app.get('/api/computer-status', async (req, res) => {
   }
 })
 
+// ---------- design mode (point at a page element, capture it) ----------
+app.post('/api/design/open', async (req, res) => {
+  try {
+    const { web } = await import('./browser.js')
+    res.json(await web.navigate(req.body.url))
+  } catch (e) { res.status(400).json({ error: e.message }) }
+})
+app.post('/api/design/pick', async (req, res) => {
+  try {
+    const { web } = await import('./browser.js')
+    const capture = await web.pickElement()
+    res.json({ capture })
+  } catch (e) { res.status(400).json({ error: e.message }) }
+})
+
 // ---------- version & updates ----------
 app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }))
 

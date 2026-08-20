@@ -77,6 +77,57 @@ export const web = {
     const text = await p.evaluate(() => document.body.innerText.slice(0, 12000))
     return { url: p.url(), title: await p.title(), text }
   },
+  // Design Mode: the user hovers/clicks an element in the real Chrome window; we
+  // capture its markup, curated computed styles, and a cropped screenshot.
+  async pickElement () {
+    const p = await ensure()
+    await p.bringToFront().catch(() => {})
+    const pick = await p.evaluate(() => new Promise(resolve => {
+      const box = document.createElement('div')
+      box.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border:2px solid #4c8dff;background:rgba(76,141,255,.15);border-radius:2px'
+      const label = document.createElement('div')
+      label.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#4c8dff;color:#fff;font:12px/1.4 system-ui;padding:2px 6px;border-radius:4px;white-space:nowrap'
+      const tip = document.createElement('div')
+      tip.textContent = 'Design Mode — click an element to capture it (Esc to cancel)'
+      tip.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;left:50%;bottom:16px;transform:translateX(-50%);background:#111;color:#fff;font:13px/1.4 system-ui;padding:6px 12px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.4)'
+      document.body.append(box, label, tip)
+      let hovered = null
+      const move = e => {
+        const el = document.elementFromPoint(e.clientX, e.clientY)
+        if (!el || el === box || el === label || el === tip) return
+        hovered = el
+        const r = el.getBoundingClientRect()
+        Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' })
+        const cls = (el.className && typeof el.className === 'string') ? '.' + el.className.trim().split(/\s+/).join('.') : ''
+        label.textContent = el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + cls
+        Object.assign(label.style, { left: r.left + 'px', top: Math.max(0, r.top - 22) + 'px' })
+      }
+      const cleanup = () => { document.removeEventListener('mousemove', move, true); document.removeEventListener('click', click, true); document.removeEventListener('keydown', key, true); box.remove(); label.remove(); tip.remove() }
+      const click = e => {
+        e.preventDefault(); e.stopPropagation()
+        const el = hovered; if (!el) return
+        cleanup()
+        const r = el.getBoundingClientRect(), cs = getComputedStyle(el)
+        const props = ['display', 'position', 'width', 'height', 'margin', 'padding', 'color', 'background-color', 'background-image', 'border', 'border-radius', 'box-shadow', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-align', 'text-transform', 'flex-direction', 'justify-content', 'align-items', 'gap', 'grid-template-columns', 'opacity']
+        const css = {}; for (const k of props) { const v = cs.getPropertyValue(k); if (v && v !== 'none' && v !== 'normal' && v !== 'auto') css[k] = v }
+        resolve({ outerHTML: el.outerHTML.slice(0, 8000), css, rect: { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }, tag: el.tagName.toLowerCase(), text: (el.innerText || '').slice(0, 300) })
+      }
+      const key = e => { if (e.key === 'Escape') { cleanup(); resolve(null) } }
+      document.addEventListener('mousemove', move, true)
+      document.addEventListener('click', click, true)
+      document.addEventListener('keydown', key, true)
+    }))
+    if (!pick) return null
+    let screenshot = null
+    try {
+      const vw = 1280, vh = 800
+      const r = pick.rect
+      const clip = { x: Math.max(0, r.x), y: Math.max(0, r.y), width: Math.min(r.width, vw - Math.max(0, r.x)), height: Math.min(r.height, vh - Math.max(0, r.y)) }
+      const buf = (clip.width > 4 && clip.height > 4) ? await p.screenshot({ clip }) : await p.screenshot()
+      screenshot = { dataB64: buf.toString('base64'), mime: 'image/png' }
+    } catch {}
+    return { ...pick, screenshot, url: p.url() }
+  },
   async close () {
     try { await browser?.close() } catch {}
     browser = context = page = null
