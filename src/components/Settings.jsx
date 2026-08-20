@@ -543,6 +543,15 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
           {models.map(m => <option key={m.provider + m.id} value={m.id}>{m.providerName} · {m.id}</option>)}
         </select>
       </label>
+      <label className='agent-field'>Planner model <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>— optional lead model that plans first, then the model above executes</span>
+        <select className='text-input' style={{ fontFamily: 'inherit' }} value={a.plannerModel || ''} onChange={e => {
+          const m = models.find(x => x.id === e.target.value)
+          set({ plannerModel: e.target.value || null, plannerProvider: m ? m.provider : null })
+        }}>
+          <option value=''>None (no separate planning step)</option>
+          {models.map(m => <option key={m.provider + m.id} value={m.id}>{m.providerName} · {m.id}</option>)}
+        </select>
+      </label>
       <label className='agent-field'>Color
         <input type='range' min='0' max='360' className='hue-slider' value={a.hue ?? 258} onChange={e => set({ hue: Number(e.target.value) })} />
       </label>

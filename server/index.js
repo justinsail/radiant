@@ -254,14 +254,15 @@ app.get('/api/files', (req, res) => {
 
 // ---------- agents ----------
 app.post('/api/agents', (req, res) => {
-  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl } = req.body
+  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl, plannerModel, plannerProvider } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   config.agents = config.agents || []
   config.agents.push({
     id: 'ag-' + crypto.randomBytes(4).toString('hex'),
     name, emoji: emoji || '🤖', icon: icon || null, hue: hue ?? 258, persona: persona || '',
     model: model || null, provider: provider || null, skills: skills || [],
-    useTools: useTools !== false, computerControl: Boolean(computerControl)
+    useTools: useTools !== false, computerControl: Boolean(computerControl),
+    plannerModel: plannerModel || null, plannerProvider: plannerProvider || null
   })
   saveConfig(config)
   res.json(publicConfig(config))
@@ -270,7 +271,7 @@ app.post('/api/agents', (req, res) => {
 app.patch('/api/agents/:id', (req, res) => {
   const a = (config.agents || []).find(x => x.id === req.params.id)
   if (!a) return res.status(404).json({ error: 'not found' })
-  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl']) {
+  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl', 'plannerModel', 'plannerProvider']) {
     if (k in req.body) a[k] = req.body[k]
   }
   saveConfig(config)
@@ -996,6 +997,30 @@ app.post('/api/chat', async (req, res) => {
   const memoryOn = config.settings.memory !== false
   const memory = memoryOn ? relevantFacts(text, session.cwd) : []
 
+  // lead/worker: if this agent has a planner model, have the (stronger) lead model
+  // outline the approach first; the (session) model then executes it.
+  let plannedPersona = agent?.persona || ''
+  if (agent?.plannerModel && agent?.plannerProvider && session.useTools !== false && !session.group) {
+    const pProvider = config.providers.find(p => p.id === agent.plannerProvider)
+    if (pProvider) {
+      const pOAuth = Boolean(config.oauth[pProvider.id])
+      emit({ type: 'notice', text: `Planning with ${agent.plannerModel}…` })
+      const tmp = { cwd: session.cwd, messages: [{ role: 'user', text: `You are the planning lead. Produce a brief numbered plan (3–6 steps, no code) that a coding agent will follow to handle this request in the workspace. Be concrete.\n\nRequest: ${text}` }] }
+      let plan = ''
+      try {
+        await runTurn({
+          provider: pProvider, model: agent.plannerModel, apiKey: config.keys[pProvider.id],
+          getAccessToken: pOAuth ? () => validAccessToken(pProvider.id, config, saveConfig) : null,
+          getAccountId: pOAuth ? () => config.oauth[pProvider.id]?.accountId || null : null,
+          session: tmp, useTools: false, computerControl: false, persona: '', skills: [],
+          emit: ev => { if (ev.type === 'text_delta') plan += ev.text },
+          requestApproval: null, signal: controller.signal
+        })
+      } catch {}
+      if (plan.trim()) plannedPersona = `${plannedPersona}\n\n[A lead model has planned the approach below — follow it, adapting as needed:]\n${plan.trim()}`
+    }
+  }
+
   const common = {
     provider,
     model: session.model,
@@ -1032,7 +1057,7 @@ app.post('/api/chat', async (req, res) => {
         ...common,
         useTools: session.useTools !== false,
         computerControl: Boolean(session.computerControl),
-        persona: agent?.persona || '',
+        persona: plannedPersona,
         skills: mergedSkills,
         askAgent,
         peerAgents,
