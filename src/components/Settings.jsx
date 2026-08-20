@@ -1003,6 +1003,15 @@ function AgentPane ({ config, onSettings }) {
         Turn on the <strong>computer</strong> toggle in the chat bar to let the agent drive a browser and your desktop.
         Use a vision-capable model (Claude, GPT-4o, or a local VL model) so it can see what it's doing.
       </p>
+      <label className='check-row'>
+        <input type='checkbox' checked={Boolean(s.fullAutomation)} onChange={e => onSettings({ fullAutomation: e.target.checked })} />
+        <span>Full automation <span className='desc'>— let agents click, type, and run apps <strong>without approving each step</strong></span></span>
+      </label>
+      <div className={'automation-note' + (s.fullAutomation ? ' warn' : '')}>
+        {s.fullAutomation
+          ? '⚠ On — computer actions run automatically. An agent can act on your Mac as you would, including actions that can\'t be undone. Use only with models and tasks you trust.'
+          : 'Basic (recommended) — every computer action pauses for your approval before it runs.'}
+      </div>
       <div className='spec-card' style={{ marginTop: 4 }}>
         <div className='comp-stat'>
           <span className={comp?.browser ? 'key-ok' : 'fit-badge fit-no'}>{comp?.browser ? '✓' : '—'} Browser control</span>

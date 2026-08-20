@@ -459,6 +459,7 @@ export function GroupPicker ({ agents, onStart, onCancel }) {
 
 export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, skillSuggestion, onReviewSkill, onDismissSuggestion, rightOpen, onToggleRight, onMenu }) {
   const [groupPicker, setGroupPicker] = useState(false)
+  const [pickAgent, setPickAgent] = useState(false) // splash: reveal the agent picker
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [queued, setQueued] = useState([]) // messages typed mid-turn, sent as one follow-up when the turn settles
@@ -571,25 +572,43 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
             <div className='logo-mark big-mark' aria-hidden />
             <div className='wordmark welcome-word'>Radiant</div>
             <div className='welcome-tagline'>A Templeton Technologies Product</div>
-            {agents.length > 0
-              ? <>
-                  <p className='hint' style={{ marginTop: 22 }}>Start a session with an agent</p>
-                  <div className='welcome-agents'>
-                    {agents.map(a => (
-                      <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
-                        <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={18} /></span>
-                        <span className='welcome-agent-text'>
-                          <span className='welcome-agent-name'>{a.name}</span>
-                          <span className='welcome-agent-desc'>{agentBlurb(a)}</span>
-                        </span>
-                      </button>
-                    ))}
+            {agents.length === 0
+              ? <p style={{ marginTop: 26 }}><button className='small-btn primary' onClick={() => onNew()}>Start a session</button></p>
+              : !pickAgent
+                ? <div className='welcome-choices'>
+                    <button className='welcome-choice' onClick={() => onNew(agents.find(a => a.id === 'agent-radiant') ? 'agent-radiant' : undefined)}>
+                      <span className='welcome-choice-ico'><AgentGlyph agent={agents.find(a => a.id === 'agent-radiant') || agents[0]} size={22} /></span>
+                      <span className='welcome-choice-title'>Start a quick chat</span>
+                      <span className='welcome-choice-sub'>Jump straight in with Radiant, your all-purpose assistant.</span>
+                    </button>
+                    <button className='welcome-choice' onClick={() => setPickAgent(true)}>
+                      <span className='welcome-choice-ico'><Icon.target size={22} /></span>
+                      <span className='welcome-choice-title'>Work with an agent</span>
+                      <span className='welcome-choice-sub'>Pick a ready-made specialist, start a group chat, or build your own.</span>
+                    </button>
                   </div>
-                  {agents.length >= 2 && (groupPicker
-                    ? <GroupPicker agents={agents} onStart={ids => { setGroupPicker(false); onNewGroup(ids) }} onCancel={() => setGroupPicker(false)} />
-                    : <button className='group-chat-btn' onClick={() => setGroupPicker(true)}>👥 Start a group chat</button>)}
-                </>
-              : <p style={{ marginTop: 26 }}><button className='small-btn primary' onClick={() => onNew()}>Start a session</button></p>}
+                : <>
+                    <div className='welcome-pick-head'>
+                      <button className='back-link' onClick={() => { setPickAgent(false); setGroupPicker(false) }}>← Back</button>
+                      <span className='hint'>Choose an agent</span>
+                    </div>
+                    <div className='welcome-agents'>
+                      {agents.map(a => (
+                        <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
+                          <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={18} /></span>
+                          <span className='welcome-agent-text'>
+                            <span className='welcome-agent-name'>{a.name}</span>
+                            <span className='welcome-agent-desc'>{agentBlurb(a)}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className='welcome-pick-actions'>
+                      {agents.length >= 2 && (groupPicker
+                        ? <GroupPicker agents={agents} onStart={ids => { setGroupPicker(false); onNewGroup(ids) }} onCancel={() => setGroupPicker(false)} />
+                        : <button className='group-chat-btn' onClick={() => setGroupPicker(true)}>👥 Start a group chat</button>)}
+                    </div>
+                  </>}
           </div>
         </div>
       </main>

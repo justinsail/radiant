@@ -484,7 +484,7 @@ async function compactSession (session, keepRecent, summarize, emit) {
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, memory, agentId, groupSpeakerId, groupNames, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, memory, agentId, groupSpeakerId, groupNames, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, autoApproveComputer, emit, requestApproval, requestUserChoice, signal }) {
   const cwd = session.cwd || os.homedir()
   const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona, planMode, memory)
   // proactive compaction before a very long turn
@@ -577,7 +577,7 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
       emit({ type: 'tool_start', id: call.id, name: call.name, args: call.args })
       const isComputer = COMPUTER_TOOL_NAMES.has(call.name)
       const isMcp = call.name.startsWith('mcp__')
-      const needsApproval = requestApproval && (call.name === 'run_command' || isMcp || (isComputer && !COMPUTER_SAFE.has(call.name)))
+      const needsApproval = requestApproval && (call.name === 'run_command' || isMcp || (isComputer && !COMPUTER_SAFE.has(call.name) && !autoApproveComputer))
       const approved = needsApproval ? await requestApproval(call) : true
       if (signal.aborted) return
       if (!approved) {

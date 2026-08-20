@@ -1074,6 +1074,18 @@ input[type='range']::-webkit-slider-thumb {
 .agent-skill-chk input { accent-color: var(--accent); }
 
 /* welcome-screen agent gallery */
+/* splash: two primary choices */
+.welcome-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 560px; margin: 26px auto 0; }
+.welcome-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; text-align: left; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-panel); cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.1s; }
+.welcome-choice:hover { border-color: var(--accent-dim); background: var(--bg-hover); }
+.welcome-choice:active { transform: translateY(1px); }
+.welcome-choice-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--accent); background: var(--accent-wash); margin-bottom: 4px; }
+.welcome-choice-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.welcome-choice-sub { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+.welcome-pick-head { display: flex; align-items: center; gap: 12px; max-width: 620px; margin: 22px auto 6px; }
+.welcome-pick-head .hint { margin: 0; }
+.welcome-pick-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+@media (max-width: 620px) { .welcome-choices { grid-template-columns: 1fr; max-width: 100%; } }
 .welcome-agents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-width: 620px; margin: 20px auto 0; }
 .welcome-agent {
   display: flex; flex-direction: row; align-items: center; gap: 10px; width: 100%;
@@ -1139,6 +1151,8 @@ input[type='range']::-webkit-slider-thumb {
 .comp-stat { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12.5px; }
 .comp-stat .desc { color: var(--text-faint); font-size: 12px; }
 .check-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.automation-note { font-size: 11.5px; color: var(--text-faint); margin: 2px 0 4px 26px; line-height: 1.45; }
+.automation-note.warn { color: var(--danger); }
 .check-row input { accent-color: var(--accent); width: 15px; height: 15px; }
 .check-row .desc { color: var(--text-faint); font-size: 12px; }
 

@@ -1101,6 +1101,7 @@ app.post('/api/chat', async (req, res) => {
     memory,
     summarize,
     autoCompact: config.settings.autoCompact !== false,
+    autoApproveComputer: config.settings.fullAutomation === true,
     mcpTools,
     callMcp,
     emit,
