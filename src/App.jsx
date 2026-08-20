@@ -24,6 +24,7 @@ export default function App () {
   const [error, setError] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTab, setSettingsTab] = useState('providers')
+  const [agentView, setAgentView] = useState(null) // 'library' deep-links the Agents pane into the template gallery
   const [rightOpen, setRightOpen] = useState(false)
   const [rightTab, setRightTab] = useState('activity')
   const [updateInfo, setUpdateInfo] = useState(null) // {latest, dmgUrl} when an update exists
@@ -299,6 +300,7 @@ export default function App () {
         onTruncate={truncateSession}
         skillSuggestion={skillSuggestion}
         onReviewSkill={() => { setSkillSuggestion(null); setSettingsTab('skills'); setSettingsOpen(true) }}
+        onOpenLibrary={() => { setAgentView('library'); setSettingsTab('agents'); setSettingsOpen(true) }}
         onDismissSuggestion={() => setSkillSuggestion(null)}
         recipes={config.recipes || []}
         agents={config.agents || []}
@@ -366,7 +368,8 @@ export default function App () {
         <Settings
           config={config}
           initialTab={settingsTab}
-          onClose={() => { setSettingsOpen(false); setSettingsTab('providers'); refreshModels() }}
+          initialAgentView={agentView}
+          onClose={() => { setSettingsOpen(false); setSettingsTab('providers'); setAgentView(null); refreshModels() }}
           onSettings={saveSettings}
           onConfigChange={setConfig}
           onModelsChanged={refreshModels}

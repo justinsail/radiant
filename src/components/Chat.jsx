@@ -457,7 +457,7 @@ export function GroupPicker ({ agents, onStart, onCancel }) {
   )
 }
 
-export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, skillSuggestion, onReviewSkill, onDismissSuggestion, rightOpen, onToggleRight, onMenu }) {
+export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, skillSuggestion, onReviewSkill, onDismissSuggestion, onOpenLibrary, rightOpen, onToggleRight, onMenu }) {
   const [groupPicker, setGroupPicker] = useState(false)
   const [pickAgent, setPickAgent] = useState(false) // splash: reveal the agent picker
   const [draft, setDraft] = useState('')
@@ -607,6 +607,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
                       {agents.length >= 2 && (groupPicker
                         ? <GroupPicker agents={agents} onStart={ids => { setGroupPicker(false); onNewGroup(ids) }} onCancel={() => setGroupPicker(false)} />
                         : <button className='group-chat-btn' onClick={() => setGroupPicker(true)}>👥 Start a group chat</button>)}
+                      {!groupPicker && onOpenLibrary && <button className='group-chat-btn' onClick={onOpenLibrary}>◎ Browse the agent library</button>}
                     </div>
                   </>}
           </div>

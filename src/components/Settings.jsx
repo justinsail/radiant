@@ -619,12 +619,12 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
   )
 }
 
-function AgentsPane ({ config, onConfigChange }) {
+function AgentsPane ({ config, onConfigChange, initialView }) {
   const agents = config.agents || []
   const skills = config.skills || []
   const [models, setModels] = useState([])
   const [editing, setEditing] = useState(null) // agent object or null
-  const [browsing, setBrowsing] = useState(false) // template library open
+  const [browsing, setBrowsing] = useState(initialView === 'library') // template library open
   useEffect(() => { api.getModels().then(setModels).catch(() => {}) }, [])
   const fromTemplate = t => { setBrowsing(false); setEditing({ name: t.name, icon: t.icon, hue: null, persona: t.persona, model: null, provider: null, skills: [], useTools: true }) }
 
@@ -1345,7 +1345,7 @@ const TABS = [
   { id: 'about', label: 'About' }
 ]
 
-export default function Settings ({ config, initialTab = 'providers', embedded = false, onClose, onSettings, onConfigChange, onModelsChanged }) {
+export default function Settings ({ config, initialTab = 'providers', initialAgentView = null, embedded = false, onClose, onSettings, onConfigChange, onModelsChanged }) {
   const [tab, setTab] = useState(initialTab)
   const body = (
     <div className={'modal wide' + (embedded ? ' embedded' : '')} role='dialog' aria-label='Settings'>
@@ -1365,7 +1365,7 @@ export default function Settings ({ config, initialTab = 'providers', embedded =
           {tab === 'guide' && <GuidePane />}
           {tab === 'providers' && <ProvidersPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'models' && <ModelsPane onModelsChanged={onModelsChanged} />}
-          {tab === 'agents' && <AgentsPane config={config} onConfigChange={onConfigChange} />}
+          {tab === 'agents' && <AgentsPane config={config} onConfigChange={onConfigChange} initialView={initialAgentView} />}
           {tab === 'skills' && <SkillsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'mcp' && <McpPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'memory' && <MemoryPane config={config} onSettings={onSettings} />}
