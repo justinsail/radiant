@@ -104,7 +104,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
     const ag = agentOf(s.agentId)
     return (
       <div
-        className={'session-item' + (s.id === activeId ? ' active' : '') + (s.pinned ? ' pinned' : '')}
+        className={'session-item' + (s.id === activeId ? ' active' : '') + (s.pinned ? ' pinned' : '') + (working && s.id === activeId ? ' working' : '')}
         onClick={() => onOpen(s.id)}
         title={s.title}
       >
