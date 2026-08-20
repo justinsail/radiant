@@ -780,10 +780,14 @@ app.get('/api/sessions', (req, res) => res.json(listSessions()))
 
 app.post('/api/sessions', (req, res) => {
   const agent = req.body.agentId ? (config.agents || []).find(a => a.id === req.body.agentId) : null
+  const participants = Array.isArray(req.body.participants) ? req.body.participants.filter(id => (config.agents || []).some(a => a.id === id)) : null
+  const isGroup = Boolean(participants && participants.length >= 2)
   const session = {
     id: crypto.randomUUID(),
-    title: req.body.title || 'New session',
+    title: req.body.title || (isGroup ? 'Group chat' : 'New session'),
     agentId: agent ? agent.id : null,
+    group: isGroup,
+    participants: isGroup ? participants : undefined,
     // agent picks the model/tools unless the request overrides them
     provider: req.body.provider || (agent && agent.provider) || null,
     model: req.body.model || (agent && agent.model) || config.settings.defaultModel,
@@ -939,31 +943,49 @@ app.post('/api/chat', async (req, res) => {
     return out
   }
 
+  const common = {
+    provider,
+    model: session.model,
+    apiKey,
+    getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
+    getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
+    session,
+    summarize,
+    autoCompact: config.settings.autoCompact !== false,
+    mcpTools,
+    callMcp,
+    emit,
+    requestApproval,
+    requestUserChoice,
+    signal: controller.signal
+  }
+
   try {
-    await runTurn({
-      provider,
-      model: session.model,
-      apiKey,
-      getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
-      getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
-      session,
-      summarize,
-      autoCompact: config.settings.autoCompact !== false,
-      useTools: session.useTools !== false,
-      computerControl: Boolean(session.computerControl),
-      persona: agent?.persona || '',
-      skills: mergedSkills,
-      mcpTools,
-      callMcp,
-      askAgent,
-      peerAgents,
-      planMode: Boolean(session.planMode),
-      onPlanExit: () => { session.planMode = false; emit({ type: 'plan_mode', on: false }) },
-      emit,
-      requestApproval,
-      requestUserChoice,
-      signal: controller.signal
-    })
+    const participants = (session.group && Array.isArray(session.participants)) ? session.participants : null
+    if (participants && participants.length) {
+      // group chat: each participant agent responds in turn, seeing the others' replies
+      const names = participants.map(id => (config.agents || []).find(a => a.id === id)?.name).filter(Boolean)
+      for (const pid of participants) {
+        if (controller.signal.aborted) break
+        const ag = (config.agents || []).find(a => a.id === pid)
+        if (!ag) continue
+        emit({ type: 'agent_turn', agentId: pid, name: ag.name })
+        const groupPersona = `${ag.persona || ''}\n\nThis is a group discussion between ${names.join(', ')}. You are ${ag.name}. Speak only as yourself, in the first person, briefly. Add something new — build on or respectfully challenge what the others said; do not repeat them or role-play the other participants.`
+        await runTurn({ ...common, agentId: pid, persona: groupPersona, skills: [], useTools: false, computerControl: false })
+      }
+    } else {
+      await runTurn({
+        ...common,
+        useTools: session.useTools !== false,
+        computerControl: Boolean(session.computerControl),
+        persona: agent?.persona || '',
+        skills: mergedSkills,
+        askAgent,
+        peerAgents,
+        planMode: Boolean(session.planMode),
+        onPlanExit: () => { session.planMode = false; emit({ type: 'plan_mode', on: false }) }
+      })
+    }
     // auto-title a still-unnamed session from its first user message
     const firstUser = session.messages.find(m => m.role === 'user')
     if (firstUser?.text && session.autoTitle !== false && !controller.signal.aborted) {

@@ -437,7 +437,7 @@ async function compactSession (session, keepRecent, summarize, emit) {
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, agentId, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
   const cwd = session.cwd || os.homedir()
   const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona, planMode)
   // proactive compaction before a very long turn
@@ -445,6 +445,7 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
     await compactSession(session, 4, summarize, emit)
   }
   const assistant = { role: 'assistant', model, parts: [] }
+  if (agentId) assistant.agentId = agentId
   session.messages.push(assistant)
   let compacted = false
 

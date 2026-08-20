@@ -97,6 +97,15 @@ export default function App () {
     refreshSessions()
   }
 
+  const newGroup = async (participantIds) => {
+    const body = { participants: participantIds }
+    const best = models[0]
+    if (best) { body.provider = best.provider; body.model = best.id }
+    const s = await api.createSession(body)
+    setSession(s); setTodos([]); setQuestion(null); setStats(null); setLive(null); setApproval(null); setError(null); setNavOpen(false)
+    refreshSessions()
+  }
+
   const removeSession = async id => {
     await api.deleteSession(id)
     if (session?.id === id) setSession(null)
@@ -180,6 +189,17 @@ export default function App () {
           case 'question_request': setQuestion({ id: ev.id, question: ev.question, options: ev.options || [] }); break
           case 'plan_mode': setSession(s => (s && s.id === sessionId ? { ...s, planMode: ev.on } : s)); break
           case 'stats': setStats(ev.stats); break
+          case 'agent_turn': {
+            // group chat: finalize the previous speaker's message, start the next
+            endThinking()
+            if (liveMsg.parts.length || liveMsg.thinking) {
+              const finished = { role: 'assistant', parts: [...liveMsg.parts], model: target.model, agentId: liveMsg.agentId }
+              setSession(prev => (prev && prev.id === sessionId ? { ...prev, messages: [...prev.messages, finished] } : prev))
+            }
+            liveMsg.parts = []; liveMsg.thinking = ''; liveMsg.thinkingActive = false; liveMsg.thinkingSecs = 0
+            liveMsg.agentId = ev.agentId
+            break
+          }
           case 'usage': setUsage(u => ({ input: ev.input ?? u?.input, output: ev.output ?? u?.output })); break
           case 'notice': liveMsg.parts.push({ type: 'notice', text: ev.text }); break
           case 'todos': setTodos(ev.todos || []); break
@@ -257,6 +277,7 @@ export default function App () {
         rightOpen={rightOpen}
         onToggleRight={() => setRightOpen(o => !o)}
         onMenu={() => setNavOpen(true)}
+        onNewGroup={newGroup}
         agents={config.agents || []}
         session={session}
         todos={todos}

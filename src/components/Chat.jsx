@@ -301,7 +301,31 @@ function StatsChip ({ stats }) {
   )
 }
 
-export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+function GroupPicker ({ agents, onStart, onCancel }) {
+  const [sel, setSel] = useState([])
+  const toggle = id => setSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
+  return (
+    <div className='group-picker'>
+      <div className='group-picker-title'>Pick 2 or more agents for a group chat</div>
+      <div className='group-picker-list'>
+        {agents.map(a => (
+          <label key={a.id} className={'group-pick' + (sel.includes(a.id) ? ' on' : '')} style={{ '--ah': a.hue ?? 258 }}>
+            <input type='checkbox' checked={sel.includes(a.id)} onChange={() => toggle(a.id)} />
+            <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 258})` }}><AgentGlyph agent={a} size={16} /></span>
+            {a.name}
+          </label>
+        ))}
+      </div>
+      <div className='row' style={{ justifyContent: 'center', marginTop: 12 }}>
+        <button className='small-btn primary' disabled={sel.length < 2} onClick={() => onStart(sel)}>Start group chat</button>
+        <button className='small-btn' onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+  const [groupPicker, setGroupPicker] = useState(false)
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
   const [dragOver, setDragOver] = useState(false)
@@ -375,6 +399,9 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
                       </button>
                     ))}
                   </div>
+                  {agents.length >= 2 && (groupPicker
+                    ? <GroupPicker agents={agents} onStart={ids => { setGroupPicker(false); onNewGroup(ids) }} onCancel={() => setGroupPicker(false)} />
+                    : <button className='group-chat-btn' onClick={() => setGroupPicker(true)}>👥 Start a group chat</button>)}
                 </>
               : <p style={{ marginTop: 26 }}><button className='small-btn primary' onClick={() => onNew()}>Start a session</button></p>}
           </div>
@@ -426,11 +453,11 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
                     {m.text}
                   </div>
                 </div>
-              : <AssistantMessage key={i} parts={m.parts || []} model={m.model} agent={sessionAgent} />
+              : <AssistantMessage key={i} parts={m.parts || []} model={m.model} agent={m.agentId ? agents.find(a => a.id === m.agentId) || sessionAgent : sessionAgent} />
           )}
           {live && (
             <AssistantMessage
-              agent={sessionAgent}
+              agent={live.agentId ? agents.find(a => a.id === live.agentId) || sessionAgent : sessionAgent}
               model={session.model}
               parts={live.parts}
               thinking={live.thinking}
