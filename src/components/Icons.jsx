@@ -19,7 +19,7 @@ export const Icon = {
   contrast: p => <Svg {...p}><circle cx='12' cy='12' r='9' /><path d='M12 3a9 9 0 0 0 0 18z' fill='currentColor' /></Svg>,
   plus: p => <Svg {...p}><path d='M12 5v14M5 12h14' /></Svg>,
   arrowUp: p => <Svg {...p}><path d='M12 19V5M5 12l7-7 7 7' /></Svg>,
-  sparkle: p => <Svg {...p}><path d='M12 3l1.8 4.9L18.7 9.7l-4.9 1.8L12 16.4l-1.8-4.9L5.3 9.7l4.9-1.8z' /></Svg>,
+  sparkle: p => <Svg {...p}><path d='M12 5.3l1.8 4.9L18.7 12l-4.9 1.8L12 18.7l-1.8-4.9L5.3 12l4.9-1.8z' /></Svg>,
   stop: p => <Svg {...p}><rect x='6' y='6' width='12' height='12' rx='2' /></Svg>,
   close: p => <Svg {...p}><path d='M18 6 6 18M6 6l12 12' /></Svg>,
   folder: p => <Svg {...p}><path d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' /></Svg>,

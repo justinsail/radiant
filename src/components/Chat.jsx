@@ -393,7 +393,7 @@ function RecipeMenu ({ recipes, onUse }) {
   }
   return (
     <div ref={ref} style={{ position: 'relative', display: 'flex' }}>
-      <button className='attach-btn' title='Recipes — reusable task templates' onClick={() => { setOpen(o => !o); setActive(null) }}><Icon.sparkle size={16} /></button>
+      <button className='attach-btn' title='Recipes' data-tip={'Recipes — insert a reusable\ntask template into the message'} onClick={() => { setOpen(o => !o); setActive(null) }}><Icon.sparkle size={16} /></button>
       {open && (
         <div className='recipe-menu'>
           {!active ? recipes.map(r => (
@@ -574,14 +574,15 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
         <StatsChip stats={stats} />
         <button
           className='cwd-chip'
-          title={`Workspace folder for this session (the agent reads/writes here):\n${session.cwd}\nClick to change`}
+          title={session.cwd}
+          data-tip={'Workspace folder — the agent reads &\nwrites here. Click to change.'} data-tip-below data-tip-end
           onClick={() => {
             const next = window.prompt('Workspace folder for this session:', session.cwd)
             if (next) onSetCwd(next)
           }}
         >
           <Icon.folder size={13} />
-          {session.cwd?.replace(/^\/Users\/[^/]+/, '~')}
+          <span className='cwd-path'>{session.cwd?.replace(/^\/Users\/[^/]+/, '~')}</span>
         </button>
         <button className='icon-btn' onClick={() => exportSessionMarkdown(session)} title='Export this conversation as a Markdown file' data-tip='Export chat as Markdown' data-tip-below data-tip-end><Icon.download /></button>
         <button className={'icon-btn' + (rightOpen ? ' on' : '')} onClick={onToggleRight} title='Show activity & terminal panel' data-tip={'Activity & terminal panel\n(tool runs, output, terminal)'} data-tip-below data-tip-end><Icon.panel /></button>

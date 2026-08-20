@@ -485,9 +485,10 @@ code, pre, .mono { font-family: var(--font-mono); }
   font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
   border: 1px solid var(--border); border-radius: 999px;
   padding: 3px 10px; background: none; max-width: 260px;
-  overflow: hidden; white-space: nowrap;
+  white-space: nowrap;
 }
 .cwd-chip svg { flex-shrink: 0; opacity: 0.7; }
+.cwd-chip .cwd-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .cwd-chip:hover { color: var(--text-muted); border-color: var(--border-strong); }
 
 /* model picker (lives in the prompt bar) */
