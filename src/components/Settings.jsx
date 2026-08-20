@@ -1321,21 +1321,27 @@ const GUIDE = [
     title: 'Chat & agents',
     items: [
       ['Agents', 'Named personas with their own model, personality, and skills. Pick one from the welcome screen; the Agents sidebar view groups your sessions by agent. Edit them in Settings → Agents.'],
+      ['Agent library', 'Over 140 ready-made expert agents across two dozen categories — browse, filter, and add one in a click, then tweak its model, name, and skills before saving.'],
+      ['Duplicate, export & import', 'Clone any agent into an editable copy, export your custom agents as a shareable file, and import a pack — so a curated set can be handed to a whole team.'],
+      ['Group chat', 'Put several agents in one conversation and let them build on each other, with a roster showing who is in the room.'],
       ['Agents consult each other', 'Any agent can call the ask_agent tool to get a second opinion from another agent (e.g. Reviewer asks Architect) and fold the answer in.'],
+      ['Queue while it works', 'Type a follow-up mid-turn and it queues — the agent picks it up as soon as the current turn finishes instead of making you wait.'],
+      ['Generative UI', 'Agents can render results inline as widgets — stat tiles, tables, diffs, and clickable choices — not just text.'],
       ['Plan mode (📋)', 'Toggle it in the composer. The agent researches and proposes a step-by-step plan for your approval before changing anything — then builds once you approve.'],
       ['The agent can ask you', 'When a decision is genuinely yours, the agent pauses and asks a multiple-choice question (you can also type your own answer) instead of guessing.'],
       ['Task checklists', 'On multi-step work the agent keeps a live to-do list above the composer (done / in-progress / pending).'],
       ['Files changed', 'After a turn, the files the agent created or edited appear as clickable chips — click to open them.'],
-      ['Loop-breaker', 'If an agent gets stuck repeating the same action, Radiant nudges it to change approach — without blocking legitimate repeats.'],
       ['Auto titles', 'New chats name themselves from your first message. Rename to pin your own title.']
     ]
   },
   {
     title: 'Models & providers',
     items: [
-      ['Subscriptions', 'Sign in with your Claude, ChatGPT, or Nous Portal subscription (Settings → Providers) — no API key needed. Or paste an API key for any provider.'],
-      ['Any OpenAI-compatible provider', 'Add Groq, Mistral, Together, a remote server, etc. with a name + base URL.'],
-      ['Local models', 'Run models from Ollama or LM Studio with no key. Search Hugging Face and download GGUFs straight from Settings → Models.'],
+      ['Subscriptions', 'Sign in with a subscription instead of an API key (Settings → Providers): Claude, ChatGPT, Nous Portal, xAI (Grok), Qwen, and GitHub Copilot — Copilot unlocks GPT, Claude, and Gemini models through your plan.'],
+      ['Ready-to-add providers', 'One-tap presets for DeepSeek, Kimi, GLM, Mistral, Groq, Together, Fireworks, Cerebras, Perplexity, Gemini, Ollama Cloud, and Vercel AI Gateway — just paste a key.'],
+      ['Multiple accounts', 'Keep more than one account or key per provider and switch the active one; the sidebar meters follow whichever is active.'],
+      ['Any OpenAI-compatible provider', 'Add anything else with a name + base URL.'],
+      ['Local models', 'Run models from Ollama or LM Studio with no key. Search Hugging Face and download GGUFs straight from Settings → Models, with a disk-space check before you pull.'],
       ['Compare', 'Run one prompt against two models side by side (command palette → Compare).']
     ]
   },
@@ -1345,24 +1351,28 @@ const GUIDE = [
       ['Files & commands', 'Read, write, and edit files and run shell commands in the workspace folder. Toggle with the “tools” pill; command runs ask for approval.'],
       ['Background jobs', 'Long builds, test watchers, and dev servers run in the background so the agent keeps working and checks on them.'],
       ['Terminal', 'A real terminal in the activity panel (top-right icon).'],
-      ['Computer control (🖥)', 'Let a vision model drive the browser and desktop (needs macOS permissions).'],
+      ['Computer control (🖥)', 'Let a vision model drive the browser and desktop. Basic automation is on by default; full automation is an opt-in checkbox in Settings → Automation.'],
+      ['Design Mode (◎)', 'Point at any element in the agent’s browser and capture its HTML, CSS, and a screenshot straight into the chat, so the agent can match or rework a design.'],
+      ['Website → API', 'The agent can watch a site’s network calls and turn its hidden API into a reusable HTTP client (a built-in skill).'],
+      ['Give an agent its own computer', 'Optionally run an agent on its own private Linux desktop in a container so it never touches your Mac (needs Docker — Settings → Agents).'],
       ['MCP', 'Connect Model Context Protocol servers in Settings → MCP to give agents extra tools.'],
-      ['Skills', 'Drop a skill file into Settings → Skills (or type one) to inject house rules / instructions the agent follows.']
+      ['Skills', 'Drop a skill file into Settings → Skills (or type one) to inject house rules the agent follows — globally or per agent.'],
+      ['Skills that build themselves', 'When an agent notices a repeatable workflow it suggests a reusable skill; review the full description and Add or Reject it in Settings → Skills.']
     ]
   },
   {
     title: 'Your devices',
     items: [
       ['One server, all your devices', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share on my network) and connect your other Macs and phone to it — they share the same agents, models, and sessions.'],
-      ['On your phone', 'Open the host’s address in Safari (over Tailscale) and Add to Home Screen — it installs like an app.']
+      ['On your phone', 'Open the host’s address in Safari (over Tailscale) and Add to Home Screen — it installs like an app, with a mobile-tuned layout.']
     ]
   },
   {
     title: 'Look & feel',
     items: [
-      ['Themes', 'A dozen palettes plus a custom accent, in light / medium / dark (bottom-left toggle).'],
-      ['Motion backgrounds', 'Ten animated backgrounds in Settings → Appearance.'],
-      ['Usage meters', 'Live remaining quota for your subscriptions and OpenRouter balance at the bottom of the sidebar.'],
+      ['Themes', 'A dozen palettes plus a custom accent, in light / medium / dark (bottom-left toggle). Agents can follow the accent or carry their own color.'],
+      ['Motion', 'Ten animated backgrounds in Settings → Appearance, an accent-lit beam around the composer while an agent is working, and subtle entrance animations throughout (all respect Reduce Motion).'],
+      ['Usage meters', 'A gas-tank view of how much is left on each subscription plus your OpenRouter balance, at the bottom of the sidebar.'],
       ['Command palette', 'Press ⌘K for quick actions, model switching, and jumping between sessions.']
     ]
   }
