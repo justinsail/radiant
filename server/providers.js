@@ -677,7 +677,8 @@ export async function listModels (provider, apiKey, accessToken, accountId) {
 
 // shown if a key provider's /models call fails but a key is present
 const KEY_FALLBACK_MODELS = {
-  nousresearch: ['Hermes-4-405B', 'Hermes-4-70B', 'Hermes-4.3-36B']
+  nousresearch: ['Hermes-4-405B', 'Hermes-4-70B', 'Hermes-4.3-36B'],
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
 }
 
 function fallback (provider, accessToken, apiKey) {

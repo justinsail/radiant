@@ -29,7 +29,8 @@ const DEFAULT_CONFIG = {
     { id: 'cerebras', name: 'Cerebras', type: 'openai', baseUrl: 'https://api.cerebras.ai/v1', auth: 'key', removable: true, preset: true, hint: 'Very fast inference. Key at cloud.cerebras.ai.' },
     { id: 'perplexity', name: 'Perplexity', type: 'openai', baseUrl: 'https://api.perplexity.ai', auth: 'key', removable: true, preset: true, hint: 'Sonar models. Key at perplexity.ai/settings/api.' },
     { id: 'vercel', name: 'Vercel AI Gateway', type: 'openai', baseUrl: 'https://ai-gateway.vercel.sh/v1', auth: 'key', removable: true, preset: true, hint: 'Routes to many models. Key from your Vercel dashboard.' },
-    { id: 'ollama-cloud', name: 'Ollama Cloud', type: 'openai', baseUrl: 'https://ollama.com/v1', auth: 'key', removable: true, preset: true, hint: 'Cloud-hosted Ollama models. Key at ollama.com/settings/keys.' }
+    { id: 'ollama-cloud', name: 'Ollama Cloud', type: 'openai', baseUrl: 'https://ollama.com/v1', auth: 'key', removable: true, preset: true, hint: 'Cloud-hosted Ollama models. Key at ollama.com/settings/keys.' },
+    { id: 'gemini', name: 'Google Gemini', type: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', auth: 'key', removable: true, preset: true, hint: 'Gemini models. Key from aistudio.google.com/apikey (free tier available).' }
   ],
   removedProviders: [],
   keys: {},
