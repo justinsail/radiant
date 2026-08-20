@@ -4,6 +4,7 @@ import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } fr
 import { MOTIONS } from './MotionBackground.jsx'
 import { Icon } from './Icons.jsx'
 import { AGENT_ICONS, AGENT_ICON_IDS, AgentGlyph } from './AgentIcons.jsx'
+import { AGENT_TEMPLATES, AGENT_TEMPLATE_CATS } from '../agentTemplates.js'
 
 // strip a leading "You are (a|an|the) …" so descriptions read as a role, not a command
 function cleanDesc (s) {
@@ -623,7 +624,9 @@ function AgentsPane ({ config, onConfigChange }) {
   const skills = config.skills || []
   const [models, setModels] = useState([])
   const [editing, setEditing] = useState(null) // agent object or null
+  const [browsing, setBrowsing] = useState(false) // template library open
   useEffect(() => { api.getModels().then(setModels).catch(() => {}) }, [])
+  const fromTemplate = t => { setBrowsing(false); setEditing({ name: t.name, icon: t.icon, hue: null, persona: t.persona, model: null, provider: null, skills: [], useTools: true }) }
 
   const saveAgent = async a => {
     const cfg = a.id && agents.find(x => x.id === a.id)
@@ -640,6 +643,35 @@ function AgentsPane ({ config, onConfigChange }) {
         <button className='back-link' onClick={() => setEditing(null)}>← All agents</button>
         <h3 style={{ marginTop: 6 }}>{editing.id ? `Edit ${editing.name || 'agent'}` : 'New agent'}</h3>
         <AgentEditor agent={editing} skills={skills} models={models} onSave={saveAgent} onDelete={del} onClose={() => setEditing(null)} />
+      </div>
+    )
+  }
+
+  if (browsing) {
+    const have = new Set(agents.map(a => a.name.toLowerCase()))
+    return (
+      <div className='set-section'>
+        <button className='back-link' onClick={() => setBrowsing(false)}>← All agents</button>
+        <h3 style={{ marginTop: 6 }}>Agent library</h3>
+        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
+          Ready-made expert agents. Pick one to review and add — you can change the model, name, and skills before saving.
+        </p>
+        {AGENT_TEMPLATE_CATS.map(cat => (
+          <div key={cat} className='tmpl-cat'>
+            <div className='tmpl-cat-label'>{cat}</div>
+            <div className='tmpl-grid'>
+              {AGENT_TEMPLATES.filter(t => t.cat === cat).map(t => (
+                <button key={t.name} className='tmpl-card' onClick={() => fromTemplate(t)}>
+                  <span className='tmpl-ico'>{(AGENT_ICONS[t.icon] || AGENT_ICONS.bot)({ size: 18 })}</span>
+                  <span className='tmpl-body'>
+                    <span className='tmpl-name'>{t.name}{have.has(t.name.toLowerCase()) && <span className='tmpl-have'>✓ added</span>}</span>
+                    <span className='tmpl-blurb'>{t.blurb}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
@@ -661,6 +693,11 @@ function AgentsPane ({ config, onConfigChange }) {
         <button className='agent-card agent-card-new' onClick={() => setEditing({ name: '', emoji: '🤖', hue: null, persona: '', model: null, provider: null, skills: [], useTools: true })}>
           <span className='agent-avatar'>+</span>
           <span className='agent-card-name'>New agent</span>
+        </button>
+        <button className='agent-card agent-card-new' onClick={() => setBrowsing(true)}>
+          <span className='agent-avatar'>◎</span>
+          <span className='agent-card-name'>Browse library</span>
+          <span className='agent-card-desc'>{AGENT_TEMPLATES.length} ready-made agents</span>
         </button>
       </div>
     </div>
