@@ -647,6 +647,7 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
   const [editing, setEditing] = useState(null) // agent object or null
   const [editNonce, setEditNonce] = useState(0) // bump to remount the editor with fresh state
   const [browsing, setBrowsing] = useState(initialView === 'library') // template library open
+  const [libQuery, setLibQuery] = useState('')
   const importFileRef = useRef(null)
   useEffect(() => { api.getModels().then(setModels).catch(() => {}) }, [])
   const openEditor = obj => { setEditNonce(n => n + 1); setEditing(obj) }
@@ -674,6 +675,10 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
 
   if (browsing) {
     const have = new Set(agents.map(a => a.name.toLowerCase()))
+    const q = libQuery.trim().toLowerCase()
+    const matches = t => !q || `${t.name} ${t.blurb} ${t.cat} ${t.persona || ''}`.toLowerCase().includes(q)
+    const shownCats = AGENT_TEMPLATE_CATS.filter(cat => AGENT_TEMPLATES.some(t => t.cat === cat && matches(t)))
+    const total = AGENT_TEMPLATES.filter(matches).length
     return (
       <div className='set-section'>
         <button className='back-link' onClick={() => setBrowsing(false)}>← All agents</button>
@@ -681,11 +686,12 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
           Ready-made expert agents. Pick one to review and add — you can change the model, name, and skills before saving.
         </p>
-        {AGENT_TEMPLATE_CATS.map(cat => (
+        <input className='session-search' style={{ marginBottom: 4 }} placeholder={`Filter ${AGENT_TEMPLATES.length} agents…`} value={libQuery} onChange={e => setLibQuery(e.target.value)} />
+        {shownCats.map(cat => (
           <div key={cat} className='tmpl-cat'>
             <div className='tmpl-cat-label'>{cat}</div>
             <div className='tmpl-grid'>
-              {AGENT_TEMPLATES.filter(t => t.cat === cat).map(t => (
+              {AGENT_TEMPLATES.filter(t => t.cat === cat && matches(t)).map(t => (
                 <button key={t.name} className='tmpl-card' onClick={() => fromTemplate(t)}>
                   <span className='tmpl-ico'>{(AGENT_ICONS[t.icon] || AGENT_ICONS.bot)({ size: 18 })}</span>
                   <span className='tmpl-body'>
@@ -697,6 +703,7 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
             </div>
           </div>
         ))}
+        {!total && <p style={{ fontSize: 12.5, color: 'var(--text-faint)' }}>No agents match “{libQuery}”.</p>}
       </div>
     )
   }

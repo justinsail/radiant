@@ -1065,6 +1065,18 @@ input[type='range']::-webkit-slider-thumb {
 .tmpl-blurb { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; }
 .agent-card-new { align-items: center; justify-content: center; color: var(--text-muted); border-style: dashed; }
 .agent-card-new .agent-avatar { background: var(--bg-hover); font-size: 20px; }
+/* staggered entrance so the gallery flows in rather than snapping */
+.agent-grid .agent-card, .tmpl-grid .tmpl-card { animation: rise-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.agent-grid .agent-card:nth-child(1), .tmpl-grid .tmpl-card:nth-child(1) { animation-delay: 0.01s; }
+.agent-grid .agent-card:nth-child(2), .tmpl-grid .tmpl-card:nth-child(2) { animation-delay: 0.04s; }
+.agent-grid .agent-card:nth-child(3), .tmpl-grid .tmpl-card:nth-child(3) { animation-delay: 0.07s; }
+.agent-grid .agent-card:nth-child(4), .tmpl-grid .tmpl-card:nth-child(4) { animation-delay: 0.10s; }
+.agent-grid .agent-card:nth-child(5), .tmpl-grid .tmpl-card:nth-child(5) { animation-delay: 0.13s; }
+.agent-grid .agent-card:nth-child(6), .tmpl-grid .tmpl-card:nth-child(6) { animation-delay: 0.16s; }
+.agent-grid .agent-card:nth-child(7), .tmpl-grid .tmpl-card:nth-child(7) { animation-delay: 0.19s; }
+.agent-grid .agent-card:nth-child(8), .tmpl-grid .tmpl-card:nth-child(8) { animation-delay: 0.22s; }
+.agent-grid .agent-card:nth-child(n+9), .tmpl-grid .tmpl-card:nth-child(n+9) { animation-delay: 0.25s; }
+@media (prefers-reduced-motion: reduce) { .agent-grid .agent-card, .tmpl-grid .tmpl-card { animation: none; } }
 
 .agent-editor-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .agent-emoji-input { width: 44px; height: 38px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); }
