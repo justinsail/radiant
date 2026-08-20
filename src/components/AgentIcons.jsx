@@ -36,7 +36,10 @@ export const AGENT_ICONS = {
   message: p => <S {...p}><path d='M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' /></S>,
   bolt: p => <S {...p}><path d='M13 2L4 14h7l-2 8 9-12h-7z' /></S>,
   ghost: p => <S {...p}><path d='M5 21v-9a7 7 0 0 1 14 0v9l-2.5-2-2.5 2-2-2-2 2-2.5-2zM9 10h.01M15 10h.01' /></S>,
-  cap: p => <S {...p}><path d='M12 4L2 9l10 5 10-5zM6 11v5a6 3 0 0 0 12 0v-5' /></S>
+  cap: p => <S {...p}><path d='M12 4L2 9l10 5 10-5zM6 11v5a6 3 0 0 0 12 0v-5' /></S>,
+  chart: p => <S {...p}><path d='M3 3v18h18M7 15l3-4 3 3 5-7' /></S>,
+  megaphone: p => <S {...p}><path d='M3 11v2a1 1 0 0 0 1 1h2l9 5V6L6 11H4a1 1 0 0 0-1 0zM18 9a3 3 0 0 1 0 6' /></S>,
+  lock: p => <S {...p}><rect x='4' y='11' width='16' height='9' rx='2' /><path d='M8 11V8a4 4 0 0 1 8 0v3' /></S>
 }
 
 export const AGENT_ICON_IDS = Object.keys(AGENT_ICONS)
