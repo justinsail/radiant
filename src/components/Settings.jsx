@@ -549,7 +549,7 @@ function McpPane ({ config, onConfigChange }) {
 
 // ---------- Agents ----------
 
-function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
+function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose, onDuplicate }) {
   const [a, setA] = useState({ ...agent })
   const set = patch => setA(prev => ({ ...prev, ...patch }))
   const accentHue = Math.round(Number(getComputedStyle(document.documentElement).getPropertyValue('--accent-h')) || 258)
@@ -633,6 +633,7 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
       <div className='row' style={{ marginTop: 10 }}>
         <button className='small-btn primary' onClick={() => onSave(a)} disabled={!a.name?.trim()}>Save</button>
         <button className='small-btn' onClick={onClose}>Cancel</button>
+        {agent.id && onDuplicate && <button className='small-btn' onClick={() => onDuplicate(a)} title='Make an editable copy of this agent'>Duplicate</button>}
         {!agent.builtin && agent.id && <button className='small-btn danger' style={{ marginLeft: 'auto' }} onClick={() => onDelete(agent.id)}>Delete</button>}
       </div>
     </div>
@@ -644,10 +645,12 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
   const skills = config.skills || []
   const [models, setModels] = useState([])
   const [editing, setEditing] = useState(null) // agent object or null
+  const [editNonce, setEditNonce] = useState(0) // bump to remount the editor with fresh state
   const [browsing, setBrowsing] = useState(initialView === 'library') // template library open
   const importFileRef = useRef(null)
   useEffect(() => { api.getModels().then(setModels).catch(() => {}) }, [])
-  const fromTemplate = t => { setBrowsing(false); setEditing({ name: t.name, icon: t.icon, hue: null, persona: t.persona, model: null, provider: null, skills: [], useTools: true }) }
+  const openEditor = obj => { setEditNonce(n => n + 1); setEditing(obj) }
+  const fromTemplate = t => { setBrowsing(false); openEditor({ name: t.name, icon: t.icon, hue: null, persona: t.persona, model: null, provider: null, skills: [], useTools: true }) }
 
   const saveAgent = async a => {
     const cfg = a.id && agents.find(x => x.id === a.id)
@@ -657,13 +660,14 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
     onConfigChange(cfg)
   }
   const del = async id => { onConfigChange(await api.deleteAgent(id)); setEditing(null) }
+  const duplicate = a => { const { id, builtin, ...copy } = a; openEditor({ ...copy, name: (a.name || 'Agent') + ' copy' }) }
 
   if (editing) {
     return (
       <div className='set-section'>
         <button className='back-link' onClick={() => setEditing(null)}>← All agents</button>
         <h3 style={{ marginTop: 6 }}>{editing.id ? `Edit ${editing.name || 'agent'}` : 'New agent'}</h3>
-        <AgentEditor agent={editing} skills={skills} models={models} onSave={saveAgent} onDelete={del} onClose={() => setEditing(null)} />
+        <AgentEditor key={editNonce} agent={editing} skills={skills} models={models} onSave={saveAgent} onDelete={del} onClose={() => setEditing(null)} onDuplicate={duplicate} />
       </div>
     )
   }
@@ -737,13 +741,13 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
       </p>
       <div className='agent-grid'>
         {agents.map(a => (
-          <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => setEditing(a)}>
+          <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => openEditor(a)}>
             <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={20} /></span>
             <span className='agent-card-name'>{a.name}</span>
             <span className='agent-card-desc'>{(() => { const d = cleanDesc(a.persona); return d ? d.slice(0, 70) + (d.length > 70 ? '…' : '') : 'General assistant' })()}</span>
           </button>
         ))}
-        <button className='agent-card agent-card-new' onClick={() => setEditing({ name: '', emoji: '🤖', hue: null, persona: '', model: null, provider: null, skills: [], useTools: true })}>
+        <button className='agent-card agent-card-new' onClick={() => openEditor({ name: '', emoji: '🤖', hue: null, persona: '', model: null, provider: null, skills: [], useTools: true })}>
           <span className='agent-avatar'>+</span>
           <span className='agent-card-name'>New agent</span>
         </button>
