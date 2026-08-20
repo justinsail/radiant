@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
 import { execSync, spawn } from 'child_process'
-import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession, searchSessions, upsertCredential, activateAccount, removeAccount } from './config.js'
+import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession, searchSessions, upsertCredential, activateAccount, removeAccount, SESSIONS_DIR } from './config.js'
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken, startDevice, pollDevice } from './oauth.js'
 import { checkForUpdate } from './updater.js'
@@ -273,14 +273,14 @@ app.get('/api/files', (req, res) => {
 
 // ---------- agents ----------
 app.post('/api/agents', (req, res) => {
-  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl, plannerModel, plannerProvider } = req.body
+  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl, sandbox, plannerModel, plannerProvider } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   config.agents = config.agents || []
   config.agents.push({
     id: 'ag-' + crypto.randomBytes(4).toString('hex'),
     name, emoji: emoji || '🤖', icon: icon || null, hue: hue ?? null, persona: persona || '',
     model: model || null, provider: provider || null, skills: skills || [],
-    useTools: useTools !== false, computerControl: Boolean(computerControl),
+    useTools: useTools !== false, computerControl: Boolean(computerControl), sandbox: Boolean(sandbox),
     plannerModel: plannerModel || null, plannerProvider: plannerProvider || null
   })
   saveConfig(config)
@@ -290,7 +290,7 @@ app.post('/api/agents', (req, res) => {
 app.patch('/api/agents/:id', (req, res) => {
   const a = (config.agents || []).find(x => x.id === req.params.id)
   if (!a) return res.status(404).json({ error: 'not found' })
-  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl', 'plannerModel', 'plannerProvider']) {
+  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl', 'sandbox', 'plannerModel', 'plannerProvider']) {
     if (k in req.body) a[k] = req.body[k]
   }
   saveConfig(config)
@@ -590,14 +590,62 @@ app.get('/api/system', (req, res) => {
   try { chip = execSync('sysctl -n machdep.cpu.brand_string', { timeout: 2000 }).toString().trim() } catch {}
   let osVersion = ''
   try { osVersion = execSync('sw_vers -productVersion', { timeout: 2000 }).toString().trim() } catch {}
+  // real free space on the volume that actually holds the models (follows the
+  // ~/.ollama symlink if models live on an external drive) — the number a
+  // download really gets, not Finder's purgeable-inflated figure.
+  let diskFreeGB = null
+  try {
+    const modelsPath = path.join(os.homedir(), '.ollama', 'models')
+    const target = fs.existsSync(modelsPath) ? modelsPath : os.homedir()
+    const out = execSync(`df -k "${target}"`, { timeout: 3000 }).toString().trim().split('\n').pop().split(/\s+/)
+    diskFreeGB = Math.round(Number(out[3]) / (1024 * 1024))
+  } catch {}
   res.json({
     chip,
     ramGB: Math.round(os.totalmem() / (1024 ** 3)),
     cores: os.cpus().length,
     arch: os.arch(),
     platform: os.platform(),
-    osVersion
+    osVersion,
+    diskFreeGB
   })
+})
+
+// ---------- docker status (for the agent sandbox) ----------
+app.get('/api/docker-status', (req, res) => {
+  const probe = cmd => { try { return execSync(cmd, { timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch { return null } }
+  const installed = Boolean(probe('command -v docker || command -v colima'))
+  const running = Boolean(probe('docker info --format "{{.ServerVersion}}"'))
+  const version = running ? probe('docker --version') : null
+  res.json({ installed, running, version })
+})
+
+// ---------- local storage (Radiant's own data) ----------
+app.get('/api/storage', (req, res) => {
+  const dir = SESSIONS_DIR
+  let count = 0; let bytes = 0
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.json')) continue
+      count++; try { bytes += fs.statSync(path.join(dir, f)).size } catch {}
+    }
+  } catch {}
+  res.json({ sessions: count, sizeMB: Math.round(bytes / (1024 * 1024) * 10) / 10 })
+})
+// delete sessions older than `days` (0 = all)
+app.post('/api/storage/clear-sessions', (req, res) => {
+  const days = Number(req.body?.days ?? 30)
+  const cutoff = days > 0 ? Date.now() - days * 86400000 : Infinity
+  let removed = 0
+  try {
+    for (const f of fs.readdirSync(SESSIONS_DIR)) {
+      if (!f.endsWith('.json')) continue
+      const p = path.join(SESSIONS_DIR, f)
+      let mt = 0; try { mt = fs.statSync(p).mtimeMs } catch {}
+      if (days === 0 || mt < cutoff) { try { fs.unlinkSync(p); removed++ } catch {} }
+    }
+  } catch {}
+  res.json({ removed })
 })
 
 // live registry search: GGUF repos on Hugging Face, pullable via `ollama pull hf.co/{repo}:{quant}`

@@ -213,7 +213,7 @@ function fmtCount (n) {
   return String(n)
 }
 
-function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam }) {
+function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam, diskFree }) {
   const [open, setOpen] = useState(false)
   const [files, setFiles] = useState(null)
   const [failed, setFailed] = useState(false)
@@ -237,6 +237,7 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam }
         const model = qt.model
         const ram = ramNeededGB(qt.sizeGB)
         const fit = fitClass(ram, systemRam)
+        const noDisk = diskFree != null && qt.sizeGB > diskFree - 2 // keep ~2 GB headroom
         const pull = pulls[model]
         const pct = pull && pull.total ? Math.round((pull.completed / pull.total) * 100) : null
         return (
@@ -244,6 +245,7 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam }
             <span className='v-tag mono'>{qt.label.toLowerCase()}{qt.sharded ? ` · ${qt.files.length} parts` : ''}</span>
             <span className='v-meta'>{qt.sizeGB} GB download · ~{ram} GB RAM</span>
             <span className={'fit-badge ' + fit}>{FIT_LABEL[fit] || ''}</span>
+            {noDisk && <span className='fit-badge fit-no' title={`Only ${diskFree} GB free on disk`}>not enough disk</span>}
             <span className='v-action'>
               {installedCheck(model)
                 ? <span className='key-ok'>✓ installed</span>
@@ -253,7 +255,7 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam }
                       {pct != null ? pct + '%' : (pull.status || 'starting…')}
                       <button className='pull-stop' title='Stop download' onClick={() => onCancel(model)}>✕</button>
                     </span>
-                  : <button className='small-btn' onClick={() => onPull({ repo: repo.id, files: qt.files, model })} disabled={fit === 'fit-no'}>Download</button>}
+                  : <button className='small-btn' onClick={() => onPull({ repo: repo.id, files: qt.files, model })} disabled={fit === 'fit-no' || noDisk} title={noDisk ? `Not enough free disk (${diskFree} GB free, needs ${qt.sizeGB} GB)` : ''}>Download</button>}
             </span>
           </div>
         )
@@ -416,6 +418,7 @@ function ModelsPane ({ onModelsChanged }) {
           <div className='spec-chip-name'>{system.chip}</div>
           <div className='spec-detail'>
             {system.ramGB} GB unified memory · {system.cores} cores · macOS {system.osVersion}
+            {system.diskFreeGB != null && <> · <span className={system.diskFreeGB < 20 ? 'fit-badge fit-tight' : ''}>{system.diskFreeGB} GB free on disk</span></>}
           </div>
           <div className='spec-note'>
             Badges show what fits: <span className='fit-badge fit-ok'>runs well</span> under {Math.round(system.ramGB * 0.75)} GB,
@@ -472,6 +475,7 @@ function ModelsPane ({ onModelsChanged }) {
             onPull={startPull}
             onCancel={cancelPull}
             systemRam={system?.ramGB}
+            diskFree={system?.diskFreeGB}
           />
         ))}
         {hfResults && !hfResults.length && <div className='activity-empty'>No GGUF models match.</div>}
@@ -549,6 +553,8 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
   const [a, setA] = useState({ ...agent })
   const set = patch => setA(prev => ({ ...prev, ...patch }))
   const accentHue = Math.round(Number(getComputedStyle(document.documentElement).getPropertyValue('--accent-h')) || 258)
+  const [docker, setDocker] = useState(null)
+  useEffect(() => { api.dockerStatus().then(setDocker).catch(() => {}) }, [])
   const toggleSkill = id => set({ skills: (a.skills || []).includes(id) ? a.skills.filter(s => s !== id) : [...(a.skills || []), id] })
   return (
     <div className='agent-editor'>
@@ -609,6 +615,20 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose }) {
       <div className='agent-field-row'>
         <label className='agent-skill-chk'><input type='checkbox' checked={a.useTools !== false} onChange={e => set({ useTools: e.target.checked })} /> Agent tools</label>
         <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(a.computerControl)} onChange={e => set({ computerControl: e.target.checked })} /> Computer control</label>
+      </div>
+      <div className='sandbox-field'>
+        <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(a.sandbox)} onChange={e => set({ sandbox: e.target.checked })} /> Give this agent its own computer <span className='sandbox-tag'>sandbox</span></label>
+        <div className='sandbox-note'>
+          The agent works on its <strong>own private Linux desktop</strong> in a container — it can click, type, and run apps freely and <strong>never touches this Mac</strong>.
+          {' '}
+          {docker == null ? 'Checking Docker…'
+            : docker.running ? <span className='key-ok'>✓ Docker is running — ready.</span>
+              : docker.installed ? <span className='fit-badge fit-tight'>Docker is installed but not running — start Docker Desktop or Colima.</span>
+                : <span className='fit-badge fit-no'>Requires Docker Desktop (or Colima) — not detected.</span>}
+        </div>
+        <div className='sandbox-note' style={{ color: 'var(--text-faint)' }}>
+          Requirements: Docker running · a one-time ~2 GB Linux desktop download · ~1–2 GB RAM while active. The sandbox desktop is provisioned the first time the agent uses its computer.
+        </div>
       </div>
       <div className='row' style={{ marginTop: 10 }}>
         <button className='small-btn primary' onClick={() => onSave(a)} disabled={!a.name?.trim()}>Save</button>
@@ -1041,8 +1061,17 @@ function AboutPane ({ config, onSettings }) {
   const [phase, setPhase] = useState('idle') // idle | downloading | ready
   const [progress, setProgress] = useState(0)
   const native = typeof window !== 'undefined' && window.radiantUpdater
+  const [storage, setStorage] = useState(null)
 
   useEffect(() => { api.getVersion().then(v => setVersion(v.version)).catch(() => {}) }, [])
+  useEffect(() => { api.getStorage().then(setStorage).catch(() => {}) }, [])
+  const clearOld = async days => {
+    const label = days === 0 ? 'ALL saved chat sessions' : `chat sessions older than ${days} days`
+    if (!window.confirm(`Delete ${label}? This can't be undone.`)) return
+    const r = await api.clearSessions(days)
+    api.getStorage().then(setStorage).catch(() => {})
+    window.alert(`Removed ${r.removed} session${r.removed === 1 ? '' : 's'}.`)
+  }
 
   // listen to auto-updater events in the packaged app
   useEffect(() => {
@@ -1130,7 +1159,19 @@ function AboutPane ({ config, onSettings }) {
         Updates download in the background and install when you restart.
       </div>
 
-      <div className='about-footer'>
+      <h3 style={{ marginTop: 22 }}>Storage</h3>
+      <p className='oauth-note' style={{ marginTop: 0 }}>
+        {storage
+          ? <>Radiant is keeping <strong>{storage.sessions}</strong> chat session{storage.sessions === 1 ? '' : 's'} ({storage.sizeMB} MB) in <span className='mono'>~/.radiant</span>. Old sessions add up — clear ones you no longer need.</>
+          : 'Reading local storage…'}
+      </p>
+      <div className='row' style={{ gap: 8, flexWrap: 'wrap' }}>
+        <button className='small-btn' onClick={() => clearOld(90)}>Clear older than 90 days</button>
+        <button className='small-btn' onClick={() => clearOld(30)}>Older than 30 days</button>
+        <button className='small-btn danger' onClick={() => clearOld(0)}>Delete all sessions</button>
+      </div>
+
+      <div className='about-footer' style={{ marginTop: 22 }}>
         <div className='about-footer-text'>A Templeton Technologies Product</div>
         <img
           className='about-footer-logo'
