@@ -18,6 +18,7 @@ export default function App () {
   const [live, setLive] = useState(null) // in-flight assistant message view {parts, thinking, streaming}
   const [approval, setApproval] = useState(null) // {id, name, args}
   const [groupPickerOpen, setGroupPickerOpen] = useState(false)
+  const [skillSuggestion, setSkillSuggestion] = useState(null) // {id, name, description, rationale} — a drafted skill awaiting review
   const [activity, setActivity] = useState([]) // tool feed for right panel
   const [usage, setUsage] = useState(null)
   const [error, setError] = useState(null)
@@ -215,6 +216,10 @@ export default function App () {
           case 'notice': liveMsg.parts.push({ type: 'notice', text: ev.text }); break
           case 'todos': setTodos(ev.todos || []); break
           case 'title': setSession(s => (s && s.id === sessionId ? { ...s, title: ev.title } : s)); refreshSessions(); break
+          case 'skill_suggested':
+            setSkillSuggestion(ev.suggestion)
+            api.getConfig().then(setConfig).catch(() => {})
+            break
           case 'error': setError(ev.message); break
           default: break
         }
@@ -291,6 +296,9 @@ export default function App () {
         onMenu={() => setNavOpen(true)}
         onNewGroup={newGroup}
         onTruncate={truncateSession}
+        skillSuggestion={skillSuggestion}
+        onReviewSkill={() => { setSkillSuggestion(null); setSettingsTab('skills'); setSettingsOpen(true) }}
+        onDismissSuggestion={() => setSkillSuggestion(null)}
         recipes={config.recipes || []}
         agents={config.agents || []}
         session={session}

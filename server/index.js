@@ -15,6 +15,7 @@ import { checkForUpdate } from './updater.js'
 import { ollamaBin, SPAWN_ENV } from './ollama.js'
 import { commandRisk } from './util.js'
 import { listFacts, addFacts, addFactManual, deleteFact, clearFacts, relevantFacts } from './memory.js'
+import { shouldReflect, reflectionPrompt, parseProposal, addSuggestion } from './skillsmith.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
@@ -413,6 +414,29 @@ app.patch('/api/skills/:id', (req, res) => {
 app.delete('/api/skills/:id', (req, res) => {
   config.skills = (config.skills || []).filter(s => s.id !== req.params.id)
   saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+// ---------- suggested skills (from skillsmith) ----------
+app.post('/api/skill-suggestions/:id/accept', (req, res) => {
+  const sug = (config.skillSuggestions || []).find(s => s.id === req.params.id)
+  if (!sug) return res.status(404).json({ error: 'not found' })
+  config.skills = config.skills || []
+  config.skills.push({ id: 'sk-' + crypto.randomBytes(4).toString('hex'), name: sug.name, description: sug.description || '', content: sug.content, enabled: true, fromSuggestion: true })
+  config.skillSuggestions = (config.skillSuggestions || []).filter(s => s.id !== sug.id)
+  saveConfig(config)
+  res.json(publicConfig(config))
+})
+
+app.post('/api/skill-suggestions/:id/reject', (req, res) => {
+  const sug = (config.skillSuggestions || []).find(s => s.id === req.params.id)
+  if (sug) {
+    const key = (sug.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    config.rejectedSkills = config.rejectedSkills || []
+    if (key && !config.rejectedSkills.includes(key)) config.rejectedSkills.push(key)
+    config.skillSuggestions = (config.skillSuggestions || []).filter(s => s.id !== sug.id)
+    saveConfig(config)
+  }
   res.json(publicConfig(config))
 })
 
@@ -1112,6 +1136,37 @@ app.post('/api/chat', async (req, res) => {
         if (out && !/^\s*none\b/i.test(out.trim())) {
           const n = addFacts(out.split('\n').map(l => l.trim()).filter(Boolean), session.cwd)
           if (n) emit({ type: 'memory_added', count: n })
+        }
+      } catch {}
+    }
+    // skillsmith: draft a reusable-skill proposal from procedural work (best-effort,
+    // cloud models only, and only when the turn looks skill-worthy). Never auto-saves.
+    const suggestOn = config.settings.suggestSkills !== false
+    const cloud = ['anthropic', 'openai', 'openrouter', 'nousresearch'].includes(provider.id)
+    if (suggestOn && cloud && !session.group && !controller.signal.aborted) {
+      try {
+        const lastUser = [...session.messages].reverse().find(m => m.role === 'user')
+        const lastAsst = [...session.messages].reverse().find(m => m.role === 'assistant')
+        const alreadyPending = (config.skillSuggestions || []).some(s => s.sessionId === session.id)
+        if (!alreadyPending && shouldReflect(lastUser, lastAsst)) {
+          const asstText = (lastAsst?.parts || []).filter(p => p.type === 'text').map(p => p.text).join(' ')
+          const toolNames = [...new Set((lastAsst?.parts || []).filter(p => p.type === 'tool' && p.name).map(p => p.name))].join(', ')
+          const exchange = `User: ${(lastUser?.text || '').slice(0, 1800)}\n\nAssistant (tools used: ${toolNames || 'none'}): ${asstText.slice(0, 1800)}`
+          const tmp = { cwd: session.cwd, messages: [{ role: 'user', text: reflectionPrompt(exchange, config.skills || []) }] }
+          let out = ''
+          await runTurn({
+            provider, model: session.model, apiKey,
+            getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
+            getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
+            session: tmp, useTools: false, computerControl: false, persona: '', skills: [],
+            emit: ev => { if (ev.type === 'text_delta') out += ev.text },
+            requestApproval: null, signal: controller.signal
+          })
+          const proposal = parseProposal(out)
+          if (proposal) {
+            const sug = addSuggestion(config, proposal, session.id)
+            if (sug) { saveConfig(config); emit({ type: 'skill_suggested', suggestion: { id: sug.id, name: sug.name, description: sug.description, rationale: sug.rationale } }) }
+          }
         }
       } catch {}
     }

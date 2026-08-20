@@ -662,12 +662,16 @@ function parseSkillFile (filename, text) {
 
 function SkillsPane ({ config, onConfigChange }) {
   const skills = config.skills || []
+  const suggestions = config.skillSuggestions || []
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [expanded, setExpanded] = useState(null)
   const fileRef = useRef(null)
 
+  const acceptSuggestion = async id => onConfigChange(await api.acceptSkillSuggestion(id))
+  const rejectSuggestion = async id => onConfigChange(await api.rejectSkillSuggestion(id))
   const toggle = async (id, enabled) => onConfigChange(await api.updateSkill(id, { enabled }))
   const remove = async id => { if (window.confirm('Delete this skill?')) onConfigChange(await api.deleteSkill(id)) }
   const add = async () => {
@@ -696,6 +700,32 @@ function SkillsPane ({ config, onConfigChange }) {
         Skills are reusable instructions the agent follows when enabled — coding conventions, a house
         style, a workflow. Turn them on to add them to every session's guidance.
       </p>
+
+      {suggestions.length > 0 && (
+        <div className='skill-suggestions'>
+          <div className='skill-suggestions-head'><Icon.sparkle size={14} /> Suggested for you <span className='skill-suggest-count'>{suggestions.length}</span></div>
+          <div className='skill-suggestions-sub'>The agent noticed these while you worked. Nothing is added until you approve it.</div>
+          {suggestions.map(s => (
+            <div key={s.id} className='sug-card'>
+              <div className='sug-top'>
+                <div className='sug-main'>
+                  <div className='sug-name'>{s.name}</div>
+                  <div className='sug-desc'>{s.description}</div>
+                  {s.rationale && <div className='sug-why'>Why: {s.rationale}</div>}
+                </div>
+                <div className='sug-actions'>
+                  <button className='small-btn primary' onClick={() => acceptSuggestion(s.id)}>Add skill</button>
+                  <button className='small-btn' onClick={() => rejectSuggestion(s.id)}>Reject</button>
+                </div>
+              </div>
+              <button className='sug-preview-toggle' onClick={() => setExpanded(expanded === s.id ? null : s.id)}>
+                {expanded === s.id ? '▾ Hide' : '▸ Preview'} what it does
+              </button>
+              {expanded === s.id && <pre className='sug-preview'>{s.content}</pre>}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div
         className={'skill-drop' + (dragOver ? ' over' : '')}
@@ -886,6 +916,14 @@ function AgentPane ({ config, onSettings }) {
           onChange={e => onSettings({ autoCompact: e.target.checked })}
         />
         <span>Auto-compact long conversations <span className='desc'>— when a chat fills the model's context, summarize older messages so it can keep going</span></span>
+      </label>
+      <label className='check-row'>
+        <input
+          type='checkbox'
+          checked={s.suggestSkills !== false}
+          onChange={e => onSettings({ suggestSkills: e.target.checked })}
+        />
+        <span>Suggest skills from your activity <span className='desc'>— when the agent notices a repeatable, multi-step process or a workflow you set, it drafts a skill and asks you to approve it in Settings → Skills (cloud models only)</span></span>
       </label>
       <div style={{ marginTop: 10 }}>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Default workspace folder for new sessions</div>

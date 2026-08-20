@@ -444,7 +444,7 @@ export function GroupPicker ({ agents, onStart, onCancel }) {
   )
 }
 
-export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, rightOpen, onToggleRight, onMenu }) {
+export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, skillSuggestion, onReviewSkill, onDismissSuggestion, rightOpen, onToggleRight, onMenu }) {
   const [groupPicker, setGroupPicker] = useState(false)
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState([])
@@ -657,6 +657,17 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
         </div>
       </div>
 
+      {skillSuggestion && (
+        <div className='skill-suggest'>
+          <span className='skill-suggest-ico'><Icon.sparkle size={15} /></span>
+          <div className='skill-suggest-body'>
+            <div className='skill-suggest-title'>Save this as a skill?</div>
+            <div className='skill-suggest-text'>{skillSuggestion.rationale || `I drafted a reusable skill: “${skillSuggestion.name}”.`} It's waiting in Skills settings for you to review.</div>
+          </div>
+          <button className='skill-suggest-review' onClick={onReviewSkill}>Review “{skillSuggestion.name}”</button>
+          <button className='skill-suggest-x' onClick={onDismissSuggestion} title='Not now'>✕</button>
+        </div>
+      )}
       <div className='composer'>
         <TodoChecklist todos={todos} />
         {queued.length > 0 && (

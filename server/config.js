@@ -23,6 +23,8 @@ const DEFAULT_CONFIG = {
     { id: 'seed-plan', name: 'Plan before acting', description: 'State a brief plan before non-trivial changes.', content: 'Before making non-trivial changes, state your plan in 1–2 sentences, then carry it out. Keep the user oriented on what you are about to do.', enabled: false },
     { id: 'seed-minimal', name: 'Minimal diffs', description: 'Smallest change that solves the problem.', content: 'Make the smallest change that solves the problem. Match the surrounding code style and conventions. Do not refactor or reformat unrelated code.', enabled: false }
   ],
+  skillSuggestions: [],
+  rejectedSkills: [],
   agents: [
     { id: 'agent-radiant', name: 'Radiant', emoji: '✦', icon: 'radiant', hue: null, persona: '', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-reviewer', name: 'Reviewer', emoji: '🔍', icon: 'search', hue: null, persona: 'You are a meticulous senior code reviewer. Hunt for bugs, edge cases, security issues, race conditions, and unclear code. Be specific — cite files and lines. Prioritize correctness over style, and call out what you are NOT sure about.', model: null, provider: null, skills: [], useTools: true, builtin: true },
@@ -103,6 +105,8 @@ export function loadConfig () {
       for (const def of Object.values(defById)) if (!haveIds.has(def.id)) cfg.agents.push(def)
     }
     if (saved.mcpServers) cfg.mcpServers = saved.mcpServers
+    if (saved.skillSuggestions) cfg.skillSuggestions = saved.skillSuggestions
+    if (saved.rejectedSkills) cfg.rejectedSkills = saved.rejectedSkills
     if (saved.recipes) {
       const seeded = cfg.recipes
       cfg.recipes = saved.recipes
@@ -128,6 +132,7 @@ export function publicConfig (cfg) {
       signedIn: Boolean(cfg.oauth[p.id])
     })),
     skills: cfg.skills || [],
+    skillSuggestions: cfg.skillSuggestions || [],
     agents: cfg.agents || [],
     recipes: cfg.recipes || [],
     mcpServers: cfg.mcpServers || [],
