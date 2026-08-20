@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import http from 'http'
+import { fetchRetry, isTransient } from './util.js'
 
 // Subscription sign-in via each vendor's own OAuth client (the same public
 // PKCE clients their official CLIs use). This is UNOFFICIAL: vendors license
@@ -91,12 +92,15 @@ async function exchange (providerId, code) {
     code_verifier: flow.verifier,
     state: flow.verifier
   }
-  const res = await fetch(p.tokenUrl, {
+  const res = await fetchRetry(p.tokenUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   })
-  if (!res.ok) throw new Error(`token exchange failed (${res.status}): ${await res.text()}`)
+  if (!res.ok) {
+    if (isTransient(res.status)) throw new Error(`${p.label} sign-in hit a temporary server error (${res.status}). Wait a few seconds and try again.`)
+    throw new Error(`token exchange failed (${res.status}): ${(await res.text()).slice(0, 200)}`)
+  }
   const json = await res.json()
   pending.delete(providerId)
   return {
@@ -135,12 +139,12 @@ export function startLoopback (providerId, onDone) {
 
 export async function refreshToken (providerId, tok) {
   const p = OAUTH_PROVIDERS[providerId]
-  const res = await fetch(p.tokenUrl, {
+  const res = await fetchRetry(p.tokenUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: tok.refresh, client_id: p.clientId })
   })
-  if (!res.ok) throw new Error(`refresh failed (${res.status})`)
+  if (!res.ok) throw new Error(isTransient(res.status) ? `${p.label} servers are temporarily unavailable (${res.status}) — try again shortly.` : `refresh failed (${res.status})`)
   const json = await res.json()
   return {
     access: json.access_token,

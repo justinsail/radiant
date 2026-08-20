@@ -1,5 +1,6 @@
 import os from 'os'
 import crypto from 'crypto'
+import { fetchRetry, isTransient } from './util.js'
 import { TOOL_DEFS, runTool } from './tools.js'
 import { COMPUTER_TOOL_DEFS, COMPUTER_TOOL_NAMES, COMPUTER_SAFE, runComputerTool } from './computer-tools.js'
 
@@ -267,7 +268,7 @@ const CHATGPT_DEFAULT_MODEL = 'gpt-5.6-sol'
 // often — gpt-5-codex/gpt-5 are retired; current ids are gpt-5.6-sol etc.).
 async function chatgptModels (accessToken, accountId) {
   try {
-    const r = await fetch(`${CHATGPT_BASE}/models?client_version=${CODEX_CLIENT_VERSION}`, {
+    const r = await fetchRetry(`${CHATGPT_BASE}/models?client_version=${CODEX_CLIENT_VERSION}`, {
       headers: { authorization: `Bearer ${accessToken}`, 'chatgpt-account-id': accountId || '', originator: 'codex_cli_rs', 'openai-beta': 'responses=experimental', accept: 'application/json' },
       signal: AbortSignal.timeout(6000)
     })
@@ -314,7 +315,7 @@ async function chatgptRound ({ accessToken, accountId, model, messages, system, 
     session_id: crypto.randomUUID(),
     accept: 'text/event-stream'
   }
-  const res = await fetch(`${CHATGPT_BASE}/responses`, { method: 'POST', headers, body: JSON.stringify(body), signal })
+  const res = await fetchRetry(`${CHATGPT_BASE}/responses`, { method: 'POST', headers, body: JSON.stringify(body), signal })
   if (!res.ok) throw await httpErr(res)
 
   let text = ''
