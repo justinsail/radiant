@@ -53,7 +53,7 @@ function UsageChip () {
 const MIN_W = 190
 const MAX_W = 460
 
-export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onNewGroup, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate }) {
+export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onNewGroup, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate, onCloseNav }) {
   const agentOf = id => agents.find(a => a.id === id)
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem('radiant.sidebarWidth'))
@@ -127,6 +127,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
       <div className='brand'>
         <div className={'logo-mark brand-mark' + (working ? ' working' : '')} aria-hidden />
         <span className='wordmark brand-word'>Radiant</span>
+        {onCloseNav && <button className='nav-close' onClick={onCloseNav} title='Close menu' aria-label='Close menu'>✕</button>}
       </div>
       <div className='sidebar-switch'>
         <button className={view === 'chats' ? 'on' : ''} onClick={() => setView('chats')}>Chats</button>

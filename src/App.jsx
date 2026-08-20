@@ -276,6 +276,7 @@ export default function App () {
         onOpen={id => { openSession(id); setNavOpen(false) }}
         onNew={(...a) => { newSession(...a); setNavOpen(false) }}
         onNewGroup={() => { setGroupPickerOpen(true); setNavOpen(false) }}
+        onCloseNav={() => setNavOpen(false)}
         onDelete={removeSession}
         onRename={renameSession}
         onPin={pinSession}
