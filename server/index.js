@@ -430,7 +430,13 @@ app.patch('/api/skills/:id', (req, res) => {
 })
 
 app.delete('/api/skills/:id', (req, res) => {
-  config.skills = (config.skills || []).filter(s => s.id !== req.params.id)
+  const id = req.params.id
+  config.skills = (config.skills || []).filter(s => s.id !== id)
+  // seeded skills get re-merged on load; remember the deletion so they stay gone
+  if (id.startsWith('seed-')) {
+    config.removedSkills = config.removedSkills || []
+    if (!config.removedSkills.includes(id)) config.removedSkills.push(id)
+  }
   saveConfig(config)
   res.json(publicConfig(config))
 })

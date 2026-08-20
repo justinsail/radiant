@@ -2,10 +2,20 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import crypto from 'crypto'
+import { fileURLToPath } from 'url'
 
 export const RADIANT_DIR = path.join(os.homedir(), '.radiant')
 export const SESSIONS_DIR = path.join(RADIANT_DIR, 'sessions')
 const CONFIG_PATH = path.join(RADIANT_DIR, 'config.json')
+
+// Bundled SKILL.md-format skill folders: skills/ at the repo root in dev,
+// shipped as an extraResource in the packaged app.
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const skillsCandidates = [
+  path.join(__dirname, '..', 'skills'),
+  path.join(process.resourcesPath || '', 'skills')
+]
+export const SKILLS_ROOT = skillsCandidates.find(p => { try { return fs.existsSync(p) } catch { return false } }) || skillsCandidates[0]
 
 const DEFAULT_CONFIG = {
   providers: [
@@ -39,12 +49,16 @@ const DEFAULT_CONFIG = {
   activeAccount: {},
   mcpServers: [],
   skills: [
+    // dir: points at a SKILL.md folder bundled under SKILLS_ROOT; the folder's
+    // absolute path is appended to the skill text at prompt-build time.
+    { id: 'seed-archmap', name: 'Architecture map', description: 'Build an interactive isometric map of the repo\'s architecture.', dir: 'architecture-map', content: 'When the user asks for an architecture map, system diagram, codebase overview, or to "show how this repo fits together", read SKILL.md in this skill\'s folder and follow it. Its references/, scripts/, and assets/ live alongside it. For other tasks, ignore this skill.', enabled: false },
     { id: 'seed-commits', name: 'Conventional commits', description: 'Commit messages in Conventional Commits format.', content: 'When writing git commit messages, use Conventional Commits format (feat:, fix:, docs:, refactor:, chore:, test:) — a concise summary line, and a short body only when it adds value.', enabled: false },
     { id: 'seed-plan', name: 'Plan before acting', description: 'State a brief plan before non-trivial changes.', content: 'Before making non-trivial changes, state your plan in 1–2 sentences, then carry it out. Keep the user oriented on what you are about to do.', enabled: false },
     { id: 'seed-minimal', name: 'Minimal diffs', description: 'Smallest change that solves the problem.', content: 'Make the smallest change that solves the problem. Match the surrounding code style and conventions. Do not refactor or reformat unrelated code.', enabled: false }
   ],
   skillSuggestions: [],
   rejectedSkills: [],
+  removedSkills: [],
   agents: [
     { id: 'agent-radiant', name: 'Radiant', emoji: '✦', icon: 'radiant', hue: null, persona: '', model: null, provider: null, skills: [], useTools: true, builtin: true },
     { id: 'agent-reviewer', name: 'Reviewer', emoji: '🔍', icon: 'search', hue: null, persona: 'You are a meticulous senior code reviewer. Hunt for bugs, edge cases, security issues, race conditions, and unclear code. Be specific — cite files and lines. Prioritize correctness over style, and call out what you are NOT sure about.', model: null, provider: null, skills: [], useTools: true, builtin: true },
@@ -108,7 +122,15 @@ export function loadConfig () {
     cfg.oauth = saved.oauth || {}
     cfg.accounts = saved.accounts || {}
     cfg.activeAccount = saved.activeAccount || {}
-    if (saved.skills) cfg.skills = saved.skills
+    if (saved.removedSkills) cfg.removedSkills = saved.removedSkills
+    if (saved.skills) {
+      cfg.skills = saved.skills
+      // bundled skills (dir:) join existing configs too, unless the user deleted them
+      const have = new Set(cfg.skills.map(s => s.id))
+      for (const def of DEFAULT_CONFIG.skills) {
+        if (def.dir && !have.has(def.id) && !cfg.removedSkills.includes(def.id)) cfg.skills.push(structuredClone(def))
+      }
+    }
     if (saved.agents) {
       // built-in agents now follow the accent colour (hue: null); null out any that
       // still carry an original seeded hue, but keep a hue the user chose themselves.

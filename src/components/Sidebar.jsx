@@ -31,7 +31,7 @@ function UsageChip () {
   }
   return (
     <div className='usage-chip' title={credits ? `${credits.label}: $${credits.remaining} left of $${credits.total} ($${credits.used} used)` : ''}>
-      {credits && <span className='usage-line'><span className='usage-dot' /> ${credits.remaining} <span className='usage-sub'>OpenRouter</span></span>}
+      {credits && <span className='usage-line'><span className='usage-dot' /> <span className='num-pop' key={credits.remaining}>${credits.remaining}</span> <span className='usage-sub'>OpenRouter</span></span>}
       {subs.map(s => {
         const primary = s.windows?.[0]
         const pct = primary?.usedPct
@@ -41,7 +41,7 @@ function UsageChip () {
           <span key={s.provider} className='usage-line sub' title={subTitle(s)}>
             <span className={'usage-dot' + (left != null && left <= 10 ? ' warn' : ' ok')} /> {s.label}
             <span className='usage-sub'>
-              {left != null ? `${left}% left` : 'plan'}{reset ? <span className='usage-reset'> · ↻ {reset}</span> : ''}
+              {left != null ? <span className='num-pop' key={left}>{left}% left</span> : 'plan'}{reset ? <span className='usage-reset'> · ↻ {reset}</span> : ''}
             </span>
           </span>
         )

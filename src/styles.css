@@ -744,18 +744,50 @@ code, pre, .mono { font-family: var(--font-mono); }
    Dependency-free take on border-beam / transitions.dev, themed to the accent. */
 @property --beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
 .composer-box.beam::before {
-  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 1;
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2.5px; pointer-events: none; z-index: 1;
   background: conic-gradient(from var(--beam-angle),
-    transparent 0deg, transparent 300deg,
-    oklch(0.72 0.17 var(--accent-h)) 336deg,
-    oklch(0.95 0.05 var(--accent-h)) 352deg,
-    oklch(0.72 0.17 var(--accent-h)) 360deg);
+    transparent 0deg 220deg,
+    oklch(0.68 0.2 var(--accent-h)) 290deg,
+    oklch(0.86 0.16 var(--accent-h)) 340deg,
+    oklch(0.99 0.07 var(--accent-h)) 357deg,
+    oklch(0.86 0.16 var(--accent-h)) 360deg);
+  filter: drop-shadow(0 0 4px oklch(0.72 0.19 var(--accent-h)));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
-  animation: beam-spin 2.6s linear infinite;
+  animation: beam-spin 2s linear infinite;
 }
 @keyframes beam-spin { to { --beam-angle: 360deg; } }
-@media (prefers-reduced-motion: reduce) { .composer-box.beam::before { animation: none; } }
+/* Reduce Motion: keep a soft static accent glow rather than nothing */
+@media (prefers-reduced-motion: reduce) {
+  .composer-box.beam::before { animation: none; background: none; box-shadow: 0 0 0 1.5px var(--accent-dim); filter: none; }
+}
+
+/* ---------- motion layer (transitions.dev-style) ---------- */
+@keyframes rise-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+@keyframes menu-in { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes pop-scale { 0% { opacity: 0; transform: scale(0.94); } 60% { transform: scale(1.03); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes blur-in { from { opacity: 0; filter: blur(7px); } to { opacity: 1; filter: blur(0); } }
+@keyframes num-pop { 0% { transform: translateY(-2px); opacity: 0.4; } 55% { transform: translateY(0.5px) scale(1.06); } 100% { transform: none; opacity: 1; } }
+@keyframes soft-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* popovers / menus rising from the composer */
+.model-menu, .recipe-menu, .slash-menu, .rewind-menu { animation: menu-in 0.16s ease-out; transform-origin: bottom left; }
+/* modals: backdrop fades, panel pops */
+.modal-backdrop, .group-modal-backdrop, .palette-backdrop { animation: soft-fade 0.16s ease-out; }
+.modal-backdrop .modal, .group-modal { animation: pop-scale 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* transient chips / cards slide up as they appear */
+.skill-suggest, .design-capture, .queued-strip, .group-roster, .update-pill { animation: rise-in 0.24s ease-out; }
+.widget-choice, .sug-card { animation: rise-in 0.2s ease-out both; }
+/* the thinking line swaps with a blur */
+.thinking-head .shimmer, .thinking-head span { animation: blur-in 0.28s ease-out; }
+/* numbers pop when they change (React remounts them via key) */
+.num-pop { display: inline-block; animation: num-pop 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .model-menu, .recipe-menu, .slash-menu, .rewind-menu, .modal-backdrop, .group-modal-backdrop, .palette-backdrop,
+  .modal, .group-modal, .skill-suggest, .design-capture, .queued-strip, .group-roster, .update-pill,
+  .widget-choice, .sug-card, .thinking-head .shimmer, .thinking-head span, .num-pop { animation: none !important; }
+}
 .composer textarea {
   border: none; outline: none; background: none; resize: none;
   line-height: 1.5; max-height: 200px; padding: 2px 4px;

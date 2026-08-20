@@ -1,6 +1,6 @@
 {
   "name": "radiant",
-  "version": "0.6.43",
+  "version": "0.6.44",
   "private": true,
   "description": "Radiant — a local coding harness: chat with coding agents across cloud and local models.",
   "author": "Tony Ricciardi",
@@ -41,6 +41,10 @@
       {
         "from": "native/radiant-control",
         "to": "native/radiant-control"
+      },
+      {
+        "from": "skills",
+        "to": "skills"
       }
     ],
     "asarUnpack": [
