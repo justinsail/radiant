@@ -430,7 +430,7 @@ function ModelsPane ({ onModelsChanged }) {
       {local.models.length > 0 && (
         <div className='installed-block'>
           <div className='installed-label'>On this Mac · {local.models.length} installed</div>
-          {local.models.map(m => (
+          {[...local.models].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })).map(m => (
             <div key={m.name} className='installed-row'>
               <span className='v-tag mono'>{m.name}</span>
               <span className='v-meta'>{m.sizeGB} GB</span>
