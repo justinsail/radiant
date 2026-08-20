@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { api, streamChat } from './api.js'
 import { applyTheme } from './theme.js'
 import Sidebar from './components/Sidebar.jsx'
-import Chat from './components/Chat.jsx'
+import Chat, { GroupPicker } from './components/Chat.jsx'
 import RightPanel from './components/RightPanel.jsx'
 import Settings from './components/Settings.jsx'
 import MotionBackground from './components/MotionBackground.jsx'
@@ -17,6 +17,7 @@ export default function App () {
   const [session, setSession] = useState(null) // full active session {id,...,messages}
   const [live, setLive] = useState(null) // in-flight assistant message view {parts, thinking, streaming}
   const [approval, setApproval] = useState(null) // {id, name, args}
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false)
   const [activity, setActivity] = useState([]) // tool feed for right panel
   const [usage, setUsage] = useState(null)
   const [error, setError] = useState(null)
@@ -269,7 +270,7 @@ export default function App () {
         working={Boolean(live?.streaming)}
         onOpen={id => { openSession(id); setNavOpen(false) }}
         onNew={(...a) => { newSession(...a); setNavOpen(false) }}
-        onNewGroup={ids => { newGroup(ids); setNavOpen(false) }}
+        onNewGroup={() => { setGroupPickerOpen(true); setNavOpen(false) }}
         onDelete={removeSession}
         onRename={renameSession}
         onPin={pinSession}
@@ -345,6 +346,13 @@ export default function App () {
         />
       )}
       {compareOpen && <ComparePanel models={models} onClose={() => setCompareOpen(false)} />}
+      {groupPickerOpen && (
+        <div className='group-modal-backdrop' onClick={() => setGroupPickerOpen(false)}>
+          <div className='group-modal' onClick={e => e.stopPropagation()}>
+            <GroupPicker agents={config.agents || []} onStart={ids => { setGroupPickerOpen(false); newGroup(ids) }} onCancel={() => setGroupPickerOpen(false)} />
+          </div>
+        </div>
+      )}
       {settingsOpen && (
         <Settings
           config={config}
