@@ -1218,10 +1218,10 @@ function AboutPane ({ config, onSettings }) {
           ? <>Radiant is keeping <strong>{storage.sessions}</strong> chat session{storage.sessions === 1 ? '' : 's'} ({storage.sizeMB} MB) in <span className='mono'>~/.radiant</span>. Old sessions add up — clear ones you no longer need.</>
           : 'Reading local storage…'}
       </p>
-      <div className='row' style={{ gap: 8, flexWrap: 'wrap' }}>
+      <div className='row' style={{ gap: 12, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
         <button className='small-btn' onClick={() => clearOld(90)}>Clear older than 90 days</button>
         <button className='small-btn' onClick={() => clearOld(30)}>Older than 30 days</button>
-        <button className='small-btn danger' onClick={() => clearOld(0)}>Delete all sessions</button>
+        <button className='small-btn danger' style={{ marginLeft: 'auto' }} onClick={() => clearOld(0)}>Delete all sessions</button>
       </div>
 
       <div className='about-footer' style={{ marginTop: 22 }}>
