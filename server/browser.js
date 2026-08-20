@@ -9,6 +9,35 @@ let browser = null
 let context = null
 let page = null
 
+// Rolling capture of the site's XHR/fetch (JSON) traffic — the raw material for
+// deriving a reusable HTTP client from a website's hidden API.
+let captured = []
+const SENSITIVE = /^(cookie|authorization|x-csrf-token|x-xsrf-token|x-api-key|set-cookie)$/i
+function attachCapture (p) {
+  p.on('requestfinished', async req => {
+    try {
+      const rt = req.resourceType()
+      if (rt !== 'xhr' && rt !== 'fetch') return
+      const resp = await req.response()
+      const ct = (resp && resp.headers()['content-type']) || ''
+      if (!/json|graphql|text\/plain/i.test(ct)) return // API-ish only
+      let sample = null
+      try { sample = (await resp.text()).slice(0, 1500) } catch {}
+      captured.push({
+        method: req.method(),
+        url: req.url(),
+        headers: req.headers(),
+        postData: (req.postData() || '').slice(0, 1500) || null,
+        status: resp ? resp.status() : null,
+        contentType: ct,
+        responseSample: sample,
+        at: Date.now()
+      })
+      if (captured.length > 120) captured.shift()
+    } catch {}
+  })
+}
+
 async function ensure () {
   if (page && !page.isClosed()) return page
   if (!pw) pw = (await import('playwright-core')).chromium
@@ -17,6 +46,7 @@ async function ensure () {
   }
   context = context || await browser.newContext({ viewport: { width: 1280, height: 800 } })
   page = await context.newPage()
+  attachCapture(page)
   return page
 }
 
@@ -77,6 +107,19 @@ export const web = {
     const text = await p.evaluate(() => document.body.innerText.slice(0, 12000))
     return { url: p.url(), title: await p.title(), text }
   },
+  // The XHR/fetch (JSON) calls the current page made — a website's hidden API.
+  async getNetwork (filter) {
+    await ensure()
+    const f = (filter || '').toLowerCase()
+    const hits = captured.filter(c => !f || c.url.toLowerCase().includes(f))
+    const seen = new Set(); const out = []
+    for (let i = hits.length - 1; i >= 0; i--) { // newest first, dedupe by method+path
+      const key = hits[i].method + ' ' + hits[i].url.split('?')[0]
+      if (seen.has(key)) continue; seen.add(key); out.push(hits[i])
+    }
+    return out.slice(0, 25)
+  },
+  clearNetwork () { captured = []; return { ok: true } },
   // Design Mode: the user hovers/clicks an element in the real Chrome window; we
   // capture its markup, curated computed styles, and a cropped screenshot.
   async pickElement () {

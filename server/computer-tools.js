@@ -14,6 +14,7 @@ export const COMPUTER_TOOL_DEFS = [
   { name: 'browser_key', description: 'Press a key or combo in the browser, e.g. "Enter", "cmd+a".', input_schema: { type: 'object', properties: { keys: { type: 'string' } }, required: ['keys'] } },
   { name: 'browser_scroll', description: 'Scroll the browser page vertically. Positive dy scrolls up, negative down.', input_schema: { type: 'object', properties: { dy: { type: 'number' } }, required: ['dy'] } },
   { name: 'browser_read', description: 'Get the visible text of the current browser page.', input_schema: { type: 'object', properties: {}, required: [] } },
+  { name: 'browser_network', description: 'List the XHR/fetch JSON API calls the current site has made — its hidden API. Use it AFTER performing an action in the browser (search, load more, submit) to see the underlying requests (method, URL, headers, body, response sample), then recreate them as a plain HTTP client. Sensitive header values (cookies, tokens) are shown as present-but-hidden. Optional filter matches the URL.', input_schema: { type: 'object', properties: { filter: { type: 'string', description: 'Only calls whose URL contains this substring (optional).' } }, required: [] } },
   // ---- desktop ----
   { name: 'screen_screenshot', description: 'Screenshot the whole Mac desktop. Coordinates for clicks are in this image space.', input_schema: { type: 'object', properties: {}, required: [] } },
   { name: 'screen_click', description: 'Click on the desktop at coordinates from the latest screen screenshot.', input_schema: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' }, button: { type: 'string', enum: ['left', 'right'] } }, required: ['x', 'y'] } },
@@ -28,7 +29,9 @@ export const COMPUTER_TOOL_DEFS = [
 export const COMPUTER_TOOL_NAMES = new Set(COMPUTER_TOOL_DEFS.map(t => t.name))
 
 // mutating actions ask for approval; pure views (screenshots/read) don't
-export const COMPUTER_SAFE = new Set(['browser_screenshot', 'browser_read', 'screen_screenshot', 'screen_move'])
+export const COMPUTER_SAFE = new Set(['browser_screenshot', 'browser_read', 'browser_network', 'screen_screenshot', 'screen_move'])
+const SENSITIVE_HDR = /^(cookie|authorization|x-csrf-token|x-xsrf-token|x-api-key|set-cookie)$/i
+const NOISE_HDR = /^(host|connection|content-length|accept-encoding|user-agent|sec-|:)/i
 
 export async function runComputerTool (name, input) {
   try {
@@ -40,6 +43,15 @@ export async function runComputerTool (name, input) {
       case 'browser_key': { await web.key(input.keys); const img = await web.screenshot(); return { content: `Pressed ${input.keys}.`, image: img } }
       case 'browser_scroll': { await web.scroll(input.dy); const img = await web.screenshot(); return { content: 'Scrolled.', image: img } }
       case 'browser_read': { const r = await web.readText(); return { content: `${r.title} (${r.url})\n\n${r.text}` } }
+      case 'browser_network': {
+        const calls = await web.getNetwork(input.filter)
+        if (!calls.length) return { content: 'No JSON/API (XHR/fetch) calls captured yet. Navigate to the site and perform the action (search, load, submit) first, then call browser_network again.' }
+        const fmt = calls.map((c, i) => {
+          const hdrs = Object.entries(c.headers || {}).filter(([k]) => !NOISE_HDR.test(k)).map(([k, v]) => `    ${k}: ${SENSITIVE_HDR.test(k) ? '[present — sensitive; the request needs it, keep it out of shared code]' : v}`).join('\n')
+          return `[${i + 1}] ${c.method} ${c.url}\n  ${c.status} · ${c.contentType}\n  headers:\n${hdrs}${c.postData ? `\n  request body: ${c.postData}` : ''}${c.responseSample ? `\n  response sample: ${c.responseSample}` : ''}`
+        }).join('\n\n')
+        return { content: `Captured ${calls.length} API call(s), newest first:\n\n${fmt}` }
+      }
 
       case 'screen_screenshot': { const img = await screenScreenshot(); const s = await screenSize(); return { content: `Desktop screenshot (${s.width}x${s.height}).`, image: img } }
       case 'screen_click': { await desktop.click(input.x, input.y, input.button); const img = await screenScreenshot(); return { content: `Clicked (${input.x}, ${input.y}).`, image: img } }
