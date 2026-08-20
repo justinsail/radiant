@@ -89,7 +89,11 @@ export const api = {
   getShare: () => json('GET', '/api/share'),
   setShare: enabled => json('POST', '/api/share', { enabled }),
   openFile: p => json('POST', '/api/open', { path: p }),
-  answerQuestion: (id, answer) => json('POST', '/api/answer-question', { id, answer })
+  answerQuestion: (id, answer) => json('POST', '/api/answer-question', { id, answer }),
+  getMemory: () => json('GET', '/api/memory'),
+  addMemory: text => json('POST', '/api/memory', { text }),
+  deleteMemory: id => json('DELETE', `/api/memory/${id}`),
+  clearMemory: () => json('POST', '/api/memory/clear')
 }
 
 // POST /api/quantize streams progress lines back on the response body.

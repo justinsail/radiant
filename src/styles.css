@@ -169,6 +169,11 @@ code, pre, .mono { font-family: var(--font-mono); }
 .seg-btn { padding: 5px 12px; border: none; border-radius: 6px; background: none; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; }
 .seg-btn.on { background: var(--bg-raised); color: var(--text); box-shadow: var(--shadow-sm); }
 
+.memory-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-panel); margin-bottom: 6px; }
+.memory-text { flex: 1; font-size: 12.5px; color: var(--text); line-height: 1.4; }
+.memory-del { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 12px; padding: 0 2px; flex-shrink: 0; }
+.memory-del:hover { color: var(--danger); }
+
 .guide-section { margin-top: 18px; }
 .guide-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 8px; }
 .guide-item { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 7px 0; border-top: 1px solid var(--border); align-items: baseline; }
@@ -1080,7 +1085,7 @@ button.hf-head:hover { background: var(--bg-hover); }
 .attach-x { border: none; background: none; color: var(--text-faint); font-size: 11px; padding: 0 2px; }
 .attach-x:hover { color: var(--danger); }
 .attach-btn {
-  width: 28px; height: 28px; border-radius: 8px;
+  width: 28px; height: 28px; padding: 0; border-radius: 8px;
   border: 1px solid var(--border); background: var(--bg-panel);
   color: var(--text-muted); font-size: 16px; line-height: 1;
   display: grid; place-items: center; flex-shrink: 0;

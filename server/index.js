@@ -14,6 +14,7 @@ import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAcces
 import { checkForUpdate } from './updater.js'
 import { ollamaBin, SPAWN_ENV } from './ollama.js'
 import { commandRisk } from './util.js'
+import { listFacts, addFacts, addFactManual, deleteFact, clearFacts, relevantFacts } from './memory.js'
 
 const PORT = Number(process.env.RADIANT_PORT || 5834)
 const app = express()
@@ -359,6 +360,12 @@ app.post('/api/open', (req, res) => {
   if (!p || !fs.existsSync(p)) return res.status(400).json({ error: 'no such file' })
   try { spawn('open', [p], { detached: true, stdio: 'ignore' }).unref(); res.json({ ok: true }) } catch (e) { res.status(500).json({ error: e.message }) }
 })
+
+// ---------- memory ----------
+app.get('/api/memory', (req, res) => res.json({ facts: listFacts() }))
+app.post('/api/memory', (req, res) => { addFactManual(String(req.body?.text || '')); res.json({ facts: listFacts() }) })
+app.delete('/api/memory/:id', (req, res) => { deleteFact(req.params.id); res.json({ facts: listFacts() }) })
+app.post('/api/memory/clear', (req, res) => { clearFacts(); res.json({ facts: [] }) })
 
 // ---------- skills ----------
 app.post('/api/skills', (req, res) => {
@@ -952,6 +959,9 @@ app.post('/api/chat', async (req, res) => {
     return out
   }
 
+  const memoryOn = config.settings.memory !== false
+  const memory = memoryOn ? relevantFacts(text, session.cwd) : []
+
   const common = {
     provider,
     model: session.model,
@@ -959,6 +969,7 @@ app.post('/api/chat', async (req, res) => {
     getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
     getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
     session,
+    memory,
     summarize,
     autoCompact: config.settings.autoCompact !== false,
     mcpTools,
@@ -1021,6 +1032,28 @@ app.post('/api/chat', async (req, res) => {
         } catch {}
       }
       if (t) { session.title = t; emit({ type: 'title', title: t }) }
+    }
+    // distill durable facts into long-term memory (best-effort, after the turn)
+    if (memoryOn && !session.group && !controller.signal.aborted) {
+      try {
+        const lastUser = [...session.messages].reverse().find(m => m.role === 'user')
+        const lastAsst = [...session.messages].reverse().find(m => m.role === 'assistant')
+        const exchange = `User: ${(lastUser?.text || '').slice(0, 1500)}\n\nAssistant: ${(lastAsst?.parts || []).filter(p => p.type === 'text').map(p => p.text).join(' ').slice(0, 1500)}`
+        const tmp = { cwd: session.cwd, messages: [{ role: 'user', text: `From this exchange, extract any NEW durable facts worth remembering long-term about the USER or their PROJECT — preferences, decisions, names, conventions, tools/environment, or goals. Only lasting facts, not task-specific chatter or one-off requests. Write each as a short standalone sentence, one per line. If there is nothing durable, reply exactly "none".\n\n${exchange}` }] }
+        let out = ''
+        await runTurn({
+          provider, model: session.model, apiKey,
+          getAccessToken: hasOAuth ? () => validAccessToken(provider.id, config, saveConfig) : null,
+          getAccountId: hasOAuth ? () => config.oauth[provider.id]?.accountId || null : null,
+          session: tmp, useTools: false, computerControl: false, persona: '', skills: [],
+          emit: ev => { if (ev.type === 'text_delta') out += ev.text },
+          requestApproval: null, signal: controller.signal
+        })
+        if (out && !/^\s*none\b/i.test(out.trim())) {
+          const n = addFacts(out.split('\n').map(l => l.trim()).filter(Boolean), session.cwd)
+          if (n) emit({ type: 'memory_added', count: n })
+        }
+      } catch {}
     }
   } catch (e) {
     if (!controller.signal.aborted) emit({ type: 'error', message: e.message })

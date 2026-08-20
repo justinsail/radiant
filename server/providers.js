@@ -6,8 +6,11 @@ import { COMPUTER_TOOL_DEFS, COMPUTER_TOOL_NAMES, COMPUTER_SAFE, runComputerTool
 
 const MAX_ROUNDS = 30
 
-function systemPrompt (cwd, useTools, model, computerControl, skills, persona, planMode) {
+function systemPrompt (cwd, useTools, model, computerControl, skills, persona, planMode, memory) {
   const personaText = persona ? `\n\n${persona}` : ''
+  const memoryText = (memory && memory.length)
+    ? `\n\nWhat you remember about this user and their projects (from past sessions — use it when relevant, don't recite it):\n${memory.map(f => `• ${f}`).join('\n')}`
+    : ''
   const planText = planMode
     ? '\n\nPLAN MODE IS ON. Do NOT edit files, create files, or run mutating commands yet. Research the codebase (read/list/grep only), think through the approach, then present a concrete step-by-step plan by calling the exit_plan_mode tool with your plan in markdown. Only after the user approves the plan will you be able to make changes.'
     : ''
@@ -18,7 +21,7 @@ function systemPrompt (cwd, useTools, model, computerControl, skills, persona, p
 Workspace directory: ${cwd}
 ${useTools ? 'You have tools to read, write, and edit files and to run shell commands in the workspace. Use them to investigate before answering and to make changes when asked. Prefer edit_file for small changes and write_file for new files. After making changes, verify them when practical (run the code, run tests).' : 'Tools are disabled for this conversation; answer from knowledge and the conversation only.'}${computerControl ? `
 You can also control the computer. browser_* tools drive an automated browser; screen_* tools control the whole desktop. ALWAYS take a screenshot first (browser_screenshot / screen_screenshot) and look at it before clicking or typing — click coordinates are pixel positions read from the most recent screenshot. Work in small steps: screenshot, act, screenshot again to confirm. Prefer browser_* for web tasks.` : ''}
-Be direct and concise. Use markdown; fence code blocks with a language tag. When you finish a task, summarize what changed in a sentence or two.${planText}${skillText}`
+Be direct and concise. Use markdown; fence code blocks with a language tag. When you finish a task, summarize what changed in a sentence or two.${planText}${skillText}${memoryText}`
 }
 
 // ---------- internal message format -> provider wire formats ----------
@@ -437,9 +440,9 @@ async function compactSession (session, keepRecent, summarize, emit) {
 }
 
 // ---------- the agent loop ----------
-export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, agentId, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
+export async function runTurn ({ provider, model, apiKey, getAccessToken, getAccountId, session, useTools, computerControl, skills, persona, memory, agentId, mcpTools, callMcp, askAgent, peerAgents, planMode, onPlanExit, summarize, autoCompact, emit, requestApproval, requestUserChoice, signal }) {
   const cwd = session.cwd || os.homedir()
-  const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona, planMode)
+  const system = systemPrompt(cwd, useTools, model, computerControl, skills, persona, planMode, memory)
   // proactive compaction before a very long turn
   if (autoCompact && summarize && estimateTokens(session.messages) > PROACTIVE_TOKENS) {
     await compactSession(session, 4, summarize, emit)

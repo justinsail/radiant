@@ -1138,6 +1138,47 @@ const GUIDE = [
   }
 ]
 
+function MemoryPane ({ config, onSettings }) {
+  const [facts, setFacts] = useState(null)
+  const [draft, setDraft] = useState('')
+  const on = config.settings.memory !== false
+  const load = () => api.getMemory().then(d => setFacts(d.facts)).catch(() => setFacts([]))
+  useEffect(() => { load() }, [])
+  const add = async () => { if (!draft.trim()) return; setFacts((await api.addMemory(draft.trim())).facts); setDraft('') }
+  const del = async id => setFacts((await api.deleteMemory(id)).facts)
+  const clear = async () => { if (window.confirm('Forget everything Radiant has remembered?')) setFacts((await api.clearMemory()).facts) }
+  return (
+    <div className='set-section'>
+      <h3>Memory</h3>
+      <p className='hint' style={{ marginTop: 0 }}>Radiant remembers durable facts about you and your projects across sessions, and gives the relevant ones to the agent. Everything is stored locally in <code className='mono'>~/.radiant/memory.json</code>.</p>
+      <label className='check-row'>
+        <input type='checkbox' checked={on} onChange={e => onSettings({ memory: e.target.checked })} />
+        <span>Remember across sessions <span className='desc'>— learn from each chat and recall it later</span></span>
+      </label>
+      <div className='row' style={{ marginTop: 12 }}>
+        <input className='text-input' style={{ flex: 1 }} placeholder='Add something to remember…' value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
+        <button className='small-btn primary' onClick={add} disabled={!draft.trim()}>Add</button>
+      </div>
+      <div style={{ marginTop: 14 }}>
+        {facts === null ? <div className='v-meta'>Loading…</div>
+          : !facts.length ? <div className='v-meta'>Nothing remembered yet — Radiant will learn as you chat.</div>
+          : <>
+              <div className='row' style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                <span className='v-meta'>{facts.length} remembered</span>
+                <button className='small-btn danger' onClick={clear}>Forget all</button>
+              </div>
+              {facts.slice().reverse().map(f => (
+                <div key={f.id} className='memory-item'>
+                  <span className='memory-text'>{f.text}</span>
+                  <button className='memory-del' title='Forget this' onClick={() => del(f.id)}>✕</button>
+                </div>
+              ))}
+            </>}
+      </div>
+    </div>
+  )
+}
+
 function GuidePane () {
   return (
     <div className='set-section guide'>
@@ -1165,6 +1206,7 @@ const TABS = [
   { id: 'agents', label: 'Agents' },
   { id: 'skills', label: 'Skills' },
   { id: 'mcp', label: 'MCP' },
+  { id: 'memory', label: 'Memory' },
   { id: 'devices', label: 'Devices' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'agent', label: 'Automation' },
@@ -1194,6 +1236,7 @@ export default function Settings ({ config, initialTab = 'providers', embedded =
           {tab === 'agents' && <AgentsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'skills' && <SkillsPane config={config} onConfigChange={onConfigChange} />}
           {tab === 'mcp' && <McpPane config={config} onConfigChange={onConfigChange} />}
+          {tab === 'memory' && <MemoryPane config={config} onSettings={onSettings} />}
           {tab === 'devices' && <DevicesPane />}
           {tab === 'appearance' && <AppearancePane config={config} onSettings={onSettings} />}
           {tab === 'agent' && <AgentPane config={config} onSettings={onSettings} />}
