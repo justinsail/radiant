@@ -740,6 +740,22 @@ code, pre, .mono { font-family: var(--font-mono); }
   position: relative;
 }
 .composer-box:focus-within { border-color: var(--accent); }
+/* Border beam — a light travels the composer edge while an agent is working.
+   Dependency-free take on border-beam / transitions.dev, themed to the accent. */
+@property --beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.composer-box.beam::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 1;
+  background: conic-gradient(from var(--beam-angle),
+    transparent 0deg, transparent 300deg,
+    oklch(0.72 0.17 var(--accent-h)) 336deg,
+    oklch(0.95 0.05 var(--accent-h)) 352deg,
+    oklch(0.72 0.17 var(--accent-h)) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+  animation: beam-spin 2.6s linear infinite;
+}
+@keyframes beam-spin { to { --beam-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .composer-box.beam::before { animation: none; } }
 .composer textarea {
   border: none; outline: none; background: none; resize: none;
   line-height: 1.5; max-height: 200px; padding: 2px 4px;

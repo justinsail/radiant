@@ -726,7 +726,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
           </div>
         )}
         <div
-          className={'composer-box' + (dragOver ? ' drag-over' : '')}
+          className={'composer-box' + (dragOver ? ' drag-over' : '') + (streaming ? ' beam' : '')}
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files) }}
