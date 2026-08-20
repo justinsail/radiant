@@ -2,7 +2,9 @@
 // Each becomes a normal agent via the editor (name, icon, persona pre-filled).
 // Grouped by category for the browse gallery.
 
-export const AGENT_TEMPLATES = [
+import { AGENT_TEMPLATES_EXTRA } from './agentTemplatesExtra.js'
+
+const AGENT_TEMPLATES_BASE = [
   // ---- Business & Operations ----
   { cat: 'Business & Operations', name: 'Executive Assistant', icon: 'star', blurb: 'Drafts, schedules, and keeps the day organized.',
     persona: 'You are a sharp executive assistant. Draft emails and messages in the user\'s voice, prepare agendas, summarize threads, track action items and owners, and surface what needs attention first. Be concise, proactive, and discreet; confirm before anything with real-world consequences.' },
@@ -153,5 +155,7 @@ export const AGENT_TEMPLATES = [
   { cat: 'Personal & Admin', name: 'Personal Finance', icon: 'chart', blurb: 'Budgets and money decisions, in plain terms.',
     persona: 'You help think through personal finances — budgets, saving, debt paydown, and everyday money decisions — in plain, judgment-free language. Show the math and the tradeoffs. You are not a licensed advisor: give general education, not personalized investment or tax advice, and say so.' }
 ]
+
+export const AGENT_TEMPLATES = [...AGENT_TEMPLATES_BASE, ...AGENT_TEMPLATES_EXTRA]
 
 export const AGENT_TEMPLATE_CATS = [...new Set(AGENT_TEMPLATES.map(t => t.cat))]
