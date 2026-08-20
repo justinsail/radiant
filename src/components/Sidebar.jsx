@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Icon } from './Icons.jsx'
 import { AgentGlyph } from './AgentIcons.jsx'
+import { GroupPicker } from './Chat.jsx'
 import { api } from '../api.js'
 
 function UsageChip () {
@@ -52,8 +53,9 @@ function UsageChip () {
 const MIN_W = 190
 const MAX_W = 460
 
-export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate }) {
+export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onNewGroup, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate }) {
   const agentOf = id => agents.find(a => a.id === id)
+  const [groupOpen, setGroupOpen] = useState(false)
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem('radiant.sidebarWidth'))
     return saved >= MIN_W && saved <= MAX_W ? saved : 248
@@ -132,6 +134,9 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         <button className={view === 'bots' ? 'on' : ''} onClick={() => setView('bots')}>Agents</button>
       </div>
       <button className='new-session' onClick={() => onNew()}>+ New session</button>
+      {view === 'bots' && agents.length >= 2 && onNewGroup && (
+        <button className='new-group-btn' onClick={() => setGroupOpen(true)}>👥 New group chat</button>
+      )}
       {view === 'chats' && (
         <input className='session-search' placeholder='Search all sessions…' value={search}
           onChange={e => setSearch(e.target.value)} />
@@ -196,6 +201,13 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         </button>
       </div>
       <div className='sidebar-resize' onMouseDown={startDrag} title='Drag to resize' />
+      {groupOpen && (
+        <div className='group-modal-backdrop' onClick={() => setGroupOpen(false)}>
+          <div className='group-modal' onClick={e => e.stopPropagation()}>
+            <GroupPicker agents={agents} onStart={ids => { setGroupOpen(false); onNewGroup(ids) }} onCancel={() => setGroupOpen(false)} />
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

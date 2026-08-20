@@ -382,6 +382,31 @@ const ASK_USER_TOOL = {
   }
 }
 
+const SHOW_WIDGET_TOOL = {
+  name: 'show_widget',
+  description: 'Render a rich inline widget in the chat instead of (or alongside) plain prose, when structured data would land better than a paragraph. Use it for: a comparison table, a set of key stats/metrics, a before/after code diff, or a decision card offering the user a few choices. Keep it focused — one widget per call, and still write a short sentence of prose around it. Do NOT use it for ordinary explanations that read fine as text.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: ['stats', 'table', 'diff', 'choices'], description: 'stats = metric cards; table = rows/columns; diff = before/after code; choices = a decision card (clicking a choice sends it back as the user\'s answer).' },
+      title: { type: 'string', description: 'Optional heading for the widget.' },
+      // stats
+      stats: { type: 'array', description: 'For kind=stats: metric cards.', items: { type: 'object', properties: { label: { type: 'string' }, value: { type: 'string' }, delta: { type: 'string', description: 'Optional change, e.g. "+12%"' }, tone: { type: 'string', enum: ['neutral', 'positive', 'caution', 'negative'] } }, required: ['label', 'value'] } },
+      // table
+      columns: { type: 'array', description: 'For kind=table: column headers.', items: { type: 'string' } },
+      rows: { type: 'array', description: 'For kind=table: each row is an array of cell strings matching columns.', items: { type: 'array', items: { type: 'string' } } },
+      // diff
+      language: { type: 'string', description: 'For kind=diff: language hint, e.g. "js".' },
+      before: { type: 'string', description: 'For kind=diff: the original code.' },
+      after: { type: 'string', description: 'For kind=diff: the changed code.' },
+      // choices
+      question: { type: 'string', description: 'For kind=choices: the prompt shown above the options.' },
+      options: { type: 'array', description: 'For kind=choices: the selectable answers.', items: { type: 'object', properties: { label: { type: 'string' }, detail: { type: 'string', description: 'Optional one-line explanation.' }, tone: { type: 'string', enum: ['neutral', 'positive', 'caution', 'negative'] } }, required: ['label'] } }
+    },
+    required: ['kind']
+  }
+}
+
 const EXIT_PLAN_TOOL = {
   name: 'exit_plan_mode',
   description: 'Call this when your plan is ready, to present it to the user for approval. Pass the full plan as markdown. If approved, plan mode turns off and you may start making changes; if not, incorporate their feedback and keep planning.',
@@ -462,6 +487,7 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
     ...(computerControl ? COMPUTER_TOOL_DEFS : []),
     ...(mcpTools || []),
     ...(canAskAgents ? [askAgentToolDef(peerAgents)] : []),
+    SHOW_WIDGET_TOOL,
     ...(requestUserChoice ? [ASK_USER_TOOL] : []),
     ...(planMode ? [EXIT_PLAN_TOOL] : [])
   ]
@@ -543,6 +569,13 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
         const done = todos.filter(t => t.status === 'done').length
         part.result = `Todo list updated (${done}/${todos.length} done).`
         part.hidden = true // shown as the checklist widget, not a tool chip
+      } else if (call.name === 'show_widget') {
+        // the tool's arguments ARE the widget spec; the client renders it inline.
+        part.widget = call.args || {}
+        part.hidden = true // shown as a widget, not a tool chip
+        part.result = call.args?.kind === 'choices'
+          ? 'Decision card shown. The option the user clicks will arrive as their next message.'
+          : 'Widget shown to the user.'
       } else if (call.name === 'ask_user' && requestUserChoice) {
         const answer = await requestUserChoice(call.args?.question || 'Which option?', call.args?.options)
         part.result = `The user answered: ${answer}`

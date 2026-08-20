@@ -168,7 +168,64 @@ function ThinkingTrace ({ thinking, active, seconds }) {
   )
 }
 
-function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming, model, agent }) {
+// a rich inline widget the agent chose to render (show_widget tool)
+function AgentWidget ({ spec, onChoose }) {
+  if (!spec || !spec.kind) return null
+  const toneClass = t => t ? ' tone-' + t : ''
+  return (
+    <div className='agent-widget'>
+      {spec.title && <div className='agent-widget-title'>{spec.title}</div>}
+      {spec.kind === 'stats' && (
+        <div className='widget-stats'>
+          {(spec.stats || []).map((s, i) => (
+            <div key={i} className={'widget-stat' + toneClass(s.tone)}>
+              <div className='widget-stat-value'>{s.value}</div>
+              <div className='widget-stat-label'>{s.label}</div>
+              {s.delta && <div className='widget-stat-delta'>{s.delta}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+      {spec.kind === 'table' && (
+        <div className='widget-table-wrap'>
+          <table className='widget-table'>
+            {spec.columns?.length ? <thead><tr>{spec.columns.map((c, i) => <th key={i}>{c}</th>)}</tr></thead> : null}
+            <tbody>
+              {(spec.rows || []).map((row, i) => <tr key={i}>{(row || []).map((cell, j) => <td key={j}>{cell}</td>)}</tr>)}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {spec.kind === 'diff' && (
+        <div className='widget-diff'>
+          <div className='widget-diff-col'>
+            <div className='widget-diff-head before'>− before</div>
+            <pre><code>{spec.before || ''}</code></pre>
+          </div>
+          <div className='widget-diff-col'>
+            <div className='widget-diff-head after'>+ after</div>
+            <pre><code>{spec.after || ''}</code></pre>
+          </div>
+        </div>
+      )}
+      {spec.kind === 'choices' && (
+        <div className='widget-choices'>
+          {spec.question && <div className='widget-choices-q'>{spec.question}</div>}
+          <div className='widget-choices-list'>
+            {(spec.options || []).map((o, i) => (
+              <button key={i} className={'widget-choice' + toneClass(o.tone)} onClick={() => onChoose && onChoose(o.label)}>
+                <span className='widget-choice-label'>{o.label}</span>
+                {o.detail && <span className='widget-choice-detail'>{o.detail}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming, model, agent, onChoose }) {
   return (
     <div className='msg msg-assistant'>
       <div className='who'>
@@ -181,7 +238,10 @@ function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, stre
       {thinking ? <ThinkingTrace thinking={thinking} active={Boolean(thinkingActive)} seconds={thinkingSecs} /> : null}
       {parts.map((p, i) => {
         if (p.type === 'text') return <Markdown key={i} text={p.text} />
-        if (p.type === 'tool') return (p.name === 'todo_write' || p.hidden) ? null : <ToolChip key={p.id || i} part={p} />
+        if (p.type === 'tool') {
+          if (p.widget || p.name === 'show_widget') return <AgentWidget key={p.id || i} spec={p.widget || p.args} onChoose={onChoose} />
+          return (p.name === 'todo_write' || p.hidden) ? null : <ToolChip key={p.id || i} part={p} />
+        }
         if (p.type === 'notice') return <div key={i} className='notice'>{p.text}</div>
         return null
       })}
@@ -361,7 +421,7 @@ function RecipeMenu ({ recipes, onUse }) {
   )
 }
 
-function GroupPicker ({ agents, onStart, onCancel }) {
+export function GroupPicker ({ agents, onStart, onCancel }) {
   const [sel, setSel] = useState([])
   const toggle = id => setSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
   return (
@@ -458,6 +518,13 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
     setAttachments([])
   }
 
+  // clicking an option in a decision-card widget sends it as the answer
+  const onWidgetChoice = label => {
+    if (!label || !session) return
+    if (streaming) { setQueued(q => [...q, { text: label, attachments: [] }]); return }
+    onSend({ text: label, attachments: [] })
+  }
+
   if (!session) {
     return (
       <main className='main'>
@@ -544,7 +611,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
                     }}>↺ edit &amp; retry</button>
                   )}
                 </div>
-              : <AssistantMessage key={i} parts={m.parts || []} model={m.model} agent={m.agentId ? agents.find(a => a.id === m.agentId) || sessionAgent : sessionAgent} />
+              : <AssistantMessage key={i} parts={m.parts || []} model={m.model} agent={m.agentId ? agents.find(a => a.id === m.agentId) || sessionAgent : sessionAgent} onChoose={onWidgetChoice} />
           )}
           {live && (
             <AssistantMessage
@@ -555,6 +622,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
               thinkingActive={live.thinkingActive}
               thinkingSecs={live.thinkingSecs}
               streaming={live.streaming}
+              onChoose={onWidgetChoice}
             />
           )}
           {approval && (

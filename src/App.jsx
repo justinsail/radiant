@@ -183,6 +183,7 @@ export default function App () {
           case 'tool_start':
             endThinking()
             if (ev.name === 'todo_write') break // rendered as the checklist, not a chip
+            if (ev.name === 'show_widget') { liveMsg.parts.push({ type: 'tool', id: ev.id, name: 'show_widget', widget: ev.args, hidden: true }); break } // rendered as a rich widget
             liveMsg.parts.push({ type: 'tool', id: ev.id, name: ev.name, args: ev.args, pending: true })
             setActivity(a => [...a, { id: ev.id, name: ev.name, args: ev.args, at: Date.now() }])
             setRightOpen(true)
@@ -268,6 +269,7 @@ export default function App () {
         working={Boolean(live?.streaming)}
         onOpen={id => { openSession(id); setNavOpen(false) }}
         onNew={(...a) => { newSession(...a); setNavOpen(false) }}
+        onNewGroup={ids => { newGroup(ids); setNavOpen(false) }}
         onDelete={removeSession}
         onRename={renameSession}
         onPin={pinSession}
