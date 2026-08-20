@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { fetchRetry, isTransient } from './util.js'
 import { TOOL_DEFS, runTool } from './tools.js'
 import { COMPUTER_TOOL_DEFS, COMPUTER_TOOL_NAMES, COMPUTER_SAFE, runComputerTool } from './computer-tools.js'
+import { COPILOT_HEADERS } from './oauth.js'
 
 const MAX_ROUNDS = 30
 
@@ -233,12 +234,12 @@ async function anthropicRound ({ baseUrl, apiKey, accessToken, model, messages, 
   return { parts, stopOnTools: stopReason === 'tool_use' }
 }
 
-async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, tools, toolDefs, emit, signal }) {
+async function openaiRound ({ baseUrl, apiKey, accessToken, model, messages, tools, toolDefs, extraHeaders, emit, signal }) {
   const body = { model, messages, stream: true }
   if (tools) {
     body.tools = (toolDefs || TOOL_DEFS).map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }))
   }
-  const headers = { 'content-type': 'application/json' }
+  const headers = { 'content-type': 'application/json', ...(extraHeaders || {}) }
   const bearer = accessToken || apiKey
   if (bearer) headers.authorization = `Bearer ${bearer}`
   const res = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers, body: JSON.stringify(body), signal })
@@ -528,6 +529,7 @@ export async function runTurn ({ provider, model, apiKey, getAccessToken, getAcc
       system,
       tools: toolsEnabled,
       toolDefs,
+      extraHeaders: provider.id === 'copilot' ? COPILOT_HEADERS : undefined,
       emit: emitS,
       signal
     }
@@ -660,7 +662,7 @@ export async function listModels (provider, apiKey, accessToken, accountId) {
       const list = (data.data || []).map(m => ({ id: m.id, label: m.display_name || m.id }))
       return list.length ? list : fallback(provider, accessToken)
     }
-    const headers = {}
+    const headers = provider.id === 'copilot' ? { ...COPILOT_HEADERS } : {}
     const bearer = accessToken || apiKey
     if (bearer) headers.authorization = `Bearer ${bearer}`
     const res = await fetch(`${provider.baseUrl}/models`, { headers, signal: AbortSignal.timeout(6000) })

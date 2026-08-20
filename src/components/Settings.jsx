@@ -87,6 +87,8 @@ function ProviderRow ({ provider, oauthInfo, onConfig }) {
             </>
           : provider.auth === 'none'
             ? <span className='key-ok'>no key needed</span>
+            : provider.auth === 'oauth'
+              ? <span className='v-meta'>Sign in below ↓</span>
             : provider.hasKey
               ? <>
                   <span className='key-ok'>✓ key saved</span>

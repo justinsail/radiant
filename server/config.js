@@ -15,6 +15,7 @@ const DEFAULT_CONFIG = {
     { id: 'openrouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1', auth: 'key', removable: false },
     { id: 'nousresearch', name: 'Nous Portal', type: 'openai', baseUrl: 'https://inference-api.nousresearch.com/v1', auth: 'key', removable: false, hint: 'Sign in with your Nous Portal subscription below — or paste an API key from portal.nousresearch.com → API Keys.' },
     { id: 'xai', name: 'xAI (Grok)', type: 'openai', baseUrl: 'https://api.x.ai/v1', auth: 'key', removable: false, hint: 'Sign in with your Grok subscription below (SuperGrok / Premium+) — or paste an xAI API key from console.x.ai.' },
+    { id: 'copilot', name: 'GitHub Copilot', type: 'openai', baseUrl: 'https://api.githubcopilot.com', auth: 'oauth', removable: false, hint: 'Sign in with your GitHub Copilot subscription below — it unlocks GPT, Claude, and Gemini models through Copilot.' },
     // Pre-configured API-key services (OpenAI-compatible). Removable — hide any you don't use.
     { id: 'deepseek', name: 'DeepSeek', type: 'openai', baseUrl: 'https://api.deepseek.com', auth: 'key', removable: true, preset: true, hint: 'deepseek-chat & deepseek-reasoner. Key at platform.deepseek.com.' },
     { id: 'moonshot', name: 'Kimi (Moonshot)', type: 'openai', baseUrl: 'https://api.moonshot.ai/v1', auth: 'key', removable: true, preset: true, hint: 'Kimi models. Key at platform.moonshot.ai.' },

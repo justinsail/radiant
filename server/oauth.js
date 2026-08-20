@@ -44,7 +44,34 @@ export const OAUTH_PROVIDERS = {
     tokenUrl: 'https://auth.x.ai/oauth2/token',
     clientId: 'b1a00492-073a-47ea-816f-4c329264a828', // public client id used by the grok CLI
     scope: 'openid profile email offline_access grok-cli:access api:access'
+  },
+  copilot: {
+    label: 'GitHub Copilot',
+    mode: 'device', // GitHub device flow → a GitHub token, then exchanged for a short-lived Copilot token
+    deviceCodeUrl: 'https://github.com/login/device/code',
+    tokenUrl: 'https://github.com/login/oauth/access_token',
+    clientId: 'Iv1.b507a08c87ecfe98', // the public VS Code Copilot client id
+    scope: 'read:user',
+    custom: 'copilot'
   }
+}
+
+// Copilot editor identification headers, required on every api.githubcopilot.com call.
+export const COPILOT_HEADERS = {
+  'Copilot-Integration-Id': 'vscode-chat',
+  'Editor-Version': 'vscode/1.95.0',
+  'Editor-Plugin-Version': 'copilot-chat/0.22.0',
+  'Openai-Intent': 'conversation-panel'
+}
+
+// Exchange a GitHub OAuth token for a short-lived Copilot API token.
+async function exchangeCopilot (githubToken) {
+  const res = await fetch('https://api.github.com/copilot_internal/v2/token', {
+    headers: { authorization: `token ${githubToken}`, accept: 'application/json', ...COPILOT_HEADERS }
+  })
+  if (!res.ok) throw new Error(res.status === 403 ? 'This GitHub account has no active Copilot subscription.' : `Copilot token exchange failed (${res.status})`)
+  const j = await res.json()
+  return { token: j.token, expires: (j.expires_at ? j.expires_at * 1000 : Date.now() + 25 * 60_000) }
 }
 
 const b64url = buf => buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -170,7 +197,7 @@ export async function startDevice (providerId) {
   if (!p || p.mode !== 'device') throw new Error('not a device-code provider')
   const res = await fetch(p.deviceCodeUrl, {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
     body: new URLSearchParams({ client_id: p.clientId, scope: p.scope })
   })
   if (!res.ok) throw new Error(`couldn't start sign-in (${res.status})`)
@@ -191,12 +218,17 @@ export async function pollDevice (providerId) {
   if (!flow?.deviceCode) throw new Error('no sign-in in progress — start again')
   const res = await fetch(p.tokenUrl, {
     method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: p.clientId, device_code: flow.deviceCode })
   })
   const j = await res.json().catch(() => ({}))
   if (res.ok && j.access_token) {
     pending.delete(providerId)
+    // Copilot: the GitHub token is only the first leg — exchange it for a Copilot API token.
+    if (p.custom === 'copilot') {
+      const cop = await exchangeCopilot(j.access_token)
+      return { done: true, token: { github: j.access_token, access: cop.token, expires: cop.expires } }
+    }
     return { done: true, token: { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + (j.expires_in ? j.expires_in * 1000 : 300_000) } }
   }
   if (j.error === 'authorization_pending' || j.error === 'slow_down') return { done: false }
@@ -238,6 +270,14 @@ async function refreshNous (tok) {
 export async function validAccessToken (providerId, config, saveConfig) {
   const tok = config.oauth?.[providerId]
   if (!tok) return null
+  // Copilot: re-mint the short-lived Copilot token from the stored GitHub token.
+  if (providerId === 'copilot') {
+    if (tok.expires - Date.now() > 120_000) return tok.access
+    const cop = await exchangeCopilot(tok.github)
+    config.oauth.copilot = { github: tok.github, access: cop.token, expires: cop.expires }
+    saveConfig(config)
+    return cop.token
+  }
   // Nous invoke JWTs are short-lived; refresh with a wider skew and its own flow.
   const skew = providerId === 'nousresearch' ? 130_000 : 60_000
   if (tok.expires - Date.now() > skew) return tok.access
