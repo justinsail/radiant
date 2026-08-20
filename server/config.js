@@ -16,6 +16,7 @@ const DEFAULT_CONFIG = {
     { id: 'nousresearch', name: 'Nous Portal', type: 'openai', baseUrl: 'https://inference-api.nousresearch.com/v1', auth: 'key', removable: false, hint: 'Sign in with your Nous Portal subscription below — or paste an API key from portal.nousresearch.com → API Keys.' },
     { id: 'xai', name: 'xAI (Grok)', type: 'openai', baseUrl: 'https://api.x.ai/v1', auth: 'key', removable: false, hint: 'Sign in with your Grok subscription below (SuperGrok / Premium+) — or paste an xAI API key from console.x.ai.' },
     { id: 'copilot', name: 'GitHub Copilot', type: 'openai', baseUrl: 'https://api.githubcopilot.com', auth: 'oauth', removable: false, hint: 'Sign in with your GitHub Copilot subscription below — it unlocks GPT, Claude, and Gemini models through Copilot.' },
+    { id: 'qwen', name: 'Qwen', type: 'openai', baseUrl: 'https://portal.qwen.ai/v1', auth: 'oauth', removable: false, hint: 'Sign in with your Qwen (chat.qwen.ai) subscription below.' },
     // Pre-configured API-key services (OpenAI-compatible). Removable — hide any you don't use.
     { id: 'deepseek', name: 'DeepSeek', type: 'openai', baseUrl: 'https://api.deepseek.com', auth: 'key', removable: true, preset: true, hint: 'deepseek-chat & deepseek-reasoner. Key at platform.deepseek.com.' },
     { id: 'moonshot', name: 'Kimi (Moonshot)', type: 'openai', baseUrl: 'https://api.moonshot.ai/v1', auth: 'key', removable: true, preset: true, hint: 'Kimi models. Key at platform.moonshot.ai.' },
@@ -26,7 +27,8 @@ const DEFAULT_CONFIG = {
     { id: 'fireworks', name: 'Fireworks', type: 'openai', baseUrl: 'https://api.fireworks.ai/inference/v1', auth: 'key', removable: true, preset: true, hint: 'Open models. Key at fireworks.ai.' },
     { id: 'cerebras', name: 'Cerebras', type: 'openai', baseUrl: 'https://api.cerebras.ai/v1', auth: 'key', removable: true, preset: true, hint: 'Very fast inference. Key at cloud.cerebras.ai.' },
     { id: 'perplexity', name: 'Perplexity', type: 'openai', baseUrl: 'https://api.perplexity.ai', auth: 'key', removable: true, preset: true, hint: 'Sonar models. Key at perplexity.ai/settings/api.' },
-    { id: 'vercel', name: 'Vercel AI Gateway', type: 'openai', baseUrl: 'https://ai-gateway.vercel.sh/v1', auth: 'key', removable: true, preset: true, hint: 'Routes to many models. Key from your Vercel dashboard.' }
+    { id: 'vercel', name: 'Vercel AI Gateway', type: 'openai', baseUrl: 'https://ai-gateway.vercel.sh/v1', auth: 'key', removable: true, preset: true, hint: 'Routes to many models. Key from your Vercel dashboard.' },
+    { id: 'ollama-cloud', name: 'Ollama Cloud', type: 'openai', baseUrl: 'https://ollama.com/v1', auth: 'key', removable: true, preset: true, hint: 'Cloud-hosted Ollama models. Key at ollama.com/settings/keys.' }
   ],
   removedProviders: [],
   keys: {},

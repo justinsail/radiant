@@ -536,7 +536,8 @@ app.get('/api/models', async (req, res) => {
     const hasOAuth = Boolean(config.oauth[p.id])
     if ((p.auth === 'key' || p.auth === 'oauth') && !hasKey && !hasOAuth) return []
     const accessToken = hasOAuth ? await validAccessToken(p.id, config, saveConfig).catch(() => null) : null
-    const models = await listModels(p, config.keys[p.id], accessToken, hasOAuth ? config.oauth[p.id]?.accountId : null)
+    const prov = (p.id === 'qwen' && config.oauth.qwen?.apiBase) ? { ...p, baseUrl: config.oauth.qwen.apiBase } : p
+    const models = await listModels(prov, config.keys[p.id], accessToken, hasOAuth ? config.oauth[p.id]?.accountId : null)
     models.sort((a, b) => a.id.localeCompare(b.id))
     return models.map(m => ({ ...m, provider: p.id, providerName: p.name }))
   }))
@@ -905,8 +906,10 @@ app.post('/api/chat', async (req, res) => {
   if (!session) return res.status(404).json({ error: 'session not found' })
   if (activeTurns.has(sessionId)) return res.status(409).json({ error: 'a turn is already running' })
 
-  const provider = config.providers.find(p => p.id === session.provider)
+  let provider = config.providers.find(p => p.id === session.provider)
   if (!provider) return res.status(400).json({ error: 'Pick a model first — no provider set on this session.' })
+  // Qwen's OAuth token names the API host to use; honour it over the default.
+  if (provider.id === 'qwen' && config.oauth.qwen?.apiBase) provider = { ...provider, baseUrl: config.oauth.qwen.apiBase }
   const apiKey = config.keys[provider.id]
   const hasOAuth = Boolean(config.oauth[provider.id])
   if (provider.auth === 'key' && !apiKey && !hasOAuth) return res.status(400).json({ error: `No API key or subscription sign-in for ${provider.name}. Add one in Settings.` })

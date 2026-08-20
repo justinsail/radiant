@@ -53,6 +53,16 @@ export const OAUTH_PROVIDERS = {
     clientId: 'Iv1.b507a08c87ecfe98', // the public VS Code Copilot client id
     scope: 'read:user',
     custom: 'copilot'
+  },
+  qwen: {
+    label: 'Qwen',
+    mode: 'device', // Qwen's chat.qwen.ai device grant (PKCE required)
+    deviceCodeUrl: 'https://chat.qwen.ai/api/v1/oauth2/device/code',
+    tokenUrl: 'https://chat.qwen.ai/api/v1/oauth2/token',
+    clientId: 'f0304373b74a44d2b584a3fb70ca9e56', // public qwen-code client id
+    scope: 'openid profile email model.completion',
+    pkce: true, // device request must carry a PKCE challenge
+    custom: 'qwen'
   }
 }
 
@@ -195,14 +205,22 @@ export async function refreshToken (providerId, tok) {
 export async function startDevice (providerId) {
   const p = OAUTH_PROVIDERS[providerId]
   if (!p || p.mode !== 'device') throw new Error('not a device-code provider')
+  const params = { client_id: p.clientId, scope: p.scope }
+  let verifier = null
+  if (p.pkce) {
+    const pk = makePkce()
+    verifier = pk.verifier
+    params.code_challenge = pk.challenge
+    params.code_challenge_method = 'S256'
+  }
   const res = await fetch(p.deviceCodeUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
-    body: new URLSearchParams({ client_id: p.clientId, scope: p.scope })
+    body: new URLSearchParams(params)
   })
   if (!res.ok) throw new Error(`couldn't start sign-in (${res.status})`)
   const j = await res.json()
-  pending.set(providerId, { deviceCode: j.device_code })
+  pending.set(providerId, { deviceCode: j.device_code, verifier })
   return {
     userCode: j.user_code,
     verificationUrl: j.verification_uri_complete || j.verification_uri,
@@ -216,10 +234,12 @@ export async function pollDevice (providerId) {
   const p = OAUTH_PROVIDERS[providerId]
   const flow = pending.get(providerId)
   if (!flow?.deviceCode) throw new Error('no sign-in in progress — start again')
+  const tokenParams = { grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: p.clientId, device_code: flow.deviceCode }
+  if (flow.verifier) tokenParams.code_verifier = flow.verifier
   const res = await fetch(p.tokenUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: p.clientId, device_code: flow.deviceCode })
+    body: new URLSearchParams(tokenParams)
   })
   const j = await res.json().catch(() => ({}))
   if (res.ok && j.access_token) {
@@ -229,7 +249,10 @@ export async function pollDevice (providerId) {
       const cop = await exchangeCopilot(j.access_token)
       return { done: true, token: { github: j.access_token, access: cop.token, expires: cop.expires } }
     }
-    return { done: true, token: { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + (j.expires_in ? j.expires_in * 1000 : 300_000) } }
+    const token = { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + (j.expires_in ? j.expires_in * 1000 : 300_000) }
+    // Qwen returns the API host to use in the token payload.
+    if (p.custom === 'qwen' && j.resource_url) token.apiBase = /^https?:\/\//.test(j.resource_url) ? j.resource_url : `https://${j.resource_url}/v1`
+    return { done: true, token }
   }
   if (j.error === 'authorization_pending' || j.error === 'slow_down') return { done: false }
   throw new Error(j.error_description || j.error || `sign-in failed (${res.status})`)
@@ -245,10 +268,14 @@ async function refreshDevice (providerId, tok) {
   })
   if (!res.ok) throw new Error(`${p.label} session expired — sign in again (${res.status})`)
   const j = await res.json()
+  const apiBase = j.resource_url
+    ? (/^https?:\/\//.test(j.resource_url) ? j.resource_url : `https://${j.resource_url}/v1`)
+    : tok.apiBase
   return {
     access: j.access_token,
     refresh: j.refresh_token || tok.refresh,
     idToken: j.id_token || tok.idToken || null,
+    ...(apiBase ? { apiBase } : {}),
     expires: Date.now() + (j.expires_in ? j.expires_in * 1000 : 3600_000)
   }
 }
