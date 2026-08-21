@@ -746,17 +746,15 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
 
   return (
     <div className='set-section'>
-      <div className='row' style={{ alignItems: 'center' }}>
-        <h3 style={{ margin: 0 }}>Agents</h3>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <button className='small-btn' onClick={exportAgents} title='Download your custom agents as a shareable file'>Export</button>
-          <button className='small-btn' onClick={() => importFileRef.current?.click()} title='Import agents from a file'>Import</button>
-          <input ref={importFileRef} type='file' accept='.json' multiple hidden onChange={e => { if (e.target.files.length) importAgents(e.target.files); e.target.value = '' }} />
-        </div>
-      </div>
-      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+      <h3 style={{ margin: 0 }}>Agents</h3>
+      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '8px 0 0' }}>
         Agents are named personas with their own personality, model, and skills — start a session with one to give the agent a role. <strong>Export</strong> shares your custom agents as a file; <strong>Import</strong> loads a pack.
       </p>
+      <div className='row' style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <button className='small-btn' onClick={exportAgents} title='Download your custom agents as a shareable file'>Export</button>
+        <button className='small-btn' onClick={() => importFileRef.current?.click()} title='Import agents from a file'>Import</button>
+        <input ref={importFileRef} type='file' accept='.json' multiple hidden onChange={e => { if (e.target.files.length) importAgents(e.target.files); e.target.value = '' }} />
+      </div>
       <div className='agent-grid'>
         {agents.map(a => (
           <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => openEditor(a)}>
