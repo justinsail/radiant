@@ -748,26 +748,16 @@ code, pre, .mono { font-family: var(--font-mono); }
   position: relative;
 }
 .composer-box:focus-within { border-color: var(--accent); }
-/* Border beam — a light travels the composer edge while an agent is working.
-   Dependency-free take on border-beam / transitions.dev, themed to the accent. */
-@property --beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-.composer-box.beam::before {
-  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2.5px; pointer-events: none; z-index: 1;
-  background: conic-gradient(from var(--beam-angle),
-    transparent 0deg 220deg,
-    oklch(0.68 0.2 var(--accent-h)) 290deg,
-    oklch(0.86 0.16 var(--accent-h)) 340deg,
-    oklch(0.99 0.07 var(--accent-h)) 357deg,
-    oklch(0.86 0.16 var(--accent-h)) 360deg);
-  filter: drop-shadow(0 0 4px oklch(0.72 0.19 var(--accent-h)));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
-  animation: beam-spin 2s linear infinite;
+/* Working pulse — the composer gently breathes an accent glow while an agent is
+   working (replaces the earlier circling border beam), themed to the accent. */
+.composer-box.working { animation: composer-pulse 1.8s ease-in-out infinite; }
+@keyframes composer-pulse {
+  0%, 100% { border-color: var(--accent-dim); box-shadow: var(--shadow-sm), 0 0 0 0 oklch(0.72 0.19 var(--accent-h) / 0); }
+  50%      { border-color: oklch(0.72 0.19 var(--accent-h)); box-shadow: var(--shadow-sm), 0 0 18px 2px oklch(0.72 0.19 var(--accent-h) / 0.5); }
 }
-@keyframes beam-spin { to { --beam-angle: 360deg; } }
-/* Reduce Motion: keep a soft static accent glow rather than nothing */
+/* Reduce Motion: keep a soft static accent glow rather than a pulse */
 @media (prefers-reduced-motion: reduce) {
-  .composer-box.beam::before { animation: none; background: none; box-shadow: 0 0 0 1.5px var(--accent-dim); filter: none; }
+  .composer-box.working { animation: none; border-color: var(--accent-dim); box-shadow: var(--shadow-sm), 0 0 0 1.5px var(--accent-dim); }
 }
 
 /* ---------- motion layer (transitions.dev-style) ---------- */

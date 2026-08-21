@@ -1371,7 +1371,7 @@ const GUIDE = [
     title: 'Look & feel',
     items: [
       ['Themes', 'A dozen palettes plus a custom accent, in light / medium / dark (bottom-left toggle). Agents can follow the accent or carry their own color.'],
-      ['Motion', 'Ten animated backgrounds in Settings → Appearance, an accent-lit beam around the composer while an agent is working, and subtle entrance animations throughout (all respect Reduce Motion).'],
+      ['Motion', 'Ten animated backgrounds in Settings → Appearance, an accent glow that pulses around the composer while an agent is working, and subtle entrance animations throughout (all respect Reduce Motion).'],
       ['Usage meters', 'A gas-tank view of how much is left on each subscription plus your OpenRouter balance, at the bottom of the sidebar.'],
       ['Command palette', 'Press ⌘K for quick actions, model switching, and jumping between sessions.']
     ]
