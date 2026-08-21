@@ -133,13 +133,13 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         <button className={view === 'chats' ? 'on' : ''} onClick={() => setView('chats')}>Chats</button>
         <button className={view === 'bots' ? 'on' : ''} onClick={() => setView('bots')}>Agents</button>
       </div>
-      <button className='new-session' onClick={() => onNew()}>+ New session</button>
-      {view === 'bots' && agents.length >= 2 && onNewGroup && (
-        <button className='new-group-btn' onClick={() => onNewGroup()}>👥 New group chat</button>
-      )}
       {view === 'chats' && (
         <input className='session-search' placeholder='Search all sessions…' value={search}
           onChange={e => setSearch(e.target.value)} />
+      )}
+      <button className='new-session' onClick={() => onNew()}>+ New session</button>
+      {view === 'bots' && agents.length >= 2 && onNewGroup && (
+        <button className='new-group-btn' onClick={() => onNewGroup()}>👥 New group chat</button>
       )}
 
       {view === 'chats' ? (
