@@ -320,6 +320,8 @@ export default function App () {
         onToggleTools={() => patchSession({ useTools: !(session.useTools !== false) })}
         onToggleComputer={() => patchSession({ computerControl: !session.computerControl })}
         onTogglePlan={() => patchSession({ planMode: !session.planMode })}
+        approvalMode={config.settings.approvalMode || 'ask'}
+        onCycleApproval={() => { const order = ['ask', 'auto', 'off']; const cur = config.settings.approvalMode || 'ask'; saveSettings({ approvalMode: order[(order.indexOf(cur) + 1) % 3] }) }}
         question={question}
         onAnswer={answer => { if (question) { api.answerQuestion(question.id, answer).catch(() => {}); setQuestion(null) } }}
         onSetCwd={cwd => patchSession({ cwd })}

@@ -471,7 +471,7 @@ export function GroupPicker ({ agents, onStart, onCancel }) {
   )
 }
 
-export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, skillSuggestion, onReviewSkill, onDismissSuggestion, onOpenLibrary, rightOpen, onToggleRight, onMenu }) {
+export default function Chat ({ session, live, todos = [], stats, approval, question, onAnswer, usage, error, models, agents = [], recipes = [], onSend, onStop, onApproval, onPickModel, onToggleTools, onToggleComputer, onTogglePlan, onSetCwd, onNew, onNewGroup, onTruncate, onRefreshModels, skillSuggestion, onReviewSkill, onDismissSuggestion, onOpenLibrary, rightOpen, onToggleRight, onMenu, approvalMode = 'ask', onCycleApproval }) {
   const [groupPicker, setGroupPicker] = useState(false)
   const [pickAgent, setPickAgent] = useState(false) // splash: reveal the agent picker
   const [draft, setDraft] = useState('')
@@ -814,46 +814,56 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
             }}
           />
           <div className='composer-row'>
-            <input
-              ref={fileInputRef} type='file' multiple hidden
-              onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
-            />
-            <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images' data-tip='Attach files or images'><Icon.plus size={17} /></button>
-            <button className={'attach-btn' + (designBusy ? ' listening' : '')} onClick={startDesign} disabled={designBusy} title='Design Mode' data-tip={'Design Mode — open a web page and click\nan element to capture its HTML, CSS &\na screenshot as context'}><Icon.target size={16} /></button>
-            <RecipeMenu recipes={recipes} onUse={text => { setDraft(text); setTimeout(() => textareaRef.current?.focus(), 0) }} />
-            <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
-            <button
-              className={'pill-toggle' + (toolsOn ? ' on' : '')}
-              onClick={onToggleTools}
-              data-tip={'Agent tools: read/write files and run\ncommands in the workspace folder.\nClick to turn ' + (toolsOn ? 'off' : 'on') + '.'}
-            >
-              <span className='logo-mark' aria-hidden />
-              tools {toolsOn ? 'on' : 'off'}
-            </button>
-            <button
-              className={'pill-toggle' + (session.computerControl ? ' on' : '')}
-              onClick={onToggleComputer}
-              data-tip={'Computer control: let the model drive the\nbrowser & desktop (needs a vision model +\nmacOS permissions). Click to turn ' + (session.computerControl ? 'off' : 'on') + '.'}
-            >
-              🖥 computer {session.computerControl ? 'on' : 'off'}
-            </button>
-            <button
-              className={'pill-toggle' + (session.planMode ? ' on' : '')}
-              onClick={onTogglePlan}
-              data-tip={'Plan mode: the agent researches and proposes a\nplan for your approval before changing anything.\nClick to turn ' + (session.planMode ? 'off' : 'on') + '.'}
-            >
-              📋 plan {session.planMode ? 'on' : 'off'}
-            </button>
-            <div className='grow' />
-            {usage && (usage.input || usage.output) ? (
-              <span className='usage-note'>{usage.input ?? '–'} in · {usage.output ?? '–'} out</span>
-            ) : null}
-            {streaming
-              ? <>
-                  {(draft.trim() || attachments.length) ? <button className='send-btn queue' onClick={submit} title='Queue this — sends when the agent finishes'><Icon.arrowUp size={17} /></button> : null}
-                  <button className='send-btn stop' onClick={onStop} title='Stop generating'><Icon.stop size={15} /></button>
-                </>
-              : <button className='send-btn' onClick={submit} disabled={!draft.trim() && !attachments.length} title='Send message'><Icon.arrowUp size={17} /></button>}
+            <div className='composer-tools'>
+              <input
+                ref={fileInputRef} type='file' multiple hidden
+                onChange={e => { if (e.target.files.length) addFiles(e.target.files); e.target.value = '' }}
+              />
+              <button className='attach-btn' onClick={() => fileInputRef.current?.click()} title='Attach files or images' data-tip='Attach files or images'><Icon.plus size={17} /></button>
+              <button className={'attach-btn' + (designBusy ? ' listening' : '')} onClick={startDesign} disabled={designBusy} title='Design Mode' data-tip={'Design Mode — open a web page and click\nan element to capture its HTML, CSS &\na screenshot as context'}><Icon.target size={16} /></button>
+              <RecipeMenu recipes={recipes} onUse={text => { setDraft(text); setTimeout(() => textareaRef.current?.focus(), 0) }} />
+              <ModelPicker session={session} models={models} onPick={onPickModel} onRefresh={onRefreshModels} />
+              <button
+                className={'pill-toggle' + (toolsOn ? ' on' : '')}
+                onClick={onToggleTools}
+                data-tip={'Agent tools: read/write files and run\ncommands in the workspace folder.\nClick to turn ' + (toolsOn ? 'off' : 'on') + '.'}
+              >
+                <span className='logo-mark' aria-hidden />
+                tools {toolsOn ? 'on' : 'off'}
+              </button>
+              <button
+                className={'pill-toggle' + (session.computerControl ? ' on' : '')}
+                onClick={onToggleComputer}
+                data-tip={'Computer control: let the model drive the\nbrowser & desktop (needs a vision model +\nmacOS permissions). Click to turn ' + (session.computerControl ? 'off' : 'on') + '.'}
+              >
+                🖥 computer {session.computerControl ? 'on' : 'off'}
+              </button>
+              <button
+                className={'pill-toggle' + (session.planMode ? ' on' : '')}
+                onClick={onTogglePlan}
+                data-tip={'Plan mode: the agent researches and proposes a\nplan for your approval before changing anything.\nClick to turn ' + (session.planMode ? 'off' : 'on') + '.'}
+              >
+                📋 plan {session.planMode ? 'on' : 'off'}
+              </button>
+              <button
+                className={'pill-toggle' + (approvalMode === 'off' ? ' warn' : approvalMode === 'auto' ? ' on' : '')}
+                onClick={onCycleApproval}
+                data-tip={'Permissions — what the agent may do without asking:\n• Ask each: confirm every command (safest)\n• Auto: run low-risk commands, ask for risky ones\n• Allow all: never ask (fastest, least safe)\nClick to cycle.'}
+              >
+                {approvalMode === 'off' ? '🔓 allow all' : approvalMode === 'auto' ? '⚡ auto approve' : '✋ ask each'}
+              </button>
+            </div>
+            <div className='composer-actions'>
+              {usage && (usage.input || usage.output) ? (
+                <span className='usage-note'>{usage.input ?? '–'} in · {usage.output ?? '–'} out</span>
+              ) : null}
+              {streaming
+                ? <>
+                    {(draft.trim() || attachments.length) ? <button className='send-btn queue' onClick={submit} title='Queue this — sends when the agent finishes'><Icon.arrowUp size={17} /></button> : null}
+                    <button className='send-btn stop' onClick={onStop} title='Stop generating'><Icon.stop size={15} /></button>
+                  </>
+                : <button className='send-btn' onClick={submit} disabled={!draft.trim() && !attachments.length} title='Send message'><Icon.arrowUp size={17} /></button>}
+            </div>
           </div>
         </div>
       </div>
