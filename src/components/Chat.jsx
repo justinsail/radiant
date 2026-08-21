@@ -225,7 +225,16 @@ function AgentWidget ({ spec, onChoose }) {
   )
 }
 
-function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming, model, agent, onChoose }) {
+function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, streaming, model, agent, local, onChoose }) {
+  const waiting = streaming && !parts.length && !thinking
+  // A local model that isn't resident cold-loads its weights before the first token.
+  // Reveal the note only after a beat, so a warm model (fast first token) never shows it.
+  const [slowWait, setSlowWait] = useState(false)
+  useEffect(() => {
+    if (!(waiting && local)) { setSlowWait(false); return }
+    const t = setTimeout(() => setSlowWait(true), 1000)
+    return () => clearTimeout(t)
+  }, [waiting, local])
   return (
     <div className='msg msg-assistant'>
       <div className='who'>
@@ -246,7 +255,12 @@ function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, stre
         return null
       })}
       {!streaming && <Deliverables parts={parts} />}
-      {streaming && !parts.length && !thinking && <div className='notice'>…</div>}
+      {waiting && (slowWait
+        ? <div className='notice loading-note'>
+            <span className='shimmer'>Loading the model into memory…</span>
+            <span className='loading-sub'>first reply after switching a local model can take a moment</span>
+          </div>
+        : <div className='notice'>…</div>)}
     </div>
   )
 }
@@ -688,6 +702,7 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
             <AssistantMessage
               agent={live.agentId ? agents.find(a => a.id === live.agentId) || sessionAgent : sessionAgent}
               model={session.model}
+              local={['ollama', 'lmstudio'].includes(session.provider)}
               parts={live.parts}
               thinking={live.thinking}
               thinkingActive={live.thinkingActive}

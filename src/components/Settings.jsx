@@ -1341,7 +1341,7 @@ const GUIDE = [
       ['Ready-to-add providers', 'One-tap presets for DeepSeek, Kimi, GLM, Mistral, Groq, Together, Fireworks, Cerebras, Perplexity, Gemini, Ollama Cloud, and Vercel AI Gateway — just paste a key.'],
       ['Multiple accounts', 'Keep more than one account or key per provider and switch the active one; the sidebar meters follow whichever is active.'],
       ['Any OpenAI-compatible provider', 'Add anything else with a name + base URL.'],
-      ['Local models', 'Run models from Ollama or LM Studio with no key. Search Hugging Face and download GGUFs straight from Settings → Models, with a disk-space check before you pull.'],
+      ['Local models', 'Run models from Ollama or LM Studio with no key. Search Hugging Face and download GGUFs straight from Settings → Models, with a disk-space check before you pull. The first reply after switching to a local model shows a "loading into memory" note while its weights load; it stays warm after that.'],
       ['Compare', 'Run one prompt against two models side by side (command palette → Compare).']
     ]
   },
