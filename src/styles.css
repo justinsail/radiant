@@ -752,14 +752,17 @@ code, pre, .mono { font-family: var(--font-mono); }
 .composer-box:focus-within { border-color: var(--accent); }
 /* Working pulse — the composer gently breathes an accent glow while an agent is
    working (replaces the earlier circling border beam), themed to the accent. */
-.composer-box.working { animation: composer-pulse 2.4s ease-in-out infinite alternate; }
-@keyframes composer-pulse {
-  from { border-color: var(--accent-dim); box-shadow: var(--shadow-sm), 0 0 8px 0 oklch(0.72 0.19 var(--accent-h) / 0.14); }
-  to   { border-color: oklch(0.66 0.17 var(--accent-h)); box-shadow: var(--shadow-sm), 0 0 20px 3px oklch(0.72 0.19 var(--accent-h) / 0.4); }
+.composer-box.working { border-color: var(--accent-dim); }
+.composer-box.working::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 22px 3px oklch(0.72 0.19 var(--accent-h) / 0.6);
+  animation: composer-glow 3s ease-in-out infinite alternate;
+  will-change: opacity;
 }
-/* Reduce Motion: keep a soft static accent glow rather than a pulse */
+@keyframes composer-glow { from { opacity: 0.15; } to { opacity: 1; } }
+/* Reduce Motion: hold a soft static accent glow rather than a pulse */
 @media (prefers-reduced-motion: reduce) {
-  .composer-box.working { animation: none; border-color: var(--accent-dim); box-shadow: var(--shadow-sm), 0 0 0 1.5px var(--accent-dim); }
+  .composer-box.working::before { animation: none; opacity: 0.5; }
 }
 
 /* ---------- motion layer (transitions.dev-style) ---------- */
