@@ -644,8 +644,10 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
           className='cwd-chip'
           title={session.cwd}
           data-tip={'Workspace folder — the agent reads &\nwrites here. Click to change.'} data-tip-below data-tip-end
-          onClick={() => {
-            const next = window.prompt('Workspace folder for this session:', session.cwd)
+          onClick={async () => {
+            const next = window.radiantNative?.pickFolder
+              ? await window.radiantNative.pickFolder(session.cwd)
+              : window.prompt('Workspace folder for this session:', session.cwd)
             if (next) onSetCwd(next)
           }}
         >

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, nativeTheme } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, nativeTheme, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
@@ -15,6 +15,16 @@ function savedMode () {
 nativeTheme.themeSource = savedMode()
 ipcMain.on('radiant:set-mode', (e, mode) => {
   nativeTheme.themeSource = mode === 'light' ? 'light' : 'dark'
+})
+
+// native folder picker for the workspace chip (window.prompt is a no-op in Electron)
+ipcMain.handle('rad:pick-folder', async (e, current) => {
+  const res = await dialog.showOpenDialog(win || undefined, {
+    title: 'Choose workspace folder',
+    properties: ['openDirectory', 'createDirectory'],
+    defaultPath: current || undefined
+  })
+  return res.canceled || !res.filePaths?.length ? null : res.filePaths[0]
 })
 
 console.log('[radiant] main.cjs loaded, electron', process.versions.electron)
