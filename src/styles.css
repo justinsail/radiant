@@ -224,6 +224,9 @@ code, pre, .mono { font-family: var(--font-mono); }
 .connect-gate .big-mark { width: 56px; height: 56px; margin: 0 auto 4px; }
 .connect-gate h2 { margin: 0; }
 .connect-gate .connect-field { text-align: left; margin-top: 10px; }
+/* Base horizontal row. Without this, `.row` divs were display:block, so their
+   inline gap/align-items/margin-auto silently did nothing and buttons touched. */
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .connect-gate .row { justify-content: center; }
 
 /* Instant, reliable tooltips (Electron's native title tooltips are slow/flaky). */
