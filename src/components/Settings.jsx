@@ -1349,6 +1349,7 @@ const GUIDE = [
     title: 'Tools the agent can use',
     items: [
       ['Files & commands', 'Read, write, and edit files and run shell commands in the workspace folder. Toggle with the “tools” pill; command runs ask for approval.'],
+      ['Permissions', 'The composer’s permissions pill sets how much the agent can do without asking — Ask each (confirm every command), Auto approve (low-risk runs silently, risky ones still ask), or Allow all (never ask). Flip it to Allow all for an unattended long build.'],
       ['Background jobs', 'Long builds, test watchers, and dev servers run in the background so the agent keeps working and checks on them.'],
       ['Terminal', 'A real terminal in the activity panel (top-right icon).'],
       ['Computer control (🖥)', 'Let a vision model drive the browser and desktop. Basic automation is on by default; full automation is an opt-in checkbox in Settings → Automation.'],
