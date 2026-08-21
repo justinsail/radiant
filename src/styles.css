@@ -752,10 +752,10 @@ code, pre, .mono { font-family: var(--font-mono); }
 .composer-box:focus-within { border-color: var(--accent); }
 /* Working pulse — the composer gently breathes an accent glow while an agent is
    working (replaces the earlier circling border beam), themed to the accent. */
-.composer-box.working { animation: composer-pulse 1.8s ease-in-out infinite; }
+.composer-box.working { animation: composer-pulse 2.4s ease-in-out infinite alternate; }
 @keyframes composer-pulse {
-  0%, 100% { border-color: var(--accent-dim); box-shadow: var(--shadow-sm), 0 0 0 0 oklch(0.72 0.19 var(--accent-h) / 0); }
-  50%      { border-color: oklch(0.72 0.19 var(--accent-h)); box-shadow: var(--shadow-sm), 0 0 18px 2px oklch(0.72 0.19 var(--accent-h) / 0.5); }
+  from { border-color: var(--accent-dim); box-shadow: var(--shadow-sm), 0 0 8px 0 oklch(0.72 0.19 var(--accent-h) / 0.14); }
+  to   { border-color: oklch(0.66 0.17 var(--accent-h)); box-shadow: var(--shadow-sm), 0 0 20px 3px oklch(0.72 0.19 var(--accent-h) / 0.4); }
 }
 /* Reduce Motion: keep a soft static accent glow rather than a pulse */
 @media (prefers-reduced-motion: reduce) {
