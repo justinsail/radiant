@@ -747,7 +747,7 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
   }
 
   const importExternal = async ext => {
-    const cfg = await api.addAgent({ name: ext.name, emoji: ext.emoji || '🤖', hue: ext.hue ?? null, persona: ext.persona || '', model: ext.model || null, skills: [], useTools: true })
+    const cfg = await api.addAgent({ name: ext.name, emoji: ext.emoji || '🤖', hue: ext.hue ?? null, persona: ext.persona || '', model: ext.model || null, skills: [], useTools: true, avatar: ext.avatar || null, relay: ext.relay || null, source: ext.source || null })
     onConfigChange(cfg)
   }
 
@@ -765,7 +765,7 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
       {external.length > 0 && (
         <div className='ext-agents'>
           <div className='ext-agents-title'>Connected agents on this Mac</div>
-          <p className='ext-agents-sub'>Radiant found other agent apps you have installed. Import their persona into your library — connecting to them live is coming soon.</p>
+          <p className='ext-agents-sub'>Radiant found other agent apps you have installed. Connect a Hermes agent to chat with the real one — its own model, skills, and memory — right inside Radiant.</p>
           {external.map(ext => {
             const already = agents.some(a => (a.name || '').trim().toLowerCase() === (ext.name || '').trim().toLowerCase())
             return (
@@ -778,8 +778,8 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
                 {ext.importable === false
                   ? <span className='ext-agent-tag'>Detected</span>
                   : already
-                    ? <span className='ext-agent-tag ext-agent-tag-done'>✓ Imported</span>
-                    : <button className='small-btn' onClick={() => importExternal(ext)}>Import</button>}
+                    ? <span className='ext-agent-tag ext-agent-tag-done'>{ext.relay ? '✓ Connected' : '✓ Imported'}</span>
+                    : <button className='small-btn' onClick={() => importExternal(ext)}>{ext.relay ? 'Connect' : 'Import'}</button>}
               </div>
             )
           })}
@@ -788,6 +788,7 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
       <div className='agent-grid'>
         {agents.map(a => (
           <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => openEditor(a)}>
+            {a.relay && <span className='agent-card-live' title='Live-connected agent'><span className='agent-card-live-dot' />live</span>}
             <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={20} /></span>
             <span className='agent-card-name'>{a.name}</span>
             <span className='agent-card-desc'>{(() => { const d = cleanDesc(a.persona); return d ? d.slice(0, 70) + (d.length > 70 ? '…' : '') : 'General assistant' })()}</span>
@@ -1351,7 +1352,7 @@ const GUIDE = [
       ['Agents', 'Named personas with their own model, personality, and skills. Pick one from the welcome screen; the Agents sidebar view groups your sessions by agent. Edit them in Settings → Agents.'],
       ['Agent library', 'Over 140 ready-made expert agents across two dozen categories — browse, filter, and add one in a click, then tweak its model, name, and skills before saving.'],
       ['Duplicate, export & import', 'Clone any agent into an editable copy, export your custom agents as a shareable file, and import a pack — so a curated set can be handed to a whole team.'],
-      ['Connected agents', 'Radiant detects other agent apps installed on your Mac — a Hermes profile imports its persona straight into your library (Settings → Agents), and OpenClaw is detected too.'],
+      ['Connected agents', 'Radiant detects other agent apps installed on your Mac (Settings → Agents). Connect a Hermes agent and you chat with the real thing — its own model, skills, and memory — right inside a Radiant session; OpenClaw is detected too.'],
       ['Group chat', 'Put several agents in one conversation and let them build on each other, with a roster showing who is in the room.'],
       ['Agents consult each other', 'Any agent can call the ask_agent tool to get a second opinion from another agent (e.g. Reviewer asks Architect) and fold the answer in.'],
       ['Queue while it works', 'Type a follow-up mid-turn and it queues — the agent picks it up as soon as the current turn finishes instead of making you wait.'],

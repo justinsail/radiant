@@ -273,7 +273,7 @@ app.get('/api/files', (req, res) => {
 
 // ---------- agents ----------
 app.post('/api/agents', (req, res) => {
-  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl, sandbox, plannerModel, plannerProvider } = req.body
+  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl, sandbox, plannerModel, plannerProvider, avatar, relay, source } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   config.agents = config.agents || []
   config.agents.push({
@@ -281,7 +281,8 @@ app.post('/api/agents', (req, res) => {
     name, emoji: emoji || '🤖', icon: icon || null, hue: hue ?? null, persona: persona || '',
     model: model || null, provider: provider || null, skills: skills || [],
     useTools: useTools !== false, computerControl: Boolean(computerControl), sandbox: Boolean(sandbox),
-    plannerModel: plannerModel || null, plannerProvider: plannerProvider || null
+    plannerModel: plannerModel || null, plannerProvider: plannerProvider || null,
+    avatar: avatar || null, relay: relay || null, source: source || null
   })
   saveConfig(config)
   res.json(publicConfig(config))
@@ -290,7 +291,7 @@ app.post('/api/agents', (req, res) => {
 app.patch('/api/agents/:id', (req, res) => {
   const a = (config.agents || []).find(x => x.id === req.params.id)
   if (!a) return res.status(404).json({ error: 'not found' })
-  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl', 'sandbox', 'plannerModel', 'plannerProvider']) {
+  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl', 'sandbox', 'plannerModel', 'plannerProvider', 'avatar', 'relay', 'source']) {
     if (k in req.body) a[k] = req.body[k]
   }
   saveConfig(config)
@@ -338,7 +339,7 @@ function discoverExternalAgents () {
       } catch {}
       if (persona) out.push({
         source: 'hermes', sourceLabel: 'Hermes', name: title, emoji: '🪽',
-        hue: hexToHue(color), persona, model: null,
+        hue: hexToHue(color), persona, model: null, relay: 'hermes',
         note: modelNote ? `Hermes profile · ${modelNote}` : 'Hermes profile',
         personaChars: persona.length, importable: true
       })
@@ -351,7 +352,7 @@ function discoverExternalAgents () {
       let mode = ''
       try { mode = (JSON.parse(fs.readFileSync(ocPath, 'utf8')).gateway || {}).mode || '' } catch {}
       out.push({
-        source: 'openclaw', sourceLabel: 'OpenClaw', name: 'OpenClaw', emoji: '🐾',
+        source: 'openclaw', sourceLabel: 'OpenClaw', name: 'OpenClaw', emoji: '🦞',
         hue: null, persona: '', model: null,
         note: `Gateway detected${mode ? ` · ${mode}` : ''} — live connect coming soon`, importable: false
       })
@@ -364,6 +365,58 @@ app.get('/api/external-agents', (req, res) => {
   try { res.json({ agents: discoverExternalAgents() }) }
   catch (e) { res.json({ agents: [], error: String((e && e.message) || e) }) }
 })
+
+// Live relay to the real Hermes agent (its own model, skills, memory). Runs the
+// Hermes CLI non-interactively (`hermes -z <text>`, no shell) and streams its
+// stdout to the client as text_delta events so the reply lands in the normal
+// chat bubble. Returns the full accumulated reply (persisted as the assistant turn).
+function runHermesRelay ({ text, emit, signal, session }) {
+  return new Promise(resolve => {
+    let acc = ''
+    let stderrTail = ''
+    let settled = false
+    const finish = () => { if (!settled) { settled = true; resolve(acc) } }
+    let child
+    try {
+      child = spawn('hermes', ['-z', String(text || '')], {
+        env: process.env,
+        cwd: (session && session.cwd) || undefined,
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+    } catch (e) {
+      const msg = `⚠️ Hermes could not respond (${e.message}).`
+      acc += msg; emit({ type: 'text_delta', text: msg }); return finish()
+    }
+    const onAbort = () => { try { child.kill('SIGTERM') } catch {} }
+    if (signal) {
+      if (signal.aborted) onAbort()
+      else signal.addEventListener('abort', onAbort, { once: true })
+    }
+    child.stdout.on('data', d => {
+      const chunk = d.toString()
+      acc += chunk
+      emit({ type: 'text_delta', text: chunk })
+    })
+    child.stderr.on('data', d => { stderrTail = (stderrTail + d.toString()).slice(-800) })
+    child.on('error', e => {
+      if (signal) signal.removeEventListener('abort', onAbort)
+      if (!acc.trim() && !(signal && signal.aborted)) {
+        const msg = `⚠️ Hermes could not respond (${e.message}).`
+        acc += msg; emit({ type: 'text_delta', text: msg })
+      }
+      finish()
+    })
+    child.on('close', code => {
+      if (signal) signal.removeEventListener('abort', onAbort)
+      if (code !== 0 && !acc.trim() && !(signal && signal.aborted)) {
+        const tail = stderrTail.trim().split('\n').slice(-3).join(' ').slice(-300)
+        const msg = `⚠️ Hermes could not respond (exit ${code}${tail ? `: ${tail}` : ''}).`
+        acc += msg; emit({ type: 'text_delta', text: msg })
+      }
+      finish()
+    })
+  })
+}
 
 // ---------- usage / credits ----------
 app.get('/api/usage', async (req, res) => {
@@ -1052,6 +1105,49 @@ app.post('/api/chat', async (req, res) => {
   if (!session) return res.status(404).json({ error: 'session not found' })
   if (activeTurns.has(sessionId)) return res.status(409).json({ error: 'a turn is already running' })
 
+  // agent (persona + its skills) plus globally-enabled skills
+  const agent = session.agentId ? (config.agents || []).find(a => a.id === session.agentId) : null
+
+  // Live relay: some agents bridge to a real external agent (e.g. Hermes) with its
+  // own model, skills, and memory. They need no Radiant provider — stream the
+  // external agent's reply straight through and skip provider/skills/mcp/runTurn.
+  if (agent && agent.relay === 'hermes') {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      connection: 'keep-alive'
+    })
+    const emit = ev => res.write(`data: ${JSON.stringify(ev)}\n\n`)
+    const text = typeof content === 'string' ? content : (content.text || '')
+    const attachments = (typeof content === 'object' && content.attachments) || []
+    session.messages.push({ role: 'user', text, attachments })
+    if (session.messages.length === 1 && session.autoTitle !== false) {
+      session.title = text.length > 48 ? text.slice(0, 48) + '…' : (text || `${attachments.length} file(s)`)
+      session.autoTitle = true
+      emit({ type: 'title', title: session.title })
+    }
+    saveSession(session)
+    const controller = new AbortController()
+    activeTurns.set(sessionId, { controller })
+    res.on('close', () => { if (!res.writableEnded) controller.abort() })
+    const assistant = { role: 'assistant', parts: [] }
+    if (agent.id) assistant.agentId = agent.id
+    session.messages.push(assistant)
+    try {
+      const reply = await runHermesRelay({ text, emit, signal: controller.signal, session })
+      if (reply) assistant.parts.push({ type: 'text', text: reply })
+      emit({ type: 'done' })
+    } catch (e) {
+      if (!controller.signal.aborted) emit({ type: 'error', message: e.message })
+    } finally {
+      activeTurns.delete(sessionId)
+      saveSession(session)
+      emit({ type: 'closed' })
+      res.end()
+    }
+    return
+  }
+
   let provider = config.providers.find(p => p.id === session.provider)
   if (!provider) return res.status(400).json({ error: 'Pick a model first — no provider set on this session.' })
   // Qwen's OAuth token names the API host to use; honour it over the default.
@@ -1060,8 +1156,7 @@ app.post('/api/chat', async (req, res) => {
   const hasOAuth = Boolean(config.oauth[provider.id])
   if (provider.auth === 'key' && !apiKey && !hasOAuth) return res.status(400).json({ error: `No API key or subscription sign-in for ${provider.name}. Add one in Settings.` })
 
-  // agent (persona + its skills) plus globally-enabled skills
-  const agent = session.agentId ? (config.agents || []).find(a => a.id === session.agentId) : null
+  // agent (persona + its skills, resolved above) plus globally-enabled skills
   const allSkills = config.skills || []
   const agentSkillIds = new Set(agent?.skills || [])
   const mergedSkills = allSkills.filter(s => s.enabled || agentSkillIds.has(s.id))
