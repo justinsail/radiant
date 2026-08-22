@@ -46,6 +46,7 @@ export const AGENT_ICON_IDS = Object.keys(AGENT_ICONS)
 
 // Render an agent's identity: SVG icon if set, else its emoji, else a bot.
 export function AgentGlyph ({ agent, size = 16 }) {
+  if (agent?.avatar) return <img src={agent.avatar} alt='' width={Math.round(size * 1.35)} height={Math.round(size * 1.35)} style={{ borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
   if (agent?.icon && AGENT_ICONS[agent.icon]) return AGENT_ICONS[agent.icon]({ size })
   if (agent?.emoji) return <span style={{ fontSize: size }}>{agent.emoji}</span>
   return AGENT_ICONS.bot({ size })
