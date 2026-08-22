@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Markdown from './Markdown.jsx'
 import { Icon } from './Icons.jsx'
 import { AgentGlyph } from './AgentIcons.jsx'
@@ -484,6 +484,15 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
   const textareaRef = useRef(null)
   const scrollRef = useRef(null)
   const streaming = Boolean(live?.streaming)
+
+  // grow the composer to fit what's typed or pasted (up to a cap, then it
+  // scrolls internally) — no more hunting for a big block below a 2-row box
+  useLayoutEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 320) + 'px'
+  }, [draft])
 
   // drain the mid-turn queue once the agent's turn settles (finished OR stopped)
   const wasStreaming = useRef(streaming)
