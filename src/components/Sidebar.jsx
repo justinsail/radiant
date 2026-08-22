@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Icon } from './Icons.jsx'
 import { AgentGlyph } from './AgentIcons.jsx'
+import { isImported } from './Chat.jsx'
 import { api } from '../api.js'
 
 function UsageChip () {
@@ -109,7 +110,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         title={s.title}
       >
         <div className='session-title'>
-          {showAgent && ag && <span className='session-agent' style={{ color: `oklch(0.7 0.15 ${ag.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={ag} size={13} /></span>}
+          {showAgent && ag && <span className='session-agent' style={isImported(ag) ? undefined : { color: `oklch(0.7 0.15 ${ag.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={ag} size={13} /></span>}
           <span className='session-title-text'>{s.title}</span>
         </div>
         <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
@@ -162,15 +163,19 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         </div>
       ) : (
         <div className='session-list'>
-          {agents.map(a => {
+          {[...agents].sort((x, y) => Number(isImported(x)) - Number(isImported(y))).map((a, i, list) => {
             const own = sessions.filter(s => s.agentId === a.id)
             const isCollapsed = collapsed[a.id]
+            // first imported agent in the list opens the "from other apps" group
+            const startsImported = isImported(a) && !(i > 0 && isImported(list[i - 1]))
             return (
-              <div key={a.id} className='bot-group'>
+              <React.Fragment key={a.id}>
+              {startsImported && <div className='agent-divider'><span>Imported from other apps</span></div>}
+              <div className='bot-group'>
                 <div className='bot-head'>
                   <button className='bot-head-toggle' onClick={() => toggleGroup(a.id)} title={isCollapsed ? 'Show sessions' : 'Hide sessions'}>
                     <span className='bot-head-caret'>{own.length ? (isCollapsed ? '▸' : '▾') : ''}</span>
-                    <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={16} /></span>
+                    <span className='bot-head-icon' style={isImported(a) ? undefined : { color: `oklch(0.7 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={16} /></span>
                     <span className='bot-head-name'>{a.name}</span>
                     <span className='bot-head-count'>{own.length}</span>
                   </button>
@@ -178,6 +183,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                 </div>
                 {!isCollapsed && own.map(s => <SessionRow key={s.id} s={s} showAgent={false} />)}
               </div>
+              </React.Fragment>
             )
           })}
           {(() => { const orphans = sessions.filter(s => !agentOf(s.agentId)); return orphans.length > 0 && (

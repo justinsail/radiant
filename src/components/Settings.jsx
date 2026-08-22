@@ -644,8 +644,13 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose, onDupl
 
 function AgentsPane ({ config, onConfigChange, initialView }) {
   const agents = config.agents || []
-  const importedAgents = agents.filter(a => a.source)
-  const regularAgents = agents.filter(a => !a.source)
+  // An agent counts as imported if it came from another app (`source`) or talks
+  // to one (`relay`). Checking both adopts agents imported before `source` was
+  // stored — otherwise they sit in the main grid wearing a hue tint that isn't
+  // theirs.
+  const isImported = a => Boolean(a.source || a.relay)
+  const importedAgents = agents.filter(isImported)
+  const regularAgents = agents.filter(a => !isImported(a))
   const skills = config.skills || []
   const [models, setModels] = useState([])
   const [editing, setEditing] = useState(null) // agent object or null
@@ -1369,6 +1374,7 @@ const GUIDE = [
       ['Agent library', 'Over 140 ready-made expert agents across two dozen categories — browse, filter, and add one in a click, then tweak its model, name, and skills before saving.'],
       ['Duplicate, export & import', 'Clone any agent into an editable copy, export your custom agents as a shareable file, and import a pack — so a curated set can be handed to a whole team.'],
       ['Connected agents', 'Radiant detects other agent apps installed on your Mac (Settings → Agents). Connect a Hermes agent and you chat with the real thing — its own model, skills, and memory — right inside a Radiant session; OpenClaw is detected too.'],
+      ['Imported agents stay recognizable', 'Agents brought in from another app sit below an “Imported from other apps” divider — in the sidebar, the agent picker, and Settings → Agents — and keep their own icon and color instead of taking a Radiant hue, so it is always clear which are yours and which are borrowed.'],
       ['Group chat', 'Put several agents in one conversation and let them build on each other, with a roster showing who is in the room.'],
       ['Agents consult each other', 'Any agent can call the ask_agent tool to get a second opinion from another agent (e.g. Reviewer asks Architect) and fold the answer in.'],
       ['Queue while it works', 'Type a follow-up mid-turn and it queues — the agent picks it up as soon as the current turn finishes instead of making you wait.'],

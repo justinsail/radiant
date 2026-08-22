@@ -4,6 +4,12 @@ import { Icon } from './Icons.jsx'
 import { AgentGlyph } from './AgentIcons.jsx'
 import { api } from '../api.js'
 
+// An agent brought in from another app on this Mac (Hermes, OpenClaw). They sit
+// apart from your own agents and keep their icon's own color rather than taking
+// a hue tint. `relay` is checked too so agents imported before `source` was
+// stored are still recognized.
+export const isImported = a => Boolean(a?.source || a?.relay)
+
 // short one-line blurb shown under an agent on the splash screen
 const AGENT_BLURBS = {
   'agent-radiant': 'General-purpose coding assistant',
@@ -239,7 +245,7 @@ function AssistantMessage ({ parts, thinking, thinkingActive, thinkingSecs, stre
     <div className='msg msg-assistant'>
       <div className='who'>
         {agent
-          ? <><span className='who-agent-emoji' style={{ '--ah': agent.hue ?? 'var(--accent-h)', color: `oklch(0.7 0.16 ${agent.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={agent} size={14} /></span><span className='who-word'>{agent.name}</span></>
+          ? <><span className='who-agent-emoji' style={isImported(agent) ? undefined : { '--ah': agent.hue ?? 'var(--accent-h)', color: `oklch(0.7 0.16 ${agent.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={agent} size={14} /></span><span className='who-word'>{agent.name}</span></>
           : <><span className='logo-mark' aria-hidden /><span className='wordmark who-word'>Radiant</span></>}
         {model && <span className='who-model'>{model}</span>}
         {streaming && <span className='who-model'>· working</span>}
@@ -616,9 +622,23 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
                       <span className='hint'>Choose an agent</span>
                     </div>
                     <div className='welcome-agents'>
-                      {agents.map(a => (
+                      {agents.filter(a => !isImported(a)).map(a => (
                         <button key={a.id} className='welcome-agent' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => onNew(a.id)} title={a.persona || a.name}>
                           <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={18} /></span>
+                          <span className='welcome-agent-text'>
+                            <span className='welcome-agent-name'>{a.name}</span>
+                            <span className='welcome-agent-desc'>{agentBlurb(a)}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    {agents.some(isImported) && (
+                      <div className='agent-divider'><span>Imported from other apps</span></div>
+                    )}
+                    <div className='welcome-agents'>
+                      {agents.filter(isImported).map(a => (
+                        <button key={a.id} className='welcome-agent welcome-agent-imported' onClick={() => onNew(a.id)} title={a.persona || a.name}>
+                          <span className='agent-avatar'><AgentGlyph agent={a} size={18} /></span>
                           <span className='welcome-agent-text'>
                             <span className='welcome-agent-name'>{a.name}</span>
                             <span className='welcome-agent-desc'>{agentBlurb(a)}</span>
