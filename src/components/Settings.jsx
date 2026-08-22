@@ -644,6 +644,8 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose, onDupl
 
 function AgentsPane ({ config, onConfigChange, initialView }) {
   const agents = config.agents || []
+  const importedAgents = agents.filter(a => a.source)
+  const regularAgents = agents.filter(a => !a.source)
   const skills = config.skills || []
   const [models, setModels] = useState([])
   const [editing, setEditing] = useState(null) // agent object or null
@@ -786,9 +788,8 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
         </div>
       )}
       <div className='agent-grid'>
-        {agents.map(a => (
+        {regularAgents.map(a => (
           <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => openEditor(a)}>
-            {a.relay && <span className='agent-card-live' title='Live-connected agent'><span className='agent-card-live-dot' />live</span>}
             <span className='agent-avatar' style={{ color: `oklch(0.68 0.16 ${a.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={a} size={20} /></span>
             <span className='agent-card-name'>{a.name}</span>
             <span className='agent-card-desc'>{(() => { const d = cleanDesc(a.persona); return d ? d.slice(0, 70) + (d.length > 70 ? '…' : '') : 'General assistant' })()}</span>
@@ -804,6 +805,21 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
           <span className='agent-card-desc'>{AGENT_TEMPLATES.length} ready-made agents</span>
         </button>
       </div>
+      {importedAgents.length > 0 && (
+        <>
+          <div className='agent-divider'><span>Imported from other apps</span></div>
+          <div className='agent-grid'>
+            {importedAgents.map(a => (
+              <button key={a.id} className='agent-card agent-card-imported' onClick={() => openEditor(a)}>
+                {a.relay && <span className='agent-card-live' title='Live-connected agent'><span className='agent-card-live-dot' />live</span>}
+                <span className='agent-avatar'><AgentGlyph agent={a} size={20} /></span>
+                <span className='agent-card-name'>{a.name}</span>
+                <span className='agent-card-desc'>{(() => { const d = cleanDesc(a.persona); return d ? d.slice(0, 70) + (d.length > 70 ? '…' : '') : 'General assistant' })()}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
