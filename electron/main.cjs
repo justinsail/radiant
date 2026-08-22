@@ -1,9 +1,10 @@
-const { app, BrowserWindow, shell, ipcMain, nativeTheme, dialog } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, nativeTheme, dialog, screen } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const os = require('os')
 const { pathToFileURL } = require('url')
 const { installUpdater } = require('./updater.cjs')
+const windowState = require('./window-state.cjs')
 
 // window chrome follows the app's own light/dark setting, not the OS
 function savedMode () {
@@ -40,13 +41,17 @@ ipcMain.on('rad:open-settings', async (e, tab) => {
   const port = await ensureServer()
   const hash = 'settings' + (tab ? '/' + tab : '')
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.focus(); if (tab) settingsWin.loadURL(`http://127.0.0.1:${port}/#${hash}`); return }
+  const setState = windowState.restore('settings', { width: 940, height: 720 }, screen.getAllDisplays())
   settingsWin = new BrowserWindow({
-    width: 940, height: 720, minWidth: 720, minHeight: 520,
+    ...setState.bounds,
+    minWidth: 720,
+    minHeight: 520,
     title: 'Radiant Settings',
     backgroundColor: nativeTheme.themeSource === 'light' ? '#f5f5f6' : '#141517',
     parent: win || undefined,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') }
   })
+  windowState.track(settingsWin, 'settings', setState)
   settingsWin.on('closed', () => {
     settingsWin = null
     if (win && !win.isDestroyed()) win.webContents.send('rad:settings-closed')
@@ -65,9 +70,9 @@ async function ensureServer () {
 
 async function createWindow () {
   const port = await ensureServer()
+  const state = windowState.restore('main', { width: 1360, height: 860 }, screen.getAllDisplays())
   win = new BrowserWindow({
-    width: 1360,
-    height: 860,
+    ...state.bounds,
     minWidth: 900,
     minHeight: 600,
     title: 'Radiant',
@@ -78,6 +83,7 @@ async function createWindow () {
       preload: path.join(__dirname, 'preload.cjs')
     }
   })
+  windowState.track(win, 'main', state)
   win.on('closed', () => { win = null })
   // external links go to the real browser, not new Electron windows
   win.webContents.setWindowOpenHandler(({ url }) => {
