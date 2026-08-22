@@ -92,6 +92,7 @@ export const api = {
   addRecipe: r => json('POST', '/api/recipes', r),
   updateRecipe: (id, patch) => json('PATCH', `/api/recipes/${id}`, patch),
   deleteRecipe: id => json('DELETE', `/api/recipes/${id}`),
+  externalAgents: () => json('GET', '/api/external-agents'),
   addAgent: agent => json('POST', '/api/agents', agent),
   updateAgent: (id, patch) => json('PATCH', `/api/agents/${id}`, patch),
   deleteAgent: id => json('DELETE', `/api/agents/${id}`),

@@ -651,7 +651,9 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
   const [browsing, setBrowsing] = useState(initialView === 'library') // template library open
   const [libQuery, setLibQuery] = useState('')
   const importFileRef = useRef(null)
+  const [external, setExternal] = useState([])
   useEffect(() => { api.getModels().then(setModels).catch(() => {}) }, [])
+  useEffect(() => { api.externalAgents().then(r => setExternal(r.agents || [])).catch(() => {}) }, [])
   const openEditor = obj => { setEditNonce(n => n + 1); setEditing(obj) }
   const fromTemplate = t => { setBrowsing(false); openEditor({ name: t.name, icon: t.icon, hue: null, persona: t.persona, model: null, provider: null, skills: [], useTools: true }) }
 
@@ -744,6 +746,11 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
     window.alert(msg)
   }
 
+  const importExternal = async ext => {
+    const cfg = await api.addAgent({ name: ext.name, emoji: ext.emoji || '🤖', hue: ext.hue ?? null, persona: ext.persona || '', model: ext.model || null, skills: [], useTools: true })
+    onConfigChange(cfg)
+  }
+
   return (
     <div className='set-section'>
       <h3 style={{ margin: 0 }}>Agents</h3>
@@ -755,6 +762,29 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
         <button className='small-btn' onClick={() => importFileRef.current?.click()} title='Import agents from a file'>Import</button>
         <input ref={importFileRef} type='file' accept='.json' multiple hidden onChange={e => { if (e.target.files.length) importAgents(e.target.files); e.target.value = '' }} />
       </div>
+      {external.length > 0 && (
+        <div className='ext-agents'>
+          <div className='ext-agents-title'>Connected agents on this Mac</div>
+          <p className='ext-agents-sub'>Radiant found other agent apps you have installed. Import their persona into your library — connecting to them live is coming soon.</p>
+          {external.map(ext => {
+            const already = agents.some(a => (a.name || '').trim().toLowerCase() === (ext.name || '').trim().toLowerCase())
+            return (
+              <div key={ext.source + ':' + ext.name} className='ext-agent'>
+                <span className='ext-agent-emoji'>{ext.emoji}</span>
+                <span className='ext-agent-info'>
+                  <span className='ext-agent-name'>{ext.name}<span className='ext-agent-src'>{ext.sourceLabel}</span></span>
+                  <span className='ext-agent-note'>{ext.note}</span>
+                </span>
+                {ext.importable === false
+                  ? <span className='ext-agent-tag'>Detected</span>
+                  : already
+                    ? <span className='ext-agent-tag ext-agent-tag-done'>✓ Imported</span>
+                    : <button className='small-btn' onClick={() => importExternal(ext)}>Import</button>}
+              </div>
+            )
+          })}
+        </div>
+      )}
       <div className='agent-grid'>
         {agents.map(a => (
           <button key={a.id} className='agent-card' style={{ '--ah': a.hue ?? 'var(--accent-h)' }} onClick={() => openEditor(a)}>

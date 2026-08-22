@@ -1040,6 +1040,19 @@ input[type='range']::-webkit-slider-thumb {
 .mcp-row .skill-name { display: flex; align-items: center; gap: 8px; }
 
 /* agents */
+.ext-agents { margin: 16px 0 4px; padding: 14px 14px 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-input); }
+.ext-agents-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.ext-agents-sub { font-size: 12px; color: var(--text-muted); margin: 4px 0 10px; }
+.ext-agent { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.ext-agent:first-of-type { border-top: none; }
+.ext-agent-emoji { font-size: 22px; flex: none; width: 26px; text-align: center; }
+.ext-agent-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ext-agent-name { font-size: 13.5px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.ext-agent-src { font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--text-faint); border: 1px solid var(--border-strong); border-radius: 5px; padding: 1px 6px; }
+.ext-agent-note { font-size: 12px; color: var(--text-muted); }
+.ext-agent-tag { font-size: 12px; color: var(--text-faint); flex: none; }
+.ext-agent-tag-done { color: var(--accent); }
+
 .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .agent-card {
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px;

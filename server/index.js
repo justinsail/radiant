@@ -305,6 +305,66 @@ app.delete('/api/agents/:id', (req, res) => {
   res.json(publicConfig(config))
 })
 
+// ---------- connected agents (import from Hermes / OpenClaw on this Mac) ----------
+function hexToHue (hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim())
+  if (!m) return null
+  const n = parseInt(m[1], 16)
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn
+  if (!d) return null
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4
+  h = Math.round(h * 60); return h < 0 ? h + 360 : h
+}
+
+function discoverExternalAgents () {
+  const home = os.homedir()
+  const out = []
+  // Hermes — its "profiles" are agents; the persona lives in SOUL.md
+  try {
+    const hDir = path.join(home, '.hermes')
+    const soulPath = path.join(hDir, 'SOUL.md')
+    if (fs.existsSync(soulPath)) {
+      const persona = fs.readFileSync(soulPath, 'utf8').trim()
+      let title = 'Hermes', color = null, modelNote = ''
+      try {
+        const py = fs.readFileSync(path.join(hDir, 'profile.yaml'), 'utf8')
+        const tm = /title:\s*['"]?([^'"\n]+)/i.exec(py); if (tm) title = tm[1].trim()
+        const cm = /color:\s*['"]?(#[0-9a-fA-F]{6})/i.exec(py); if (cm) color = cm[1]
+      } catch {}
+      try {
+        const cy = fs.readFileSync(path.join(hDir, 'config.yaml'), 'utf8')
+        const pm = /provider:\s*([a-z0-9_-]+)/i.exec(cy); if (pm) modelNote = pm[1]
+      } catch {}
+      if (persona) out.push({
+        source: 'hermes', sourceLabel: 'Hermes', name: title, emoji: '🪽',
+        hue: hexToHue(color), persona, model: null,
+        note: modelNote ? `Hermes profile · ${modelNote}` : 'Hermes profile',
+        personaChars: persona.length, importable: true
+      })
+    }
+  } catch {}
+  // OpenClaw — a local/remote gateway; detected but no local persona to import (yet)
+  try {
+    const ocPath = path.join(home, '.openclaw', 'openclaw.json')
+    if (fs.existsSync(ocPath)) {
+      let mode = ''
+      try { mode = (JSON.parse(fs.readFileSync(ocPath, 'utf8')).gateway || {}).mode || '' } catch {}
+      out.push({
+        source: 'openclaw', sourceLabel: 'OpenClaw', name: 'OpenClaw', emoji: '🐾',
+        hue: null, persona: '', model: null,
+        note: `Gateway detected${mode ? ` · ${mode}` : ''} — live connect coming soon`, importable: false
+      })
+    }
+  } catch {}
+  return out
+}
+
+app.get('/api/external-agents', (req, res) => {
+  try { res.json({ agents: discoverExternalAgents() }) }
+  catch (e) { res.json({ agents: [], error: String((e && e.message) || e) }) }
+})
+
 // ---------- usage / credits ----------
 app.get('/api/usage', async (req, res) => {
   const out = []
