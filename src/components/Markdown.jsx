@@ -59,6 +59,18 @@ export default function Markdown ({ text }) {
       })
       pre.appendChild(btn)
     })
+    // open links in the external browser — Electron denies in-window navigation,
+    // so a plain <a> click does nothing. Intercept and open via the OS.
+    const onLinkClick = e => {
+      const a = e.target.closest('a[href]')
+      if (!a || !root.contains(a)) return
+      const href = a.getAttribute('href') || ''
+      if (!href || href.startsWith('#')) return
+      e.preventDefault()
+      window.open(href, '_blank', 'noopener,noreferrer')
+    }
+    root.addEventListener('click', onLinkClick)
+    return () => root.removeEventListener('click', onLinkClick)
   }, [html])
 
   return <div className='md' ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
