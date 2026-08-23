@@ -513,16 +513,23 @@ app.get('/api/usage', async (req, res) => {
       }
     } catch {}
   }
-  // subscription sign-ins expose usage via their CLIs' private endpoints
-  for (const id of ['anthropic', 'openai']) {
+  // ⚠️ ONLY SOME VENDORS PUBLISH USAGE. Claude and ChatGPT have private
+  // endpoints their own apps call. xAI, Nous, Qwen and Copilot do not: probing
+  // their APIs with a valid OAuth token returns 404 on every usage path and no
+  // quota headers on any response (checked 2026-08-23). So the meter shows a
+  // real gauge where the number exists and "signed in" where it does not —
+  // rather than omitting the provider entirely, which read as broken.
+  const USAGE = { anthropic: claudeUsage, openai: chatgptUsage }
+  const SHORT = { anthropic: 'Claude', openai: 'ChatGPT', nousresearch: 'Nous', xai: 'Grok', qwen: 'Qwen', copilot: 'Copilot' }
+  for (const id of Object.keys(config.oauth || {})) {
     if (!config.oauth[id]) continue
-    const label = id === 'anthropic' ? 'Claude' : 'ChatGPT'
+    const label = SHORT[id] || (OAUTH_PROVIDERS[id]?.label || id).replace(/\s*\(.*\)$/, '')
     let windows = null
-    try {
-      const token = await validAccessToken(id, config, saveConfig)
-      windows = id === 'anthropic' ? await claudeUsage(token) : await chatgptUsage(token)
-    } catch {}
-    out.push({ provider: id, label, kind: 'subscription', windows })
+    const fetcher = USAGE[id]
+    if (fetcher) {
+      try { windows = await fetcher(await validAccessToken(id, config, saveConfig)) } catch {}
+    }
+    out.push({ provider: id, label, kind: 'subscription', windows, reportsUsage: Boolean(fetcher) })
   }
   res.json({ items: out })
 })

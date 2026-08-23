@@ -1407,7 +1407,7 @@ const GUIDE = [
     items: [
       ['Themes', 'A dozen palettes plus a custom accent, in light / medium / dark (bottom-left toggle). Agents can follow the accent or carry their own color.'],
       ['Motion', 'Ten animated backgrounds in Settings → Appearance, an accent glow that pulses around the composer while an agent is working, and subtle entrance animations throughout (all respect Reduce Motion).'],
-      ['Usage meters', 'A gas-tank view of how much is left on your Claude and ChatGPT subscriptions plus your OpenRouter balance, at the bottom of the sidebar. Other providers do not report usage yet.'],
+      ['Usage meters', 'Every subscription you are signed in to shows at the bottom of the sidebar, along with your OpenRouter balance. Claude and ChatGPT report how much of each window you have left and when it resets; Grok, Nous, Qwen and Copilot do not publish usage, so those read simply “signed in”.'],
       ['Command palette', 'Press ⌘K for quick actions, model switching, and jumping between sessions.'],
       ['Links open in your browser', 'Links in an agent’s reply, and the Templeton Technologies logo on the About page, open in your default browser rather than trying to navigate inside the app.'],
       ['Updates install themselves', 'Radiant downloads a new version quietly in the background and applies it the next time you quit — no prompts. While it downloads the sidebar shows the progress, and once it is ready the pill says “Restart to update”; click it to finish right away instead of waiting. You can turn the automatic check off in Settings → About.'],
