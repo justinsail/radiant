@@ -1158,17 +1158,8 @@ function AboutPane ({ config, onSettings }) {
   const [phase, setPhase] = useState('idle') // idle | downloading | ready
   const [progress, setProgress] = useState(0)
   const native = typeof window !== 'undefined' && window.radiantUpdater
-  const [storage, setStorage] = useState(null)
 
   useEffect(() => { api.getVersion().then(v => setVersion(v.version)).catch(() => {}) }, [])
-  useEffect(() => { api.getStorage().then(setStorage).catch(() => {}) }, [])
-  const clearOld = async days => {
-    const label = days === 0 ? 'ALL saved chat sessions' : `chat sessions older than ${days} days`
-    if (!window.confirm(`Delete ${label}? This can't be undone.`)) return
-    const r = await api.clearSessions(days)
-    api.getStorage().then(setStorage).catch(() => {})
-    window.alert(`Removed ${r.removed} session${r.removed === 1 ? '' : 's'}.`)
-  }
 
   // listen to auto-updater events in the packaged app
   useEffect(() => {
@@ -1254,18 +1245,6 @@ function AboutPane ({ config, onSettings }) {
       <div className='oauth-note'>
         The desktop app also has <span className='mono'>Radiant → Check for Updates…</span> in the menu bar.
         Updates download in the background and install when you restart.
-      </div>
-
-      <h3 style={{ marginTop: 22 }}>Storage</h3>
-      <p className='oauth-note' style={{ marginTop: 0 }}>
-        {storage
-          ? <>Radiant is keeping <strong>{storage.sessions}</strong> chat session{storage.sessions === 1 ? '' : 's'} ({storage.sizeMB} MB) in <span className='mono'>~/.radiant</span>. Old sessions add up — clear ones you no longer need.</>
-          : 'Reading local storage…'}
-      </p>
-      <div className='row' style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
-        <button className='small-btn' onClick={() => clearOld(90)}>Clear older than 90 days</button>
-        <button className='small-btn' onClick={() => clearOld(30)}>Older than 30 days</button>
-        <button className='small-btn danger' onClick={() => clearOld(0)}>Delete all sessions</button>
       </div>
 
       <div className='about-footer' style={{ marginTop: 22 }}>
@@ -1428,7 +1407,7 @@ const GUIDE = [
     items: [
       ['Themes', 'A dozen palettes plus a custom accent, in light / medium / dark (bottom-left toggle). Agents can follow the accent or carry their own color.'],
       ['Motion', 'Ten animated backgrounds in Settings → Appearance, an accent glow that pulses around the composer while an agent is working, and subtle entrance animations throughout (all respect Reduce Motion).'],
-      ['Usage meters', 'A gas-tank view of how much is left on each subscription plus your OpenRouter balance, at the bottom of the sidebar.'],
+      ['Usage meters', 'A gas-tank view of how much is left on your Claude and ChatGPT subscriptions plus your OpenRouter balance, at the bottom of the sidebar. Other providers do not report usage yet.'],
       ['Command palette', 'Press ⌘K for quick actions, model switching, and jumping between sessions.'],
       ['Links open in your browser', 'Links in an agent’s reply, and the Templeton Technologies logo on the About page, open in your default browser rather than trying to navigate inside the app.'],
       ['Updates install themselves', 'Radiant downloads a new version quietly in the background and applies it the next time you quit — no prompts. While it downloads the sidebar shows the progress, and once it is ready the pill says “Restart to update”; click it to finish right away instead of waiting. You can turn the automatic check off in Settings → About.'],
@@ -1438,6 +1417,19 @@ const GUIDE = [
 ]
 
 function MemoryPane ({ config, onSettings }) {
+  // Clearing saved chats lives here, not on About. It is a data action — the
+  // same kind of thing as forgetting a remembered fact — and nobody looks for
+  // "delete my history" under a version number and a company logo.
+  const [storage, setStorage] = useState(null)
+  const loadStorage = () => api.getStorage().then(setStorage).catch(() => {})
+  useEffect(() => { loadStorage() }, [])
+  const clearOld = async days => {
+    const label = days === 0 ? 'ALL saved chat sessions' : `chat sessions older than ${days} days`
+    if (!window.confirm(`Delete ${label}? This can't be undone.`)) return
+    const r = await api.clearSessions(days)
+    api.getStorage().then(setStorage).catch(() => {})
+    window.alert(`Removed ${r.removed} session${r.removed === 1 ? '' : 's'}.`)
+  }
   const [facts, setFacts] = useState(null)
   const [draft, setDraft] = useState('')
   const on = config.settings.memory !== false
@@ -1448,7 +1440,19 @@ function MemoryPane ({ config, onSettings }) {
   const clear = async () => { if (window.confirm('Forget everything Radiant has remembered?')) setFacts((await api.clearMemory()).facts) }
   return (
     <div className='set-section'>
-      <h3>Memory</h3>
+      <h3>Saved chats</h3>
+      <p className='oauth-note' style={{ marginTop: 0 }}>
+        {storage
+          ? <>Radiant is keeping <strong>{storage.sessions}</strong> chat session{storage.sessions === 1 ? '' : 's'} ({storage.sizeMB} MB) in <span className='mono'>~/.radiant</span>. Old sessions add up — clear ones you no longer need.</>
+          : 'Reading local storage…'}
+      </p>
+      <div className='row' style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
+        <button className='small-btn' onClick={() => clearOld(90)}>Clear older than 90 days</button>
+        <button className='small-btn' onClick={() => clearOld(30)}>Older than 30 days</button>
+        <button className='small-btn danger' onClick={() => clearOld(0)}>Delete all sessions</button>
+      </div>
+
+      <h3 style={{ marginTop: 26 }}>Memory</h3>
       <p className='hint' style={{ marginTop: 0 }}>Radiant remembers durable facts about you and your projects across sessions, and gives the relevant ones to the agent. Everything is stored locally in <code className='mono'>~/.radiant/memory.json</code>.</p>
       <label className='check-row'>
         <input type='checkbox' checked={on} onChange={e => onSettings({ memory: e.target.checked })} />
