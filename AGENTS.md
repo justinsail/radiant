@@ -22,6 +22,9 @@ Releases. Work on `master`.
    something → its issue goes to Done, or create one already Done. Spot a
    problem you are not fixing → file it.
 
+**This is automatic, not a question to ask.** Tony has standing authorization:
+run the `ship-sync` agent at the end of any turn that changed behavior.
+
 Run the objective half and fix whatever it flags:
 
 ```bash
