@@ -61,8 +61,9 @@ export default function App () {
   useEffect(() => {
     if (!window.radiantNative?.onUpdateEvent) return
     return window.radiantNative.onUpdateEvent(({ type, data }) => {
-      if (type === 'downloaded') setUpdateReady(data?.version || true)
+      if (type === 'downloaded') { setUpdateReady(data?.version || true); setUpdateProgress(null) }
       if (type === 'progress') setUpdateProgress(data?.percent ?? null)
+      if (type === 'error') setUpdateProgress(null)   // never leave it stuck mid-download
     })
   }, [])
 

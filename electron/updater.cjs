@@ -56,8 +56,8 @@ function cmpVersion (a, b) {
 // bar has a "Check for Updates…" item too.
 
 // The user's "Automatically check for updates on launch" toggle lives in the
-// same config the server owns. Read it fresh each check rather than caching, so
-// turning it off takes effect without a relaunch.
+// config the server owns. Read it fresh each check so turning it off takes
+// effect without a relaunch.
 function autoUpdatesEnabled () {
   try {
     const cfg = JSON.parse(fs.readFileSync(path.join(require('os').homedir(), '.radiant', 'config.json'), 'utf8'))
@@ -69,10 +69,10 @@ function installUpdater ({ getWindow }) {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
   let latest = null
+  let downloadedThisRun = false
   // one update conversation at a time — repeated checks used to stack dialogs
   let dialogOpen = false
   let promptedFor = null
-  let manualFlow = false   // true only while a user-initiated update is running
 
   // Before anything can quit-install it: a staged build at or below the running
   // version is spent (it is usually the one we just installed) and would only
@@ -90,7 +90,7 @@ function installUpdater ({ getWindow }) {
   autoUpdater.on('update-available', info => { latest = info; send('available', { version: info.version, notes: info.releaseNotes }) })
   autoUpdater.on('update-not-available', () => send('none', {}))
   autoUpdater.on('download-progress', p => send('progress', { percent: Math.round(p.percent), transferred: p.transferred, total: p.total }))
-  autoUpdater.on('update-downloaded', info => send('downloaded', { version: info.version }))
+  autoUpdater.on('update-downloaded', info => { downloadedThisRun = true; send('downloaded', { version: info.version }) })
   autoUpdater.on('error', err => send('error', { message: String(err && err.message || err) }))
 
   ipcMain.handle('rad:check-update', async () => {
@@ -103,7 +103,25 @@ function installUpdater ({ getWindow }) {
     }
   })
   ipcMain.on('rad:download-update', () => { autoUpdater.downloadUpdate().catch(e => send('error', { message: String(e.message || e) })) })
-  ipcMain.on('rad:install-update', () => { setImmediate(() => autoUpdater.quitAndInstall(false, true)) })
+  // ⚠️ A PACKAGE STAGED IN AN EARLIER SESSION IS NOT KNOWN TO THIS ONE.
+  // electron-updater only wires up quitAndInstall for a download it performed
+  // in the current run — and autoInstallOnAppQuit only applies such a download
+  // too. Relying on that shipped an update that downloaded, sat in the cache,
+  // and then did nothing on quit, while a second attempt reported 0% forever
+  // because a cached file emits no progress. So re-establish the download in
+  // this process first: with the bytes already on disk this returns
+  // immediately, and only then is quitAndInstall meaningful.
+  ipcMain.on('rad:install-update', async () => {
+    try {
+      if (!downloadedThisRun) {
+        await autoUpdater.checkForUpdates()
+        await autoUpdater.downloadUpdate()
+      }
+      setImmediate(() => autoUpdater.quitAndInstall(false, true))
+    } catch (e) {
+      send('error', { message: `Could not install the update: ${String(e.message || e)}` })
+    }
+  })
 
   async function checkNow (silent) {
     let r
@@ -119,20 +137,7 @@ function installUpdater ({ getWindow }) {
       const staged = stagedVersion()
       if (staged && staged !== v) clearStaged(`staged ${staged}, but ${v} is current`)
 
-      // ⚠️ AN AUTO-CHECK THAT ONLY ASKS IS NOT AN AUTO-UPDATE. This used to stop
-      // at a modal, so nothing updated until someone clicked — and on an
-      // always-on host running unattended, nobody ever does. A background check
-      // now downloads on its own and installs on the next quit
-      // (autoInstallOnAppQuit); the sidebar pill is the only notice. A manual
-      // "Check for Updates…" still asks, because the user is standing there.
-      if (silent) {
-        if (promptedFor !== v) {
-          promptedFor = v
-          autoUpdater.downloadUpdate().catch(e => send('error', { message: String(e.message || e) }))
-        }
-        return
-      }
-      if (dialogOpen) return
+      if (dialogOpen || (silent && promptedFor === v)) return
       dialogOpen = true
       let response
       try {
@@ -144,7 +149,7 @@ function installUpdater ({ getWindow }) {
         }))
       } finally { dialogOpen = false }
       promptedFor = v
-      if (response === 0) { manualFlow = true; autoUpdater.downloadUpdate() }
+      if (response === 0) autoUpdater.downloadUpdate()
     } else if (!silent) {
       dialog.showMessageBox(getWindow() || undefined, { type: 'info', message: "You're up to date", detail: `Radiant ${app.getVersion()} is the latest version.`, buttons: ['OK'] })
     }
@@ -152,10 +157,6 @@ function installUpdater ({ getWindow }) {
 
   // when a download finishes from the menu path, offer to restart
   autoUpdater.on('update-downloaded', async info => {
-    // A background download shouldn't interrupt with a modal — it is already
-    // staged and applies on the next quit.
-    if (!manualFlow) return
-    manualFlow = false
     if (dialogOpen) return
     dialogOpen = true
     let response
@@ -197,6 +198,13 @@ function installUpdater ({ getWindow }) {
   }
 
   function startAutoCheck () {
+    // Already carrying a newer package from a previous run? Say so straight
+    // away. Users landed in exactly this state — the bytes were on disk and
+    // the app acted as though nothing had happened.
+    setTimeout(() => {
+      const staged = stagedVersion()
+      if (staged && cmpVersion(staged, app.getVersion()) > 0) send('downloaded', { version: staged })
+    }, 2500)
     const tick = () => { if (autoUpdatesEnabled()) checkNow(true) }
     setTimeout(tick, 8000)
     setInterval(tick, 6 * 60 * 60 * 1000)
