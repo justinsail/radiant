@@ -31,11 +31,13 @@ const checks = []
 const add = (id, ok, detail, fix) => checks.push({ id, ok, detail, fix })
 
 // ── 1. Is everything committed? ──────────────────────────────────────────────
+// tryGit trims, so the first porcelain line loses its leading status space
+// (' M path' arrives as 'M path') — strip the status flags tolerantly.
 const dirty = tryGit('status', '--porcelain').split('\n').filter(Boolean)
 add(
   'committed',
   dirty.length === 0,
-  dirty.length ? `${dirty.length} uncommitted file(s): ${dirty.slice(0, 6).map(l => l.slice(3)).join(', ')}${dirty.length > 6 ? '…' : ''}` : 'working tree clean',
+  dirty.length ? `${dirty.length} uncommitted file(s): ${dirty.slice(0, 6).map(l => l.replace(/^\s*\S{1,2}\s+/, '')).join(', ')}${dirty.length > 6 ? '…' : ''}` : 'working tree clean',
   'git add -A && git commit'
 )
 
@@ -50,26 +52,39 @@ add(
 )
 
 // ── 3. Does the in-app Read me know about it? ────────────────────────────────
-// Compare against the last released tag: if user-facing code moved since then
-// and the GUIDE array never did, the Read me is behind.
+// ⚠️ COMPARE THE RELEASE, NOT "SINCE THE LAST TAG". Once a release is tagged,
+// lastTag..HEAD is empty and this check passed no matter what — v0.6.87 shipped
+// user-facing code with no Read me entry and still came back green. When HEAD's
+// version is already tagged, the range that matters is the release itself:
+// previous tag .. this tag.
+const thisTag = tryGit('tag', '-l', `v${JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version}`)
 const lastTag = tryGit('describe', '--tags', '--abbrev=0')
-if (!lastTag) {
+const prevTag = thisTag ? tryGit('describe', '--tags', '--abbrev=0', `${thisTag}^`) : ''
+const range = thisTag && prevTag ? `${prevTag}..${thisTag}` : lastTag ? `${lastTag}..HEAD` : ''
+
+if (!range) {
   add('readme', true, 'no tags yet — nothing to compare against', '')
 } else {
-  const changed = tryGit('diff', '--name-only', `${lastTag}..HEAD`).split('\n').filter(Boolean)
+  const changed = tryGit('diff', '--name-only', range).split('\n').filter(Boolean)
   const codeChanged = changed.filter(f => USER_FACING.test(f) && f !== GUIDE_FILE)
-  const guideDiff = tryGit('diff', `${lastTag}..HEAD`, '--', GUIDE_FILE)
+  const guideDiff = tryGit('diff', range, '--', GUIDE_FILE)
   // a GUIDE entry is a line like:   ['Title', 'Body'],
   const guideTouched = guideDiff.split('\n').some(l => /^[+-]\s*\['/.test(l))
+  // Some changes genuinely are invisible to users — an icon that stopped being
+  // wrong, a refactor. That is a decision, not a silence: record it with a
+  // `Read-me: n/a — <reason>` trailer in the commit and this passes.
+  const exempt = /^Read-me:\s*n\/a\b/im.test(tryGit('log', '--format=%B', range))
   add(
     'readme',
-    codeChanged.length === 0 || guideTouched,
+    codeChanged.length === 0 || guideTouched || exempt,
     codeChanged.length === 0
-      ? `no user-facing code changed since ${lastTag}`
+      ? `no user-facing code changed in ${range}`
       : guideTouched
         ? `Read me updated alongside ${codeChanged.length} changed file(s)`
-        : `${codeChanged.length} user-facing file(s) changed since ${lastTag} but the Read me (GUIDE in ${GUIDE_FILE}) was not touched`,
-    `add or amend an entry in the GUIDE array in ${GUIDE_FILE}`
+        : exempt
+          ? `${codeChanged.length} file(s) changed; declared not user-visible via a Read-me trailer`
+          : `${codeChanged.length} user-facing file(s) changed in ${range} but the Read me (GUIDE in ${GUIDE_FILE}) was not touched`,
+    `add an entry to the GUIDE array in ${GUIDE_FILE}, or record why not with a "Read-me: n/a — <reason>" commit trailer`
   )
 }
 
