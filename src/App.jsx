@@ -28,6 +28,8 @@ export default function App () {
   const [rightOpen, setRightOpen] = useState(false)
   const [rightTab, setRightTab] = useState('activity')
   const [updateInfo, setUpdateInfo] = useState(null) // {latest, dmgUrl} when an update exists
+  const [updateReady, setUpdateReady] = useState(null) // version staged and waiting for a restart
+  const [updateProgress, setUpdateProgress] = useState(null) // % while it downloads
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // mobile sidebar drawer
@@ -50,6 +52,19 @@ export default function App () {
     refreshSessions()
     refreshModels()
   }, [refreshSessions, refreshModels])
+
+  // ⚠️ A SILENT DOWNLOAD STILL NEEDS TO SAY SOMETHING. Background updates
+  // download on their own and apply on the next quit, which looked broken:
+  // nothing changed on screen, so the update appeared not to be happening.
+  // When one is staged the pill switches to "Restart to update", and clicking
+  // it restarts instead of opening Settings.
+  useEffect(() => {
+    if (!window.radiantNative?.onUpdateEvent) return
+    return window.radiantNative.onUpdateEvent(({ type, data }) => {
+      if (type === 'downloaded') setUpdateReady(data?.version || true)
+      if (type === 'progress') setUpdateProgress(data?.percent ?? null)
+    })
+  }, [])
 
   const saveSettings = async patch => {
     const cfg = await api.saveSettings(patch)
@@ -291,6 +306,9 @@ export default function App () {
           saveSettings({ mode: next })
         }}
         updateInfo={updateInfo}
+        updateReady={updateReady}
+        updateProgress={updateProgress}
+        onInstall={() => window.radiantNative?.install?.()}
         onUpdate={() => { setNavOpen(false); if (window.radiantNative?.openSettings) window.radiantNative.openSettings('about'); else { setSettingsTab('about'); setSettingsOpen(true) } }}
       />
       <Chat

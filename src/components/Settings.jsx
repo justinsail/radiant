@@ -1431,6 +1431,7 @@ const GUIDE = [
       ['Usage meters', 'A gas-tank view of how much is left on each subscription plus your OpenRouter balance, at the bottom of the sidebar.'],
       ['Command palette', 'Press ⌘K for quick actions, model switching, and jumping between sessions.'],
       ['Links open in your browser', 'Links in an agent’s reply, and the Templeton Technologies logo on the About page, open in your default browser rather than trying to navigate inside the app.'],
+      ['Updates install themselves', 'Radiant downloads a new version quietly in the background and applies it the next time you quit — no prompts. While it downloads the sidebar shows the progress, and once it is ready the pill says “Restart to update”; click it to finish right away instead of waiting. You can turn the automatic check off in Settings → About.'],
       ['Windows stay where you put them', 'Radiant reopens at the size and position you left it, and remembers whether it was maximized or full screen. The Settings window keeps its own size. If you unplug the monitor a window was on, it comes back on a screen you can actually see.']
     ]
   }

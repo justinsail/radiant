@@ -1486,3 +1486,6 @@ button.hf-head:hover { background: var(--bg-hover); }
 }
 /* Connected agents: apps that ship an avatar (Hermes) show it instead of an emoji. */
 .ext-agent-avatar { border-radius: 50%; object-fit: cover; display: block; }
+/* An update that is downloaded and waiting only needs one more click. */
+.update-pill-ready { background: var(--accent-wash); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.update-pill-progress { opacity: 0.75; cursor: default; }

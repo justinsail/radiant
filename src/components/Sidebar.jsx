@@ -54,7 +54,7 @@ function UsageChip () {
 const MIN_W = 190
 const MAX_W = 460
 
-export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onNewGroup, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate, onCloseNav }) {
+export default function Sidebar ({ updateReady, updateProgress, onInstall, sessions, activeId, working, onOpen, onNew, onNewGroup, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate, onCloseNav }) {
   const agentOf = id => agents.find(a => a.id === id)
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem('radiant.sidebarWidth'))
@@ -194,11 +194,20 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
           )})()}
         </div>
       )}
-      {updateInfo && (
-        <button className='update-pill' onClick={onUpdate} title={`Radiant ${updateInfo.latest} is available`}>
-          ↑ Update to {updateInfo.latest}
-        </button>
-      )}
+      {updateReady
+        ? <button className='update-pill update-pill-ready' onClick={onInstall}
+            title={`Radiant ${typeof updateReady === 'string' ? updateReady : ''} is downloaded — restart to finish`}>
+            ⟳ Restart to update{typeof updateReady === 'string' ? ` to ${updateReady}` : ''}
+          </button>
+        : updateProgress != null && updateProgress < 100
+          ? <div className='update-pill update-pill-progress' title='Downloading the update'>
+              ↓ Downloading… {updateProgress}%
+            </div>
+          : updateInfo && (
+            <button className='update-pill' onClick={onUpdate} title={`Radiant ${updateInfo.latest} is available`}>
+              ↑ Update to {updateInfo.latest}
+            </button>
+          )}
       <UsageChip />
       <div className='sidebar-foot'>
         <button className='icon-btn' onClick={onSettings} title='Open settings'><Icon.settings /> Settings</button>
