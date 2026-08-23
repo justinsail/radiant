@@ -81,7 +81,11 @@ export function accentHex (hue, chroma) {
 
 export function applyTheme (settings) {
   const root = document.documentElement
-  const preset = THEMES.find(t => t.id === settings.themeId)
+  // An unrecognized themeId (renamed, removed, or a bad default) used to fall
+  // through to customHue, which turned the app a color nobody chose. Fall back
+  // to the first theme — the brand one — so the app is always on a real palette.
+  const preset = THEMES.find(t => t.id === settings.themeId) ||
+    (settings.themeId ? THEMES[0] : null)
   const hue = preset ? preset.hue : (settings.customHue ?? 258)
   const chroma = preset ? preset.chroma : (settings.customChroma ?? 0.11)
   // background tint: an explicit user override wins, else the theme's default

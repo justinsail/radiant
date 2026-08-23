@@ -85,8 +85,12 @@ const DEFAULT_CONFIG = {
   ],
   settings: {
     mode: 'dark',
-    themeId: 'steel',
-    customHue: 45,
+    // ⚠️ MUST BE A REAL THEME ID FROM src/theme.js. This said 'steel', which
+    // does not exist, so every fresh install fell through to customHue and
+    // rendered orange instead of Radiant blue. The fallback below catches a
+    // bad id now, but the default should still be right.
+    themeId: 'radiant',
+    customHue: 258,
     customChroma: 0.19,
     fontFamily: 'inter',
     uiScale: 1,
@@ -133,7 +137,7 @@ export function loadConfig () {
       }
     }
     if (saved.agents) {
-      // built-in agents now follow the accent colour (hue: null); null out any that
+      // built-in agents now follow the accent color (hue: null); null out any that
       // still carry an original seeded hue, but keep a hue the user chose themselves.
       const OLD_HUES = { 'agent-radiant': 258, 'agent-reviewer': 25, 'agent-architect': 200, 'agent-explainer': 90, 'agent-pair': 300, 'agent-security': 15, 'agent-sales': 40, 'agent-design': 325, 'agent-education': 130, 'agent-finance': 160, 'agent-devops': 195, 'agent-data': 175, 'agent-docs': 65 }
       // backfill new built-in fields (e.g. icon) onto saved built-in agents
