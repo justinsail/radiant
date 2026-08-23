@@ -15,6 +15,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Radiant" />
     <title>Radiant</title>
+    <script>
+      // Paint in the right palette from the very first frame. Every color is
+      // defined under :root[data-mode=…], and the real mode only arrives with
+      // the config — so without this there's a flash of unstyled page on every
+      // launch, and a device that hasn't signed in yet (no config at all) would
+      // render the connect screen with no theme whatsoever.
+      try { document.documentElement.dataset.mode = localStorage.getItem('radiant.mode') || 'dark' }
+      catch (e) { document.documentElement.dataset.mode = 'dark' }
+    </script>
   </head>
   <body>
     <div id="root"></div>

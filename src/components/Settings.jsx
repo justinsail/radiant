@@ -1337,8 +1337,10 @@ function DevicesPane () {
                       <code className='mono'>{a.address}:{share.port}</code>
                       <span className='fit-badge' style={{ opacity: 0.8 }}>{a.label}</span>
                       <button className='small-btn' onClick={() => copy(`${a.address}:${share.port}`)}>Copy</button>
+                      <button className='small-btn' title='Link with the token built in — open it once on the phone and it stays signed in' onClick={() => copy(`http://${a.address}:${share.port}/?token=${encodeURIComponent(share.token)}`)}>Copy phone link</button>
                     </div>))
                 : <div className='v-meta'>No network address found — is Tailscale running?</div>}
+              <div className='hint' style={{ marginTop: 8 }}>“Copy phone link” carries the token, so opening it on your phone signs that device in for good — then Add to Home Screen. The token is dropped from the address bar right after, so it won’t sit in history.</div>
             </div>
           </div>
         )}
@@ -1419,7 +1421,8 @@ const GUIDE = [
     title: 'Your devices',
     items: [
       ['One server, all your devices', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share on my network) and connect your other Macs and phone to it — they share the same agents, models, and sessions.'],
-      ['On your phone', 'Open the host’s address in Safari (over Tailscale) and Add to Home Screen — it installs like an app, with a mobile-tuned layout.']
+      ['On your phone', 'On the host Mac hit Settings → Devices → “Copy phone link”, open it once in Safari on the phone, then Add to Home Screen — it installs like an app, with a mobile-tuned layout. The link carries the access token, so you never type an address or a token, and the token is dropped from the URL immediately so it doesn’t linger in history.'],
+      ['Signed in for good', 'Once a device is signed in it stays signed in — the token is held in a secure cookie rather than page storage, which iOS can clear out from under a Home Screen app. If you do land on the connect screen, it only asks for the token: the address is wherever you opened it from.']
     ]
   },
   {

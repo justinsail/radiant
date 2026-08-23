@@ -88,6 +88,11 @@ export function applyTheme (settings) {
   const tint = settings.bgTint != null ? settings.bgTint : (preset ? preset.tint : 1)
   const mode = ['light', 'medium', 'dark'].includes(settings.mode) ? settings.mode : 'dark'
   root.dataset.mode = mode
+  // Remember it for the next cold start: every color lives under
+  // :root[data-mode=…], and the mode only arrives with the config. A phone that
+  // hasn't signed in yet never gets a config, so without this the connect
+  // screen renders with no palette at all — black on white.
+  try { localStorage.setItem('radiant.mode', mode) } catch {}
   // window chrome (Electron) only knows light/dark — medium reads as dark
   if (window.radiantNative) window.radiantNative.setMode(mode === 'light' ? 'light' : 'dark')
   root.style.setProperty('--accent-h', String(hue))

@@ -1,45 +1,87 @@
 import React, { useState } from 'react'
-import { getServer, setServer, testServer } from '../api.js'
+import { getServer, setServer, testServer, servedByRadiant } from '../api.js'
 
-// Shown when the app can't reach its Radiant server — lets the user point at a
-// remote shared server (e.g. the always-on host Mac) or fall back to local.
+// Shown when the app can't reach its Radiant server.
+//
+// Two quite different situations land here, and they don't deserve the same
+// form. On a phone the page was served BY the shared server, so the address is
+// simply this origin and the only missing piece is the token — asking someone
+// to thumb in an IP they are already connected to is busywork. In the desktop
+// app there is no origin to borrow, so the address is a real question.
 export default function ConnectGate ({ error }) {
   const cur = getServer()
+  const here = servedByRadiant()
   const [base, setBase] = useState(cur.base || '')
   const [token, setToken] = useState(cur.token || '')
+  const [manual, setManual] = useState(!here)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
 
-  const connect = async () => {
+  const connect = async e => {
+    e?.preventDefault()
     setBusy(true); setMsg(null)
     try {
-      let url = base.trim()
-      if (url && !/^https?:\/\//i.test(url)) url = 'http://' + url
-      await testServer(url, token.trim())
-      setServer({ base: url, token: token.trim() })
+      if (manual) {
+        let url = base.trim()
+        if (url && !/^https?:\/\//i.test(url)) url = 'http://' + url
+        await testServer(url, token.trim())
+        setServer({ base: url, token: token.trim() })
+      } else {
+        await testServer(location.origin, token.trim())
+        setServer({ base: '', token: token.trim() })
+      }
       location.reload()
     } catch (e) { setMsg(e.message); setBusy(false) }
   }
   const useLocal = () => { setServer(null); location.reload() }
 
+  const canSubmit = token.trim() && (!manual || base.trim())
+
   return (
     <div className='app'>
-      <div className='connect-gate'>
+      <form className='connect-gate' onSubmit={connect}>
         <div className='logo-mark big-mark' aria-hidden />
-        <h2>Connect to Radiant</h2>
-        <p className='hint'>{error || "Couldn't reach a Radiant server."}</p>
-        <label className='connect-field'>Server address
-          <input className='text-input' placeholder='e.g. 100.x.y.z:5834 (Tailscale) or a Mac on your network' value={base} onChange={e => setBase(e.target.value)} />
+        <h2 className='connect-title'>Connect to Radiant</h2>
+        <p className='connect-sub'>
+          {here
+            ? <>Enter the access token from the host Mac — <strong>Settings&nbsp;→&nbsp;Devices&nbsp;&amp;&nbsp;sharing</strong>. This device stays signed in afterward.</>
+            : (error || "Couldn't reach a Radiant server.")}
+        </p>
+
+        {manual && (
+          <label className='connect-field'>
+            <span className='connect-label'>Server address</span>
+            <input
+              className='text-input' value={base} onChange={e => setBase(e.target.value)}
+              placeholder='100.x.y.z:5834 or host.tail-net.ts.net:5834'
+              autoCapitalize='off' autoCorrect='off' spellCheck='false' inputMode='url'
+            />
+          </label>
+        )}
+
+        <label className='connect-field'>
+          <span className='connect-label'>Access token</span>
+          <input
+            className='text-input' type='password' value={token} onChange={e => setToken(e.target.value)}
+            placeholder='Paste the token from the host Mac'
+            autoCapitalize='off' autoCorrect='off' spellCheck='false' autoComplete='one-time-code'
+          />
         </label>
-        <label className='connect-field'>Access token
-          <input className='text-input' type='password' placeholder='Token from the host Mac (Settings → Devices)' value={token} onChange={e => setToken(e.target.value)} />
-        </label>
-        {msg && <div className='error-note'>⚠ {msg}</div>}
-        <div className='row' style={{ marginTop: 12 }}>
-          <button className='small-btn primary' onClick={connect} disabled={busy || !base.trim()}>{busy ? 'Connecting…' : 'Connect'}</button>
-          <button className='small-btn' onClick={useLocal}>Use this Mac's own server</button>
+
+        {msg && <div className='error-note connect-error'>⚠ {msg}</div>}
+
+        <button className='small-btn primary connect-go' type='submit' disabled={busy || !canSubmit}>
+          {busy ? 'Connecting…' : 'Connect'}
+        </button>
+
+        <div className='connect-alt'>
+          {here
+            ? <button type='button' className='link-btn' onClick={() => setManual(m => !m)}>
+                {manual ? 'Use this server' : 'Connect to a different Mac'}
+              </button>
+            : <button type='button' className='link-btn' onClick={useLocal}>Use this Mac's own server</button>}
         </div>
-      </div>
+      </form>
     </div>
   )
 }

@@ -11,11 +11,17 @@ smooth the CONTOUR at 4x and let the downsample do the anti-aliasing.
 ⚠️ THE COLOUR IS MEASURED FROM THE OLD FILE, NOT CHOSEN. Tony, 2026-08-19:
 "the same exact color it is now". (83, 119, 179).
 
-Two shapes, because both were asked for:
-  disc  — what Radiant has always had: a circle with the swirl cut out of it.
-  tile  — the AiOS treatment: an opaque squircle with the swirl in white.
+Three treatments:
+  disc      — WHAT SHIPS: a blue circle with the swirl painted on in white.
+  tile      — the AiOS treatment: an opaque squircle, swirl in white.
+  knockout  — the original: a circle with the swirl cut out of it.
 
-    python3 scripts/make-icon.py [disc|tile]
+⚠️ `disc` USED TO MEAN KNOCKOUT, AND REGENERATING IT SILENTLY REPLACED THE
+SHIPPED ICON WITH A CUT-OUT ONE. The shipped artwork has a white swirl on a
+blue disc; the knockout is kept under its own name so running this script
+can't quietly change which one Radiant ships.
+
+    python3 scripts/make-icon.py [disc|tile|knockout]
 """
 import sys
 from pathlib import Path
@@ -101,7 +107,7 @@ def crisp(mask: Image.Image, px: int) -> Image.Image:
 def _shape(size: int, kind: str) -> Image.Image:
     y, x = np.mgrid[0:size, 0:size]
     c = (size - 1) / 2
-    if kind == "disc":
+    if kind != "tile":
         d = np.sqrt((x - c) ** 2 + (y - c) ** 2)
         a = np.clip((c - d) * size / 3.0 + 0.5, 0, 1)
     else:
@@ -113,15 +119,30 @@ def _shape(size: int, kind: str) -> Image.Image:
 
 
 def render(kind: str, mark: Image.Image, canvas: int) -> Image.Image:
-    # Measured off the two existing icons, so each keeps its own proportions.
-    body_frac, mark_frac = (0.920, 0.789) if kind == "disc" else (0.878, 0.753)
+    # ⚠️ THE SWIRL IS SIZED TO MATCH AiOS, MEASURED — NOT EYEBALLED. Radiant sits
+    # next to AiOS in the Dock, and the two marks have to read as the same size.
+    # AiOS's white swirl spans 0.678 of its 1024 canvas (694px of 1024, measured
+    # off mac/icon-1024.png), so Radiant's does too. Compare against the CANVAS,
+    # not the body: Radiant is a disc and AiOS a squircle, so their bodies
+    # are different shapes, but both are drawn into the same Dock slot — the
+    # canvas is the only shared frame of reference.
+    #
+    # Two earlier passes got this wrong by adjusting until it "looked right":
+    # first too big, then (scaling the finished PNG by 0.89) too small.
+    # Both numbers are measured off mac/icon-1024.png, the AiOS icon: body 918
+    # and swirl 694 in a 1024 canvas. Matching both is the only way the two read
+    # as the same size in the Dock — matching the swirl alone still looks off if
+    # one tile is bigger than the other.
+    BODY_VS_CANVAS, MARK_VS_CANVAS = 0.896, 0.678
+    body_frac = BODY_VS_CANVAS if kind == "tile" else 0.920
+    mark_frac = MARK_VS_CANVAS
     size = int(canvas * body_frac)
     body = Image.new("RGBA", (size, size), (*BLUE, 255))
     body.putalpha(_shape(size, kind))
 
     m = crisp(mark, int(canvas * mark_frac))
     offset = ((size - m.size[0]) // 2,) * 2
-    if kind == "disc":
+    if kind == "knockout":
         # Cut the swirl out of the blue, as it has always been.
         hole = Image.new("L", (size, size), 0)
         hole.paste(m, offset)
@@ -139,8 +160,8 @@ def render(kind: str, mark: Image.Image, canvas: int) -> Image.Image:
 
 def main() -> None:
     kind = sys.argv[1] if len(sys.argv) > 1 else "disc"
-    if kind not in ("disc", "tile"):
-        raise SystemExit("usage: make-icon.py [disc|tile]")
+    if kind not in ("disc", "tile", "knockout"):
+        raise SystemExit("usage: make-icon.py [disc|tile|knockout]")
     mark = swirl_mask(SOURCE)
     master = render(kind, mark, CANVAS)
     for path, px in TARGETS:

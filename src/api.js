@@ -3,7 +3,10 @@
 let SERVER = (() => { try { return JSON.parse(localStorage.getItem('radiant.server')) || {} } catch { return {} } })()
 export function getServer () { return { ...SERVER } }
 export function setServer (s) {
-  SERVER = s && s.base ? { base: String(s.base).replace(/\/$/, ''), token: s.token || '' } : {}
+  // A token with no base is valid: the page is served by the shared server
+  // itself, so the address is this origin and only the token is needed.
+  if (!s || (!s.base && !s.token)) SERVER = {}
+  else SERVER = { base: s.base ? String(s.base).replace(/\/$/, '') : '', token: s.token || '' }
   localStorage.setItem('radiant.server', JSON.stringify(SERVER))
 }
 export function apiUrl (path) { return (SERVER.base || '') + path }
@@ -17,10 +20,25 @@ export function wsUrl (path) {
   return `${proto}://${u.host}${path}${SERVER.token ? `${sep}token=${encodeURIComponent(SERVER.token)}` : ''}`
 }
 // Verify a remote server is reachable with the given token (used by the connect UI).
+// Is this page being served BY a Radiant server? Then it already knows the
+// address — only the token is missing, and asking a phone to retype an IP it
+// is literally connected to is busywork.
+export function servedByRadiant () {
+  return !SERVER.base && location.protocol.startsWith('http')
+}
+// Sign in against the server that served this page (the phone case).
+export async function connectHere (token) {
+  await testServer(location.origin, token)
+  setServer({ base: '', token })
+  return true
+}
 export async function testServer (base, token) {
   let res
   try {
-    res = await fetch(String(base).replace(/\/$/, '') + '/api/config', { headers: token ? { 'x-radiant-token': token } : {} })
+    res = await fetch(String(base).replace(/\/$/, '') + '/api/config', {
+      headers: token ? { 'x-radiant-token': token } : {},
+      credentials: 'same-origin'
+    })
   } catch {
     throw new Error("Couldn't reach that server. Check the address is right, Radiant is running and shared on the host (v0.6.9+), and both devices are on Tailscale.")
   }
