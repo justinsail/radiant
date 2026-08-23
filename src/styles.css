@@ -503,8 +503,13 @@ code, pre, .mono { font-family: var(--font-mono); }
 .update-avail { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--accent-dim); background: var(--accent-wash); border-radius: 10px; font-size: 13px; }
 .update-none { margin-top: 12px; color: var(--text-muted); font-size: 13px; }
 .about-footer { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); text-align: center; }
-.about-footer-text { font-size: 12px; color: var(--text-faint); letter-spacing: 0.02em; margin-bottom: 10px; }
-.about-footer-logo { max-width: 100%; width: 300px; height: auto; opacity: 0.9; }
+.about-footer-text { font-size: 12px; color: var(--text-faint); letter-spacing: 0.02em; margin-bottom: 14px; }
+/* ⚠️ THE WIDTH ASSUMES A TRIMMED LOGO. The original asset carried ~26% empty
+   transparent space above and below the ink, so a 10px CSS gap rendered as a
+   ~43px hole under the text. templeton-tech.png is now cropped to the artwork;
+   285px keeps the mark the same on-screen size it was before the crop.
+   Replacing the file? Trim it first, or this gap silently opens back up. */
+.about-footer-logo { display: block; margin: 0 auto; max-width: 100%; width: 285px; height: auto; opacity: 0.9; }
 .icon-btn {
   padding: 6px 9px; border: 1px solid transparent; border-radius: 8px;
   background: transparent; color: var(--text-muted); font-size: 12.5px;
