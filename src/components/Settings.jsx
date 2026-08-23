@@ -553,8 +553,6 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose, onDupl
   const [a, setA] = useState({ ...agent })
   const set = patch => setA(prev => ({ ...prev, ...patch }))
   const accentHue = Math.round(Number(getComputedStyle(document.documentElement).getPropertyValue('--accent-h')) || 258)
-  const [docker, setDocker] = useState(null)
-  useEffect(() => { api.dockerStatus().then(setDocker).catch(() => {}) }, [])
   const toggleSkill = id => set({ skills: (a.skills || []).includes(id) ? a.skills.filter(s => s !== id) : [...(a.skills || []), id] })
   return (
     <div className='agent-editor'>
@@ -617,20 +615,6 @@ function AgentEditor ({ agent, skills, models, onSave, onDelete, onClose, onDupl
       <div className='agent-field-row'>
         <label className='agent-skill-chk'><input type='checkbox' checked={a.useTools !== false} onChange={e => set({ useTools: e.target.checked })} /> Agent tools</label>
         <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(a.computerControl)} onChange={e => set({ computerControl: e.target.checked })} /> Computer control</label>
-      </div>
-      <div className='sandbox-field'>
-        <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(a.sandbox)} onChange={e => set({ sandbox: e.target.checked })} /> Give this agent its own computer <span className='sandbox-tag'>sandbox</span></label>
-        <div className='sandbox-note'>
-          The agent works on its <strong>own private Linux desktop</strong> in a container — it can click, type, and run apps freely and <strong>never touches this Mac</strong>.
-          {' '}
-          {docker == null ? 'Checking Docker…'
-            : docker.running ? <span className='key-ok'>✓ Docker is running — ready.</span>
-              : docker.installed ? <span className='sandbox-req-warn'>Docker is installed but not running — start Docker Desktop or Colima.</span>
-                : <span className='sandbox-req-warn'>Requires Docker Desktop (or Colima) — not detected.</span>}
-        </div>
-        <div className='sandbox-note' style={{ color: 'var(--text-faint)' }}>
-          Requirements: Docker running · a one-time ~2 GB Linux desktop download · ~1–2 GB RAM while active. The sandbox desktop is provisioned the first time the agent uses its computer.
-        </div>
       </div>
       <div className='row' style={{ marginTop: 10 }}>
         <button className='small-btn primary' onClick={() => onSave(a)} disabled={!a.name?.trim()}>Save</button>
@@ -1420,7 +1404,6 @@ const GUIDE = [
       ['Computer control (🖥)', 'Let a vision model drive the browser and desktop. Basic automation is on by default; full automation is an opt-in checkbox in Settings → Automation.'],
       ['Design Mode (◎)', 'Point at any element in the agent’s browser and capture its HTML, CSS, and a screenshot straight into the chat, so the agent can match or rework a design.'],
       ['Website → API', 'The agent can watch a site’s network calls and turn its hidden API into a reusable HTTP client (a built-in skill).'],
-      ['Give an agent its own computer', 'Optionally run an agent on its own private Linux desktop in a container so it never touches your Mac (needs Docker — Settings → Agents).'],
       ['MCP', 'Connect Model Context Protocol servers in Settings → MCP to give agents extra tools.'],
       ['Skills', 'Drop a skill file into Settings → Skills (or type one) to inject house rules the agent follows — globally or per agent.'],
       ['Skills that build themselves', 'When an agent notices a repeatable workflow it suggests a reusable skill; review the full description and Add or Reject it in Settings → Skills.']

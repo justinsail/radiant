@@ -311,14 +311,14 @@ app.get('/api/files', (req, res) => {
 
 // ---------- agents ----------
 app.post('/api/agents', (req, res) => {
-  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl, sandbox, plannerModel, plannerProvider, avatar, relay, source } = req.body
+  const { name, emoji, icon, hue, persona, model, provider, skills, useTools, computerControl, plannerModel, plannerProvider, avatar, relay, source } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   config.agents = config.agents || []
   config.agents.push({
     id: 'ag-' + crypto.randomBytes(4).toString('hex'),
     name, emoji: emoji || '🤖', icon: icon || null, hue: hue ?? null, persona: persona || '',
     model: model || null, provider: provider || null, skills: skills || [],
-    useTools: useTools !== false, computerControl: Boolean(computerControl), sandbox: Boolean(sandbox),
+    useTools: useTools !== false, computerControl: Boolean(computerControl),
     plannerModel: plannerModel || null, plannerProvider: plannerProvider || null,
     avatar: avatar || null, relay: relay || null, source: source || null
   })
@@ -329,7 +329,7 @@ app.post('/api/agents', (req, res) => {
 app.patch('/api/agents/:id', (req, res) => {
   const a = (config.agents || []).find(x => x.id === req.params.id)
   if (!a) return res.status(404).json({ error: 'not found' })
-  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl', 'sandbox', 'plannerModel', 'plannerProvider', 'avatar', 'relay', 'source']) {
+  for (const k of ['name', 'emoji', 'icon', 'hue', 'persona', 'model', 'provider', 'skills', 'useTools', 'computerControl', 'plannerModel', 'plannerProvider', 'avatar', 'relay', 'source']) {
     if (k in req.body) a[k] = req.body[k]
   }
   saveConfig(config)
@@ -779,15 +779,6 @@ app.get('/api/system', (req, res) => {
     osVersion,
     diskFreeGB
   })
-})
-
-// ---------- docker status (for the agent sandbox) ----------
-app.get('/api/docker-status', (req, res) => {
-  const probe = cmd => { try { return execSync(cmd, { timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch { return null } }
-  const installed = Boolean(probe('command -v docker || command -v colima'))
-  const running = Boolean(probe('docker info --format "{{.ServerVersion}}"'))
-  const version = running ? probe('docker --version') : null
-  res.json({ installed, running, version })
 })
 
 // ---------- local storage (Radiant's own data) ----------

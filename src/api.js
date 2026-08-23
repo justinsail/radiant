@@ -71,7 +71,6 @@ export const api = {
   removeAccount: (providerId, acctId) => json('DELETE', `/api/providers/${providerId}/accounts/${acctId}`),
   designOpen: url => json('POST', '/api/design/open', { url }),
   designPick: () => json('POST', '/api/design/pick'),
-  dockerStatus: () => json('GET', '/api/docker-status'),
   getStorage: () => json('GET', '/api/storage'),
   clearSessions: days => json('POST', '/api/storage/clear-sessions', { days }),
   getModels: () => json('GET', '/api/models'),
