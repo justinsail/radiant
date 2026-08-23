@@ -1,4 +1,5 @@
 import express from 'express'
+import { listGatewayAgents } from './openclaw.js'
 import http from 'http'
 import crypto from 'crypto'
 import os from 'os'
@@ -513,8 +514,33 @@ function discoverExternalAgents () {
   return out
 }
 
-app.get('/api/external-agents', (req, res) => {
-  try { res.json({ agents: discoverExternalAgents() }) }
+app.get('/api/external-agents', async (req, res) => {
+  try {
+    const agents = discoverExternalAgents()
+    // OpenClaw usually hosts the fleet on a gateway, not on this machine — ask
+    // it. Failures come back as a reason, not an exception, so the UI can say
+    // what is wrong instead of showing an empty list.
+    const gw = await listGatewayAgents()
+    if (gw.agents.length) {
+      // a real gateway answer replaces the "nothing local" placeholder
+      for (let i = agents.length - 1; i >= 0; i--) {
+        if (agents[i].source === 'openclaw' && agents[i].importable === false) agents.splice(i, 1)
+      }
+      const host = (() => { try { return new URL(gw.url).hostname } catch { return 'the gateway' } })()
+      for (const a of gw.agents) {
+        agents.push({
+          source: 'openclaw', sourceLabel: 'OpenClaw', name: a.name || a.label || a.id, emoji: '🦞',
+          hue: null, persona: a.description || a.persona || '', model: a.model || a.agentRuntime?.model || null,
+          note: `On ${host}`, gatewayId: a.id, importable: true
+        })
+      }
+    } else if (gw.error) {
+      for (const a of agents) {
+        if (a.source === 'openclaw' && a.importable === false) a.note = `Gateway found — ${gw.error}`
+      }
+    }
+    res.json({ agents })
+  }
   catch (e) { res.json({ agents: [], error: String((e && e.message) || e) }) }
 })
 
