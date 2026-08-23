@@ -41,7 +41,9 @@ export function openclawIdentity () {
   for (const root of roots) {
     const cfg = readJson(path.join(root, 'openclaw.json'))
     if (!cfg) continue
-    const url = cfg.gateway?.remote?.url || (cfg.gateway?.mode === 'local' ? 'ws://127.0.0.1:18789' : null)
+    // A remote URL when this machine is a client; otherwise OpenClaw is running
+    // here and serves the gateway locally. AI MBP hosts the fleet this way.
+    const url = cfg.gateway?.remote?.url || 'ws://127.0.0.1:18789'
     const device = readJson(path.join(root, 'identity', 'device.json'))
     const auth = readJson(path.join(root, 'identity', 'device-auth.json'))
     const op = auth?.tokens?.operator

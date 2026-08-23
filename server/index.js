@@ -376,54 +376,6 @@ function hexToHue (hex) {
   h = Math.round(h * 60); return h < 0 ? h + 360 : h
 }
 
-// Walk a tree looking for agent folders — one holding a SOUL.md or AGENTS.md.
-// Bounded depth and a skip-list so a big workspace can't turn discovery into a
-// full disk crawl on every Settings open.
-const AGENT_MARKERS = ['SOUL.md', 'AGENTS.md']
-const SKIP_DIRS = new Set(['node_modules', '.git', 'sessions', 'logs', 'cache', 'plugins', 'credentials'])
-function findAgentDirs (dir, depth, out) {
-  if (depth < 0 || out.length > 40) return
-  let entries = []
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
-  if (entries.some(e => e.isFile() && AGENT_MARKERS.includes(e.name))) out.push(dir)
-  for (const e of entries) {
-    if (!e.isDirectory() || e.name.startsWith('.') || SKIP_DIRS.has(e.name)) continue
-    findAgentDirs(path.join(dir, e.name), depth - 1, out)
-  }
-}
-function readFirst (dir, names) {
-  for (const n of names) {
-    try {
-      const t = fs.readFileSync(path.join(dir, n), 'utf8').trim()
-      if (t) return t
-    } catch {}
-  }
-  return null
-}
-function titleCase (s) {
-  return String(s).replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim()
-}
-// Where an OpenClaw CLI might be, across installs. Returns a path only if it
-// runs — presence on disk is not proof it works.
-function openclawCli () {
-  const cands = [
-    process.env.OPENCLAW_CLI,
-    ...['openclaw'].map(n => { try { return execSync(`command -v ${n}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch { return null } }),
-    '/Applications/OpenClaw.app/Contents/MacOS/openclaw',
-    path.join(os.homedir(), '.local/bin/openclaw'),
-    '/opt/homebrew/bin/openclaw',
-    '/usr/local/bin/openclaw'
-  ].filter(Boolean)
-  for (const c of cands) {
-    try {
-      if (!fs.existsSync(c)) continue
-      execSync(`${JSON.stringify(c)} --help`, { timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] })
-      return c
-    } catch {}
-  }
-  return null
-}
-
 function discoverExternalAgents () {
   const home = os.homedir()
   const out = []
@@ -451,66 +403,14 @@ function discoverExternalAgents () {
       })
     }
   } catch {}
-  // OpenClaw — layout-agnostic discovery.
+  // OpenClaw is handled by the gateway, not by scanning disk — see openclaw.js
+  // and /api/external-agents.
   //
-  // ⚠️ DO NOT HARDCODE ONE MACHINE'S SETUP. Installs vary: some are a thin
-  // client pointing at a gateway on another box (no local agents at all),
-  // some are a full local install with agent folders, and the CLI may or may
-  // not be on PATH. Probe for each of those at runtime and report only what is
-  // actually present — an agent listed as connectable must be connectable.
-  try {
-    const roots = [
-      process.env.OPENCLAW_HOME,
-      path.join(home, '.openclaw'),
-      path.join(home, '.config', 'openclaw'),
-      path.join(home, 'Library', 'Application Support', 'OpenClaw')
-    ].filter(Boolean).filter(d => { try { return fs.statSync(d).isDirectory() } catch { return false } })
-
-    if (roots.length) {
-      // A relay is only offered if a CLI actually answers. OpenClaw ships a CLI
-      // on some installs and not others; guessing would put a "Connect" button
-      // on something that cannot connect.
-      const cli = openclawCli()
-
-      // Agents are found by SHAPE, not by a fixed path: any folder holding a
-      // SOUL.md or AGENTS.md is an agent, wherever the install keeps them.
-      const found = []
-      for (const root of roots) findAgentDirs(root, 3, found)
-
-      for (const dir of found) {
-        const persona = readFirst(dir, ['SOUL.md', 'AGENTS.md'])
-        if (!persona) continue
-        const name = path.basename(dir) === path.basename(roots[0]) ? 'OpenClaw' : titleCase(path.basename(dir))
-        out.push({
-          source: 'openclaw', sourceLabel: 'OpenClaw', name, emoji: '🦞',
-          hue: null, persona, model: null,
-          relay: cli ? 'openclaw' : undefined,
-          note: cli ? 'OpenClaw agent' : 'OpenClaw agent · import only (CLI not found)',
-          personaChars: persona.length, importable: true
-        })
-      }
-
-      // Nothing local to import? Say what this install actually is, rather than
-      // promising a feature.
-      if (!found.length) {
-        let mode = ''
-        for (const root of roots) {
-          try {
-            const cfg = JSON.parse(fs.readFileSync(path.join(root, 'openclaw.json'), 'utf8'))
-            mode = (cfg.gateway || {}).mode || ''
-          } catch {}
-        }
-        out.push({
-          source: 'openclaw', sourceLabel: 'OpenClaw', name: 'OpenClaw', emoji: '🦞',
-          hue: null, persona: '', model: null,
-          note: mode === 'remote'
-            ? 'Gateway only on this machine — its agents live on the host it points at'
-            : 'Detected, but no agent files found on this machine',
-          importable: false
-        })
-      }
-    }
-  } catch {}
+  // ⚠️ DO NOT GUESS AGENTS FROM FILES. This used to treat any folder holding a
+  // SOUL.md or AGENTS.md as an agent. AGENTS.md is a repo convention for
+  // instructing coding agents — Radiant's own repo has one — so on a real
+  // machine it scraped every workspace, backup and dated snapshot and listed a
+  // dozen entries called "Workspace". OpenClaw knows what its agents are.
   return out
 }
 
@@ -522,10 +422,6 @@ app.get('/api/external-agents', async (req, res) => {
     // what is wrong instead of showing an empty list.
     const gw = await listGatewayAgents()
     if (gw.agents.length) {
-      // a real gateway answer replaces the "nothing local" placeholder
-      for (let i = agents.length - 1; i >= 0; i--) {
-        if (agents[i].source === 'openclaw' && agents[i].importable === false) agents.splice(i, 1)
-      }
       const host = (() => { try { return new URL(gw.url).hostname } catch { return 'the gateway' } })()
       for (const a of gw.agents) {
         agents.push({
@@ -535,9 +431,13 @@ app.get('/api/external-agents', async (req, res) => {
         })
       }
     } else if (gw.error) {
-      for (const a of agents) {
-        if (a.source === 'openclaw' && a.importable === false) a.note = `Gateway found — ${gw.error}`
-      }
+      // OpenClaw is set up here but its gateway would not answer. Say why —
+      // an empty list looks identical to "you have no agents".
+      agents.push({
+        source: 'openclaw', sourceLabel: 'OpenClaw', name: 'OpenClaw', emoji: '🦞',
+        hue: null, persona: '', model: null,
+        note: gw.error, importable: false
+      })
     }
     res.json({ agents })
   }
