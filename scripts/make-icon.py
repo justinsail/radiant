@@ -41,11 +41,23 @@ ROOT = Path(__file__).resolve().parent.parent
 # hand-made mark and nothing writes to it.
 SOURCE = ROOT / "src/assets/logo-mark-source.png"
 
-# Every place the mark is published. Keeping them in one list is the point:
-# they drifted apart before, and a favicon that disagrees with the app icon is
-# the kind of thing nobody notices until a customer does.
-TARGETS = [
+# ⚠️ THE MAC ICON AND THE WEB SET ARE NOT THE SAME ARTWORK, AND WRITING BOTH
+# FROM ONE RUN DESTROYED THE FAVICON ONCE ALREADY (2026-08-22). They want
+# genuinely different proportions:
+#
+#   Mac icon — sits in the Dock beside AiOS, so it copies AiOS's geometry:
+#              body 0.896 of canvas, swirl 0.678. Lots of surrounding padding,
+#              because macOS expects it and the Dock supplies the spacing.
+#   Web set  — a favicon is 16-32px on screen. It is FULL-BLEED on purpose:
+#              the tile runs to the edge so the mark survives at tab size.
+#              Padding that looks right in the Dock throws away pixels here.
+#
+# So the web set is opt-in. Regenerating the app icon must never silently
+# rewrite a favicon Tony has already signed off on.
+MAC_TARGETS = [
     (ROOT / "build/icon.png", 1024),
+]
+WEB_TARGETS = [
     (ROOT / "src/assets/logo-mark.png", 1024),
     (ROOT / "public/icon-512.png", 512),
     (ROOT / "public/icon-192.png", 192),
@@ -159,19 +171,25 @@ def render(kind: str, mark: Image.Image, canvas: int) -> Image.Image:
 
 
 def main() -> None:
-    kind = sys.argv[1] if len(sys.argv) > 1 else "disc"
+    args = [a for a in sys.argv[1:]]
+    web = "--web" in args
+    args = [a for a in args if a != "--web"]
+    kind = args[0] if args else "disc"
     if kind not in ("disc", "tile", "knockout"):
-        raise SystemExit("usage: make-icon.py [disc|tile|knockout]")
+        raise SystemExit("usage: make-icon.py [disc|tile|knockout] [--web]")
     mark = swirl_mask(SOURCE)
     master = render(kind, mark, CANVAS)
-    for path, px in TARGETS:
+    targets = MAC_TARGETS + (WEB_TARGETS if web else [])
+    for path, px in targets:
         path.parent.mkdir(parents=True, exist_ok=True)
         # ⚠️ RESIZE THE FINISHED ICON, never re-render at the small size — the
         # 64px favicon rendered natively would lose the thin inner arcs
         # entirely, and the set would stop looking like one mark.
         (master if px == CANVAS else master.resize((px, px), Image.BOX)).save(path)
         print(f"  {path.relative_to(ROOT)}  {px}x{px}")
-    print(f"done — {kind}, colour {BLUE}")
+    if not web:
+        print("  (web set untouched — pass --web to regenerate favicon/PWA icons too)")
+    print(f"done — {kind}, color {BLUE}")
 
 
 if __name__ == "__main__":
