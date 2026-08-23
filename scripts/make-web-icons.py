@@ -28,13 +28,28 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "build/icon.png"          # the Mac icon: correct artwork, big swirl
 BLUE = (83, 119, 179)
 MASTER = 1024
-SWIRL_FRAC = 0.756                     # MeOS / AiOS
+SWIRL_FRAC = 0.756                     # MeOS / AiOS, for the filled tiles
+
+# ⚠️ TWO VARIANTS, BY SURFACE — and they are not interchangeable.
+#   Filled tile, white mark  -> iOS Home Screen, PWA install. iOS composites a
+#       transparent PNG onto black or white, which looks broken beside real app
+#       icons, so these MUST be opaque.
+#   Transparent, blue mark   -> the browser tab. A tab favicon renders at ~16px;
+#       a filled tile spends most of those pixels on background and the mark
+#       shrinks to nothing. Transparent lets the mark use the full 16px and sit
+#       on either a light or dark tab strip. MeOS and AiOS both do this.
+TAB_FRAC = 0.94                        # MeOS's favicon-32 is 0.938
+
+TAB_TARGETS = [
+    (ROOT / "favicon-32.png", 32),
+    (ROOT / "favicon-16.png", 16),
+    (ROOT / "favicon.png", 48),        # legacy fallback
+]
 
 TARGETS = [
     (ROOT / "public/icon-512.png", 512),
     (ROOT / "public/icon-192.png", 192),
     (ROOT / "public/apple-touch-icon.png", 180),
-    (ROOT / "public/favicon.png", 64),
 ]
 
 
@@ -61,8 +76,21 @@ def main() -> None:
 
     for path, size in TARGETS:
         icon.resize((size, size), Image.LANCZOS).save(path)
-        print(f"  {path.relative_to(ROOT)}  {size}x{size}")
-    print(f"done — full bleed, swirl {SWIRL_FRAC} of canvas")
+        print(f"  {path.relative_to(ROOT)}  {size}x{size}  filled tile, white mark")
+
+    # the tab variant: same drawing, brand blue, nothing behind it
+    tab_px = int(round(MASTER * TAB_FRAC))
+    tab_mark = lift_swirl(Image.open(SRC)).resize((tab_px, tab_px), Image.LANCZOS)
+    tab = Image.new("RGBA", (MASTER, MASTER), (0, 0, 0, 0))
+    blue = Image.new("RGBA", tab_mark.size, (*BLUE, 255))
+    blue.putalpha(tab_mark)
+    tab.alpha_composite(blue, ((MASTER - tab_px) // 2,) * 2)
+    for path, size in TAB_TARGETS:
+        out = ROOT / "public" / path.name
+        tab.resize((size, size), Image.LANCZOS).save(out)
+        print(f"  {out.relative_to(ROOT)}  {size}x{size}  transparent, blue mark")
+
+    print(f"done — tiles {SWIRL_FRAC} of canvas, tab marks {TAB_FRAC}")
 
 
 if __name__ == "__main__":

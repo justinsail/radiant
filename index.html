@@ -6,9 +6,14 @@
     <!-- ?v= is a cache-buster. iOS caches a Home Screen icon by URL and keeps
          serving the old artwork even after you delete and re-add the app, so
          bump this whenever the icon art changes. -->
-    <link rel="icon" type="image/png" href="/favicon.png?v=3" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
-    <link rel="manifest" href="/manifest.webmanifest?v=3" />
+    <!-- Two variants on purpose. The tab gets a transparent PNG so the mark can
+         use the whole 16px and sit on a light or dark tab strip; iOS gets an
+         opaque tile, because it composites transparency onto black or white. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=4" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=4" />
+    <link rel="icon" type="image/png" href="/favicon.png?v=4" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4" />
+    <link rel="manifest" href="/manifest.webmanifest?v=4" />
     <meta name="theme-color" content="#0e1121" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
