@@ -1484,3 +1484,5 @@ button.hf-head:hover { background: var(--bg-hover); }
   /* 16px inputs stop iOS Safari from zooming on focus */
   input, textarea, select { font-size: 16px; }
 }
+/* Connected agents: apps that ship an avatar (Hermes) show it instead of an emoji. */
+.ext-agent-avatar { border-radius: 50%; object-fit: cover; display: block; }

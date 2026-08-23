@@ -55,6 +55,16 @@ function cmpVersion (a, b) {
 // quit & relaunch into the new version. Renderer drives it over IPC; the menu
 // bar has a "Check for Updates…" item too.
 
+// The user's "Automatically check for updates on launch" toggle lives in the
+// same config the server owns. Read it fresh each check rather than caching, so
+// turning it off takes effect without a relaunch.
+function autoUpdatesEnabled () {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(require('os').homedir(), '.radiant', 'config.json'), 'utf8'))
+    return cfg.settings?.autoUpdateCheck !== false
+  } catch { return true }
+}
+
 function installUpdater ({ getWindow }) {
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
@@ -62,6 +72,7 @@ function installUpdater ({ getWindow }) {
   // one update conversation at a time — repeated checks used to stack dialogs
   let dialogOpen = false
   let promptedFor = null
+  let manualFlow = false   // true only while a user-initiated update is running
 
   // Before anything can quit-install it: a staged build at or below the running
   // version is spent (it is usually the one we just installed) and would only
@@ -108,7 +119,20 @@ function installUpdater ({ getWindow }) {
       const staged = stagedVersion()
       if (staged && staged !== v) clearStaged(`staged ${staged}, but ${v} is current`)
 
-      if (dialogOpen || (silent && promptedFor === v)) return
+      // ⚠️ AN AUTO-CHECK THAT ONLY ASKS IS NOT AN AUTO-UPDATE. This used to stop
+      // at a modal, so nothing updated until someone clicked — and on an
+      // always-on host running unattended, nobody ever does. A background check
+      // now downloads on its own and installs on the next quit
+      // (autoInstallOnAppQuit); the sidebar pill is the only notice. A manual
+      // "Check for Updates…" still asks, because the user is standing there.
+      if (silent) {
+        if (promptedFor !== v) {
+          promptedFor = v
+          autoUpdater.downloadUpdate().catch(e => send('error', { message: String(e.message || e) }))
+        }
+        return
+      }
+      if (dialogOpen) return
       dialogOpen = true
       let response
       try {
@@ -120,7 +144,7 @@ function installUpdater ({ getWindow }) {
         }))
       } finally { dialogOpen = false }
       promptedFor = v
-      if (response === 0) autoUpdater.downloadUpdate()
+      if (response === 0) { manualFlow = true; autoUpdater.downloadUpdate() }
     } else if (!silent) {
       dialog.showMessageBox(getWindow() || undefined, { type: 'info', message: "You're up to date", detail: `Radiant ${app.getVersion()} is the latest version.`, buttons: ['OK'] })
     }
@@ -128,6 +152,10 @@ function installUpdater ({ getWindow }) {
 
   // when a download finishes from the menu path, offer to restart
   autoUpdater.on('update-downloaded', async info => {
+    // A background download shouldn't interrupt with a modal — it is already
+    // staged and applies on the next quit.
+    if (!manualFlow) return
+    manualFlow = false
     if (dialogOpen) return
     dialogOpen = true
     let response
@@ -169,8 +197,9 @@ function installUpdater ({ getWindow }) {
   }
 
   function startAutoCheck () {
-    setTimeout(() => checkNow(true), 8000)
-    setInterval(() => checkNow(true), 6 * 60 * 60 * 1000)
+    const tick = () => { if (autoUpdatesEnabled()) checkNow(true) }
+    setTimeout(tick, 8000)
+    setInterval(tick, 6 * 60 * 60 * 1000)
   }
 
   buildMenu()

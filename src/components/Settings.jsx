@@ -761,7 +761,13 @@ function AgentsPane ({ config, onConfigChange, initialView }) {
             const already = agents.some(a => (a.name || '').trim().toLowerCase() === (ext.name || '').trim().toLowerCase())
             return (
               <div key={ext.source + ':' + ext.name} className='ext-agent'>
-                <span className='ext-agent-emoji'>{ext.emoji}</span>
+                <span className='ext-agent-emoji'>
+                  {/* the server sends an avatar for apps that have one (Hermes);
+                      fall back to the emoji for the rest */}
+                  {ext.avatar
+                    ? <img className='ext-agent-avatar' src={ext.avatar} alt='' width={22} height={22} />
+                    : ext.emoji}
+                </span>
                 <span className='ext-agent-info'>
                   <span className='ext-agent-name'>{ext.name}<span className='ext-agent-src'>{ext.sourceLabel}</span></span>
                   <span className='ext-agent-note'>{ext.note}</span>
