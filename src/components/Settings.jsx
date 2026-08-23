@@ -1280,12 +1280,21 @@ function AboutPane ({ config, onSettings }) {
 
       <div className='about-footer' style={{ marginTop: 22 }}>
         <div className='about-footer-text'>A Templeton Technologies Product</div>
-        <img
-          className='about-footer-logo'
-          src='/templeton-tech.png'
-          alt='Templeton Technologies'
-          onError={e => { e.currentTarget.style.display = 'none' }}
-        />
+        {/* Electron denies in-window navigation, so a plain href does nothing —
+            window.open goes through setWindowOpenHandler and out to the browser. */}
+        <a
+          className='about-footer-link'
+          href='https://templetontech.com'
+          title='templetontech.com'
+          onClick={e => { e.preventDefault(); window.open('https://templetontech.com', '_blank', 'noopener,noreferrer') }}
+        >
+          <img
+            className='about-footer-logo'
+            src='/templeton-tech.png'
+            alt='Templeton Technologies'
+            onError={e => { e.currentTarget.style.display = 'none' }}
+          />
+        </a>
       </div>
     </div>
   )
