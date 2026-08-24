@@ -63,8 +63,9 @@ const rec = readme.match(/(Qwen 3 [\d.]+B) is a good place to start/)
 is('the recommended model is named', !!rec, true)
 if (rec) is(`"${rec[1]}" is in the catalogue`, swift.includes(`name: "${rec[1]}"`), true)
 
-// The three verdicts must match the labels the UI actually renders.
-const fit = readFileSync('src/mobile/fit.js', 'utf8')
+// The three verdicts must match the labels the UI actually renders. They live
+// in src/fit.js, shared by both apps — the phone's fit.js only re-exports them.
+const fit = readFileSync('src/fit.js', 'utf8')
 for (const v of ['Runs well', 'Runs tight', "Won't run"]) {
   is(`the UI still says "${v}"`, fit.includes(v), true)
 }

@@ -864,14 +864,14 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, fit, onCommit
   const downloading = job?.state === 'downloading'
   const failed = job?.state === 'failed'
   const blocked = shortfall > 0 && !model.downloaded && !downloading
-  // ⚠️ WON'T RUN IS A HARD STOP, not a warning. The Mac disables Download on a
-  // model too big for its RAM; on iOS the consequence is worse, because the
-  // phone does not refuse the load — it kills Radiant partway through it, which
-  // reads to the user as the app crashing rather than as a limit. So a model
-  // that cannot run cannot be started, however much disk is free. An already
-  // downloaded one stays tappable so it can still be removed.
+  // ⚠️ THE VERDICT LABELS, IT DOES NOT FORBID. This used to disable the button,
+  // and Tony caught it: "why can i install ministral on Locally but not with
+  // Radiant?" Two mistakes in one. Downloading is a DISK operation and has
+  // nothing to do with memory; and the verdict behind the block was an estimate,
+  // so Radiant was refusing on a guess where every other app lets you install
+  // and find out. Disk space still blocks — that one is measured and certain.
   const tooBig = fit === FITS_NO && !model.downloaded
-  const disabled = downloading || busyElsewhere || blocked || tooBig
+  const disabled = downloading || busyElsewhere || blocked
 
   const [pressed, handlers] = usePress(
     onCommit, disabled,

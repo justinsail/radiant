@@ -24,37 +24,53 @@
 /**
  * Memory a model needs while running, from its download size.
  *
- * Weights dominate and are already quantized, so the download is close to what
- * is resident. On top of that: the KV cache that grows with the conversation,
- * plus MLX's own working set. The Mac uses `size * 1.15 + 1.5`; the constant
- * there covers Ollama's server process, which the phone does not have — but it
- * cannot go to zero, or a 0.2 GB model would look free.
+ * ⚠️ THIS IS NOT THE MAC'S FORMULA, AND COPYING IT WAS A BUG. The Mac uses
+ * `size * 1.15 + 1.5`, and neither term transfers:
+ *
+ *  · the 1.15 exists because the Mac downloads GGUF and Ollama expands it. MLX
+ *    maps quantized safetensors straight into this process — the weights ARE
+ *    the download, so the multiplier is ~1, not 1.15;
+ *  · the 1.5 GB covers Ollama's separate server process, which does not exist
+ *    on a phone.
+ *
+ * Carrying both over made every model look ~0.4 GB heavier than it is, which
+ * is how Ministral 3 3B — 2.78 GB of weights, and demonstrably runnable on an
+ * iPhone 17 Pro Max — was reported as too big for a 3.54 GB ceiling.
+ *
+ * What actually sits alongside the weights is the KV cache, which grows with
+ * the conversation, plus activations and MLX's own working set. For a 3B model
+ * at a few thousand tokens that is a few hundred megabytes, so: the weights,
+ * a small allowance that scales, and a fixed floor.
+ *
+ * It remains an ESTIMATE. It is deliberately not used to forbid anything — see
+ * the note on FITS_NO.
  */
-export const ramNeededGB = (downloadGB) => downloadGB * 1.15 + 0.45
+export const ramNeededGB = (downloadGB) => downloadGB * 1.05 + 0.35
 
-export const FITS_WELL = 'well'
-export const FITS_TIGHT = 'tight'
-export const FITS_NO = 'no'
+// ⚠️ The words, the tones and the thresholds come from ../fit.js and are shared
+// with the Mac app. Do not redefine them here; that is how they drifted before.
+export { FITS_WELL, FITS_TIGHT, FITS_NO, FIT_LABEL, FIT_TONE } from '../fit.js'
+import { verdict, FITS_WELL, FITS_TIGHT, FITS_NO } from '../fit.js'
 
 /**
- * ⚠️ SAME THRESHOLDS AS THE MAC. 75% of the budget runs well, up to 95% is
- * tight, past that it will not load. Do not tune one app's numbers alone.
+ * Runs well / runs tight / won't run, for a model of this download size on a
+ * machine with this many bytes to spare. The thresholds are in ../fit.js and
+ * are the same ones the Mac applies.
  */
 export function fitOf (downloadGB, budgetBytes) {
   if (!budgetBytes || !downloadGB) return null
-  const budget = budgetBytes / 1e9
-  const need = ramNeededGB(downloadGB)
-  if (need <= budget * 0.75) return FITS_WELL
-  if (need <= budget * 0.95) return FITS_TIGHT
-  return FITS_NO
+  return verdict(ramNeededGB(downloadGB), budgetBytes / 1e9)
 }
 
-/** Tony's words, not Apple's: "run well, run tight or not run at all." */
-export const FIT_LABEL = {
-  [FITS_WELL]: 'Runs well',
-  [FITS_TIGHT]: 'Runs tight',
-  [FITS_NO]: "Won't run"
-}
+/**
+ * ⚠️ FITS_NO IS ADVICE, NOT A LOCK. It used to disable the Download button, and
+ * that was wrong twice over: downloading is a DISK operation and has nothing to
+ * do with memory, and the verdict behind it is an estimate. Tony: "why can i
+ * install ministral on Locally but not with Radiant?" — because Radiant was
+ * refusing on a guess where every other app on the phone simply lets you
+ * install and find out. Disk space still blocks a download, because that one is
+ * measured and certain.
+ */
 
 /** The explanation under a row, when someone wants to know why. */
 export const FIT_WHY = {

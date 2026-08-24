@@ -32,6 +32,33 @@ private func rxRepo(_ id: String, stop: String? = nil) -> ModelConfiguration {
     ModelConfiguration(id: id, extraEOSTokens: stop.map { Set([$0]) } ?? [])
 }
 
+
+/// This process's memory LIMIT, not the headroom left in it.
+///
+/// ⚠️ `os_proc_available_memory()` ALONE IS THE WRONG BUDGET, and using it as
+/// one is a bug I shipped. It returns what is left AFTER everything the app has
+/// already allocated — at launch the WebView, React and the model list are
+/// already resident — so it under-reports the ceiling by however much Radiant
+/// happens to be using at the moment you ask. Worse, it moves: the same model
+/// could read "runs well" on a fresh launch and "won't run" after a long
+/// conversation, with nothing about the model or the phone having changed.
+///
+/// The ceiling is what is left PLUS what is already used. `phys_footprint` is
+/// the same figure iOS itself judges against for jetsam, so the sum is the real
+/// limit rather than an estimate of it.
+private func rxMemoryLimit() -> Int64 {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+    let kerr = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    let available = Int64(os_proc_available_memory())
+    guard kerr == KERN_SUCCESS else { return available }
+    return available + Int64(info.phys_footprint)
+}
+
 @objc(LocalModels)
 public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "LocalModels"
@@ -268,9 +295,10 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     /// "won't run" on a 12 GB phone.
     override public func load() {
         let p = ProcessInfo.processInfo
-        let avail = os_proc_available_memory()
-        NSLog("RADIANT-MEM physical=%.2fGB available-to-this-app=%.2fGB",
-              Double(p.physicalMemory) / 1e9, Double(avail) / 1e9)
+        NSLog("RADIANT-MEM physical=%.2fGB headroom-now=%.2fGB app-limit=%.2fGB",
+              Double(p.physicalMemory) / 1e9,
+              Double(os_proc_available_memory()) / 1e9,
+              Double(rxMemoryLimit()) / 1e9)
     }
 
     private var loaded: (id: String, container: ModelContainer)?
@@ -682,7 +710,7 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             "cores": p.activeProcessorCount,
             "osVersion": UIDevice.current.systemVersion,
             "ramTotal": Double(p.physicalMemory),
-            "ramAvailable": Double(os_proc_available_memory())
+            "ramAvailable": Double(rxMemoryLimit())
         ])
     }
 
@@ -735,7 +763,7 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
                 "total": total,
                 "free": free,
                 "ramTotal": Double(ProcessInfo.processInfo.physicalMemory),
-                "ramAvailable": Double(os_proc_available_memory())
+                "ramAvailable": Double(rxMemoryLimit())
             ])
         } catch {
             call.reject(error.localizedDescription)

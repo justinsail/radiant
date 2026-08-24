@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { verdict, FIT_LABEL, FITS_WELL, FITS_TIGHT, FITS_NO, COMFORTABLE } from '../fit.js'
 import { api, startDownload, getDownloads, cancelDownload, streamQuantize, getServer, setServer, testServer } from '../api.js'
 import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
 import { MOTIONS } from './MotionBackground.jsx'
@@ -195,13 +196,23 @@ function ProvidersPane ({ config, onConfigChange }) {
 
 // ---------- Models (local, via Ollama) ----------
 
+/**
+ * ⚠️ THE WORDS AND THRESHOLDS ARE IN src/fit.js, SHARED WITH THE PHONE.
+ * Tony: "we should standardize the naming conventions." This file used to
+ * define its own — "runs well / tight fit / too big" against the phone's
+ * "Runs well / Runs tight / Won't run" — same judgement, two vocabularies.
+ * Only the CSS class names stay local, because they are this stylesheet's.
+ */
+const FIT_CLASS = { [FITS_WELL]: 'fit-ok', [FITS_TIGHT]: 'fit-tight', [FITS_NO]: 'fit-no' }
 function fitClass (ramGB, systemRam) {
-  if (!systemRam) return ''
-  if (ramGB <= systemRam * 0.75) return 'fit-ok'
-  if (ramGB <= systemRam * 0.95) return 'fit-tight'
-  return 'fit-no'
+  const v = verdict(ramGB, systemRam)
+  return v ? FIT_CLASS[v] : ''
 }
-const FIT_LABEL = { 'fit-ok': 'runs well', 'fit-tight': 'tight fit', 'fit-no': 'too big' }
+const FIT_TEXT = {
+  'fit-ok': FIT_LABEL[FITS_WELL],
+  'fit-tight': FIT_LABEL[FITS_TIGHT],
+  'fit-no': FIT_LABEL[FITS_NO]
+}
 
 function ramNeededGB (fileSizeGB) {
   return Math.round(fileSizeGB * 1.15 + 1.5)
@@ -244,7 +255,7 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam, 
           <div key={qt.label} className='variant-row'>
             <span className='v-tag mono'>{qt.label.toLowerCase()}{qt.sharded ? ` · ${qt.files.length} parts` : ''}</span>
             <span className='v-meta'>{qt.sizeGB} GB download · ~{ram} GB RAM</span>
-            <span className={'fit-badge ' + fit}>{FIT_LABEL[fit] || ''}</span>
+            <span className={'fit-badge ' + fit}>{FIT_TEXT[fit] || ''}</span>
             {noDisk && <span className='fit-badge fit-no' title={`Only ${diskFree} GB free on disk`}>not enough disk</span>}
             <span className='v-action'>
               {installedCheck(model)
@@ -327,7 +338,7 @@ function QuantizeBlock ({ systemRam, onDone }) {
       </div>
       <div className='quant-est'>
         Result: <span className='mono'>{targetName}</span>
-        {estGB != null && <> · about {estGB} GB{systemRam && <> · <span className={estGB <= systemRam * 0.75 ? 'key-ok' : 'fit-badge fit-tight'}>{estGB <= systemRam * 0.75 ? 'runs well here' : 'tight fit'}</span></>}</>}
+        {estGB != null && <> · about {estGB} GB{systemRam && <> · <span className={estGB <= systemRam * COMFORTABLE ? 'key-ok' : 'fit-badge fit-tight'}>{estGB <= systemRam * COMFORTABLE ? FIT_LABEL[FITS_WELL] : FIT_LABEL[FITS_TIGHT]}</span></>}</>}
       </div>
       <button className='small-btn primary' onClick={run} disabled={running || !source}>
         {running ? 'Quantizing…' : 'Quantize'}
@@ -421,9 +432,9 @@ function ModelsPane ({ onModelsChanged }) {
             {system.diskFreeGB != null && <> · <span className={system.diskFreeGB < 20 ? 'fit-badge fit-tight' : ''}>{system.diskFreeGB} GB free on disk</span></>}
           </div>
           <div className='spec-note'>
-            Badges show what fits: <span className='fit-badge fit-ok'>runs well</span> under {Math.round(system.ramGB * 0.75)} GB,
-            <span className='fit-badge fit-tight'> tight fit</span> near the limit,
-            <span className='fit-badge fit-no'> too big</span> for this Mac.
+            Badges show what fits: <span className='fit-badge fit-ok'>{FIT_LABEL[FITS_WELL]}</span> under {Math.round(system.ramGB * COMFORTABLE)} GB,
+            <span className='fit-badge fit-tight'> {FIT_LABEL[FITS_TIGHT]}</span> near the limit,
+            <span className='fit-badge fit-no'> {FIT_LABEL[FITS_NO]}</span> on this Mac.
           </div>
         </div>
       )}

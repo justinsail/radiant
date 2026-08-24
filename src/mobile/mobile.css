@@ -1893,10 +1893,47 @@
    without the OLED cut-out, which is what people who find #000 harsh actually
    want. Only the grounds move; every text and tint value stays as dark's,
    because those are what the contrast ratios were measured against. */
+/* Medium — the Mac's, not a guess at it.
+   Tony: "are you sure medium gray is the same here in ios as it is in the macos
+   app? it seems darker." It was, by a lot. Measured:
+
+       ground   iOS #121214 L=0.183   Mac L=0.300   0.117 too dark
+       bg       iOS #1C1C1E L=0.227   Mac L=0.300   0.073 too dark
+       cell     iOS #2C2C2E L=0.294   Mac L=0.360   0.066 too dark
+
+   ⚠️ THE OLD VALUES WERE APPLE'S SYSTEM GRAYS, which is why they looked
+   plausible and were still wrong: #1C1C1E and #2C2C2E are the elevated dark
+   grays every iOS app uses, so nothing about them reads as a mistake — but the
+   Mac's Medium is not Apple's dark, it is a soft grey at L=0.30 derived from
+   the accent hue. Copying the platform instead of the product is what made
+   Medium a second Dark on the phone.
+
+   Now lifted straight from src/styles.css :root[data-mode='medium'], including
+   the accent tint — the Mac's greys are faintly colored by the chosen theme and
+   flat neutrals could never match them. --bg-tint is 1 on the phone. */
 .is-native[data-rx-mode='medium'] {
-  --rx-bg: #1C1C1E;
-  --rx-bg-grouped: #121214;
-  --rx-cell: #2C2C2E;
+  --rx-bg:         oklch(0.300 0.008 var(--rx-accent-h));
+  --rx-bg-grouped: oklch(0.300 0.008 var(--rx-accent-h));
+  --rx-cell:       oklch(0.360 0.010 var(--rx-accent-h));
+  --rx-cell-2:     oklch(0.400 0.012 var(--rx-accent-h));
+  /* On a L=0.30 ground the dark mode's separators and fills disappear: they
+     were mixed for near-black. Lifted a step so the rows still divide. */
+  --rx-separator:        oklch(1 0 0 / 0.14);
+  --rx-separator-opaque: oklch(0.44 0.010 var(--rx-accent-h));
+  --rx-hairline:         oklch(1 0 0 / 0.10);
+  --rx-fill-1: rgba(255, 255, 255, 0.16);
+  --rx-fill-2: rgba(255, 255, 255, 0.13);
+  --rx-fill-3: rgba(255, 255, 255, 0.10);
+  --rx-fill-4: rgba(255, 255, 255, 0.07);
+  /* Text follows the Mac's medium ramp rather than dark's alpha-on-black,
+     which washes out badly once the ground is this light. */
+  --rx-label:   oklch(0.96 0.003 var(--rx-accent-h));
+  --rx-label-2: oklch(0.78 0.006 var(--rx-accent-h));
+  --rx-label-3: oklch(0.62 0.005 var(--rx-accent-h));
+  --rx-mat-regular-bg:  oklch(0.300 0.008 var(--rx-accent-h) / 0.80);
+  --rx-mat-thick-bg:    oklch(0.300 0.008 var(--rx-accent-h) / 0.94);
+  --rx-mat-opaque:       oklch(0.300 0.008 var(--rx-accent-h));
+  --rx-mat-thick-opaque: oklch(0.300 0.008 var(--rx-accent-h));
 }
 
 /* ═══ settings ═════════════════════════════════════════════════════════════

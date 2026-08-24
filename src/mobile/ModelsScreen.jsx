@@ -146,11 +146,9 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
 /* ── one catalog row ──────────────────────────────────────────────────────── */
 
 function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, onAccessory }) {
-  // ⚠️ A MODEL THAT CANNOT RUN MUST NOT BE STARTABLE. iOS does not refuse an
-  // oversized load — it kills the app partway through, which reads as Radiant
-  // crashing rather than as a limit. Same rule as the Mac, where Download is
-  // disabled on anything past the machine's RAM. Already-downloaded models stay
-  // tappable so they can still be removed.
+  // ⚠️ THE VERDICT LABELS, IT DOES NOT FORBID — see the same note in
+  // ModelPicker. Memory is an estimate and downloading is a disk operation;
+  // only disk space blocks a download.
   const tooBig = fit === FITS_NO && !model.downloaded
   const shown = progressText(progress)
   const pct = progress && typeof progress.pct === 'number' ? Math.round(progress.pct * 100) : null
@@ -350,7 +348,7 @@ export default function ModelsScreen ({
                   {rows.map(m => {
                     const blocked = !m.downloaded && !canFit(m)
                     const fit = fitOfModel(m)
-                    const stopped = blocked || (fit === FITS_NO && !m.downloaded)
+                    const stopped = blocked
                     return (
                       <ModelRow
                         key={m.id}

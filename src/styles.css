@@ -1344,7 +1344,10 @@ button.hf-head:hover { background: var(--bg-hover); }
 }
 .fit-ok { color: var(--ok); background: color-mix(in oklab, var(--ok) 14%, transparent); }
 .fit-tight { color: oklch(0.75 0.13 85); background: oklch(0.75 0.13 85 / 0.14); }
-.fit-no { color: var(--text-faint); background: var(--bg-hover); }
+/* Red, matching the phone. Tony: "too big should be in red text like ios."
+   It was grey-on-grey here, which read as disabled rather than as a limit —
+   and it is the one verdict that actually stops you. */
+.fit-no { color: var(--danger); background: color-mix(in oklab, var(--danger) 14%, transparent); }
 .v-action { display: flex; align-items: center; gap: 8px; min-width: 120px; justify-content: flex-end; }
 .pull-progress { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
 .pull-bar {
