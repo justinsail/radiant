@@ -44,22 +44,35 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
         let id: String, name: String, blurb: String, gb: Double
         let config: ModelConfiguration
     }
+    /// ⚠️ SIZES ARE MEASURED, NOT ESTIMATED. Each is the summed blob size from
+    /// huggingface.co/api/models/<id>?blobs=true, because the download progress
+    /// bar divides by this number — a guessed size shows a wrong percentage.
+    /// Re-check them when the catalogue changes.
+    ///
+    /// Chosen against what MLX can actually run today (LLMModelFactory's
+    /// registry, 67 entries) rather than what was current when this was
+    /// written: Qwen 3.5 and Gemma 3n are both here now, and Gemma 3n E4B is
+    /// the one Locally leads with. Ordered smallest first, which is also
+    /// slowest-phone first.
     private let catalog: [Entry] = [
-        Entry(id: "llama3.2-1b", name: "Llama 3.2 1B",
-              blurb: "Fastest. Good for quick questions and rewriting.", gb: 0.7,
-              config: LLMRegistry.llama3_2_1B_4bit),
-        Entry(id: "qwen3-1.7b", name: "Qwen 3 1.7B",
-              blurb: "A good all-rounder on any recent iPhone.", gb: 1.0,
-              config: LLMRegistry.qwen3_1_7b_4bit),
-        Entry(id: "gemma3-1b", name: "Gemma 3 1B",
-              blurb: "Google's small model, tuned to run on phones.", gb: 0.8,
-              config: LLMRegistry.gemma3_1B_qat_4bit),
         Entry(id: "lfm2-1.2b", name: "LFM2 1.2B",
-              blurb: "Liquid's phone-first model. Very fast.", gb: 0.8,
+              blurb: "Fastest, and built for phones. Good for quick questions.", gb: 0.7,
               config: LLMRegistry.lfm2_1_2b_4bit),
+        Entry(id: "qwen3-1.7b", name: "Qwen 3 1.7B",
+              blurb: "The best all-rounder on any recent iPhone.", gb: 1.0,
+              config: LLMRegistry.qwen3_1_7b_4bit),
+        Entry(id: "qwen3.5-2b", name: "Qwen 3.5 2B",
+              blurb: "Newest generation. Sharper reasoning for its size.", gb: 1.8,
+              config: LLMRegistry.qwen3_5_2b_4bit),
+        Entry(id: "llama3.2-3b", name: "Llama 3.2 3B",
+              blurb: "Meta's. Strong at everyday writing and rewriting.", gb: 1.8,
+              config: LLMRegistry.llama3_2_3B_4bit),
         Entry(id: "qwen3-4b", name: "Qwen 3 4B",
               blurb: "Noticeably smarter. Wants a Pro with headroom.", gb: 2.3,
-              config: LLMRegistry.qwen3_4b_4bit)
+              config: LLMRegistry.qwen3_4b_4bit),
+        Entry(id: "gemma3n-e4b", name: "Gemma 3n E4B",
+              blurb: "Google's phone-tuned flagship. Needs room and a recent Pro.", gb: 3.9,
+              config: LLMRegistry.gemma3n_E4B_it_lm_4bit)
     ]
 
     private var loaded: (id: String, container: ModelContainer)?
