@@ -1638,10 +1638,21 @@
   background: radial-gradient(circle, oklch(0.40 0.14 262 / 0.55), transparent 62%);
 }
 /* and (80% 60% at 82% 8%), the violet one */
+/* Blue, not violet. The site's second glow is at hue 280 and Tony does not want
+   it: "i just want our blue like in the logo with glow here and there." So both
+   glows are the brand hue (262) and differ only in depth and position — the
+   variety comes from light, not from a second colour. */
 .is-native .rx-intro-glow-b {
   left: 42%; top: -12%; width: 80%; height: 60%;
-  background: radial-gradient(circle, oklch(0.50 0.12 280 / 0.38), transparent 60%);
+  background: radial-gradient(circle, oklch(0.58 0.15 262 / 0.34), transparent 60%);
   animation-delay: 120ms;
+}
+/* a third, low and quiet, so the bottom of the screen is not dead black behind
+   the button — "glow here and there" */
+.is-native .rx-intro-glow-c {
+  left: -6%; bottom: -22%; width: 78%; height: 46%;
+  background: radial-gradient(circle, oklch(0.52 0.13 262 / 0.26), transparent 62%);
+  animation-delay: 240ms;
 }
 .is-native .rx-intro-field {
   position: absolute;
@@ -1722,8 +1733,10 @@
   border-radius: 16px;
   font: -apple-system-headline;
   color: oklch(0.16 0.03 262);
-  background: linear-gradient(135deg, oklch(0.80 0.15 262), oklch(0.78 0.13 288));
-  box-shadow: 0 16px 40px oklch(0.62 0.16 262 / 0.40);
+  /* One blue, lit from above — not a two-hue sweep. The old gradient ran into
+     oklch hue 288, which is the violet Tony rejected. */
+  background: linear-gradient(180deg, oklch(0.78 0.16 262), oklch(0.68 0.17 262));
+  box-shadow: 0 16px 44px oklch(0.62 0.16 262 / 0.45);
   transition: transform 200ms var(--rx-ease, cubic-bezier(.22,1,.36,1));
 }
 .is-native .rx-intro-cta.is-pressed { transform: scale(0.97); }

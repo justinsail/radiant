@@ -152,7 +152,7 @@ def build(_a, _b, name):
     W = H = SIDE
     BG = oklch(0.15, 0.018, 262)
     GLOW_A = oklch(0.40, 0.14, 262)
-    GLOW_B = oklch(0.50, 0.12, 280)
+    GLOW_B = oklch(0.58, 0.15, 262)   # blue, not the site's violet — Tony's call
     HALO = oklch(0.70, 0.18, 262)
 
     canvas = bytearray(bytes(BG) * (W * H))
@@ -177,7 +177,9 @@ def build(_a, _b, name):
                     canvas[o + k] = min(255, int(base + (col[k] - base * col[k] / 255) * a))
 
     wash(W * 0.50, -H * 0.10, W * 0.60, H * 0.80, GLOW_A, 0.55, 1.7)
-    wash(W * 0.82, H * 0.08, W * 0.40, H * 0.60, GLOW_B, 0.35, 1.7)
+    wash(W * 0.82, H * 0.08, W * 0.40, H * 0.60, GLOW_B, 0.34, 1.7)
+    # the low quiet one, matching .rx-intro-glow-c
+    wash(W * 0.32, H * 1.05, W * 0.78, H * 0.46, oklch(0.52, 0.13, 262), 0.26, 1.7)
 
     # the constellation, from the same file the first-run screen uses
     fld = build_field()

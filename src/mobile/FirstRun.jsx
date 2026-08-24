@@ -26,11 +26,12 @@ export default function FirstRun ({ onChooseModel, onConnectMac }) {
 
   return (
     <div className="rx-cover rx-intro">
-      {/* Ground, in layers. Two glows and the stars, all aria-hidden: this is
+      {/* Ground, in layers. Three glows and the stars, all aria-hidden: this is
           atmosphere, and a screen reader announcing it would be noise. */}
       <div className="rx-intro-sky" aria-hidden="true">
         <span className="rx-intro-glow rx-intro-glow-a" />
         <span className="rx-intro-glow rx-intro-glow-b" />
+        <span className="rx-intro-glow rx-intro-glow-c" />
         <span className="rx-intro-field" style={{ backgroundImage: `url(${fieldUrl})` }} />
       </div>
 
