@@ -2265,3 +2265,9 @@
 /* The three words appear here as a legend, so they must not carry the row
    margin they have beside a model name. */
 .is-native .rx-specs-note .rx-fit{margin-left:0}
+
+/* Said in the app's own voice, not as an error: the phone is fine, the cap is
+   ours, and it is a signing setting rather than anything the user can change.
+   Amber, because it is a limitation worth noticing — not red, because nothing
+   is broken. */
+.is-native .rx-specs-capped{color:var(--rx-amber)}

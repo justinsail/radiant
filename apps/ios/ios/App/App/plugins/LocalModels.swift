@@ -254,6 +254,25 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
               gb: 12.1, config: LLMRegistry.gpt_oss_20b_MXFP4_Q8)
     ]
 
+    /// Print the real memory numbers at launch.
+    ///
+    /// ⚠️ KEEP THIS. It is how the "why won't this model run" question gets
+    /// answered without guessing: launch with
+    ///     xcrun devicectl device process launch --console --terminate-existing \
+    ///         --device <udid> com.templetongroup.radiant
+    /// and grep RADIANT-MEM. The Simulator cannot answer it — MLX will not even
+    /// initialise there — so a physical device and this line are the only
+    /// route. Measured on an iPhone 17 Pro Max, 2026-08-24:
+    ///     physical=12.26GB  available-to-this-app=3.49GB
+    /// which is 28% of the device, and is the whole reason a 3 GB model reports
+    /// "won't run" on a 12 GB phone.
+    override public func load() {
+        let p = ProcessInfo.processInfo
+        let avail = os_proc_available_memory()
+        NSLog("RADIANT-MEM physical=%.2fGB available-to-this-app=%.2fGB",
+              Double(p.physicalMemory) / 1e9, Double(avail) / 1e9)
+    }
+
     private var loaded: (id: String, container: ModelContainer)?
     private var task: Task<Void, Never>?
 

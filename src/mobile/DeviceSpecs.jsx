@@ -38,6 +38,13 @@ export default function DeviceSpecs ({ freeBytes }) {
   if (!info) return null
 
   const budget = info.ramAvailable || 0
+  // ⚠️ MEASURED, NOT ASSUMED: an iPhone 17 Pro Max reports 3.49 GB of 12.26 —
+  // 28%. That gap is not the phone being modest, it is the default per-app
+  // jetsam limit, and it is liftable with the increased-memory-limit
+  // entitlement (see ios/App/App/App.entitlements). Until that is enabled,
+  // Radiant refuses models this exact phone runs in other apps, so the panel
+  // has to say why — otherwise the label reads as Radiant being wrong.
+  const capped = budget > 0 && info.ramTotal > 0 && budget < info.ramTotal * 0.45
   // The largest model that would still be comfortable, stated as a size the
   // user can compare against the list right below.
   const comfortable = budget ? (budget * 0.75 / 1e9 - 0.45) / 1.15 : 0
@@ -60,6 +67,13 @@ export default function DeviceSpecs ({ freeBytes }) {
           roughly <b>{comfortable.toFixed(1)} GB</b> <span className="rx-fit is-well">run well</span> here;
           bigger ones <span className="rx-fit is-tight">run tight</span>, then{' '}
           <span className="rx-fit is-no">won't run</span>.
+        </div>
+      )}
+      {capped && (
+        <div className="rx-specs-note rx-specs-capped">
+          This iPhone has more memory than that. iOS caps how much any single
+          app may use, and Radiant is still on the default cap — so some models
+          it refuses would run here otherwise.
         </div>
       )}
     </div>

@@ -23,6 +23,10 @@ import struct, zlib, pathlib
 # I picked — these are the same two files the marketing site ships.
 MARK = pathlib.Path('src/assets/brand/radiant-mark.png')
 WORD = pathlib.Path('src/assets/brand/radiant-wordmark.png')
+TT   = pathlib.Path('src/assets/brand/templeton-tech-mark.png')
+# The iOS system font, so the byline is set in the same face the live screen
+# uses rather than in the brand's display weight.
+UI_FONT = pathlib.Path('/System/Library/Fonts/SFNS.ttf')
 OUT = pathlib.Path('apps/ios/ios/App/App/Assets.xcassets/Splash.imageset')
 SIDE = 2732
 # The mark reads at about 110pt on a phone. Bigger than a bar glyph, nowhere
@@ -33,6 +37,13 @@ MARK_FRAC = 0.13
 WORD_FRAC = 0.20
 GAP_FRAC = 0.34
 BRAND_BG = (0x53, 0x77, 0xB3)   # the app icon's measured ground
+# ⚠️ THE SIDES OF THIS SQUARE ARE NOT ON SCREEN. The launch image is one square
+# shown scaleAspectFill, so on a tall phone it is scaled to the screen's HEIGHT
+# and cropped left and right: an iPhone 17 Pro Max (440x956pt) shows the middle
+# 46% of the width and the full height. Anything wider than that band is cut in
+# half. Footer content is therefore held inside SAFE_W, and the vertical
+# position can be trusted because nothing crops vertically.
+SAFE_W = 0.40
 BRAND_INK = (0xFF, 0xFF, 0xFF)
 
 def load_rgba(p):
@@ -202,6 +213,29 @@ def build(_a, _b, name):
                     canvas[o + k] = (px[so + k] * a + canvas[o + k] * (255 - a)) // 255
         return dw, dh
 
+    def text_mask(s, px):
+        """A line of UI text as an alpha mask, sized by pixel height."""
+        from PIL import Image, ImageDraw, ImageFont
+        font = ImageFont.truetype(str(UI_FONT), px)
+        x0, y0, x1, y1 = font.getbbox(s)
+        img = Image.new('L', (int(x1 - x0) + 8, int(y1 - y0) + 8), 0)
+        ImageDraw.Draw(img).text((4 - x0, 4 - y0), s, font=font, fill=255)
+        return img.crop(img.getbbox())
+
+    def place_mask(mask, col, cx, top, alpha=1.0):
+        mw, mh = mask.size
+        px = mask.load()
+        ox = int(cx - mw / 2)
+        for y in range(mh):
+            for x in range(mw):
+                a = px[x, y] * alpha
+                if not a:
+                    continue
+                o = (((top + y) * SIDE) + (ox + x)) * 3
+                for k in range(3):
+                    canvas[o + k] = int((col[k] * a + canvas[o + k] * (255 - a)) / 255)
+        return mh
+
     mark_w = int(SIDE * MARK_FRAC)
     word_w = int(mark_w * 1.42)          # the site sets the wordmark wider than the mark
     gap = int(mark_w * 0.30)
@@ -215,6 +249,37 @@ def build(_a, _b, name):
     wash(W / 2, top + mark_w / 2, mark_w * 1.5, mark_w * 1.5, HALO, 0.62, 2.1)
     _, dh = place(MARK, mark_w, W / 2, top)
     place(WORD, word_w, W / 2, top + dh + gap)
+
+    # ---- the site's footer, at the foot -----------------------------------
+    # radiant-site/index.html `.footer-fine`: the line, then the Templeton
+    # Technologies mark under it. Tony asked for this on the splash screen and
+    # I put it only on the live first-run view — which he never sees, because
+    # first run happens once. The launch image is the splash screen in practice,
+    # so it goes here too, and the two now match.
+    #
+    # ⚠️ THE TEMPLETON MARK KEEPS ITS OWN COLOURS. Composited with `place`, like
+    # the Radiant lockup — it is another company's logo, and recolouring it is
+    # exactly what you do not do to someone's mark. It reads on this ground
+    # because it is the same ground the site puts it on.
+    tt_h = int(SIDE * 0.031)                     # ~30pt on a phone
+    tw, th, tpx = load_rgba(TT)
+    tx0, ty0, tx1, ty1 = ink_bbox(tw, th, tpx)
+    tt_w = round((tx1 - tx0 + 1) * (tt_h / (ty1 - ty0 + 1)))
+    tt_w = min(tt_w, int(SIDE * SAFE_W))         # never wider than the visible band
+
+    line = 'Radiant is a Templeton Technologies product.'
+    byline = text_mask(line, int(SIDE * 0.0125))
+    if byline.size[0] > SIDE * SAFE_W:           # shrink to fit rather than crop
+        from PIL import Image as _I
+        k = (SIDE * SAFE_W) / byline.size[0]
+        byline = byline.resize((int(byline.size[0] * k), int(byline.size[1] * k)), _I.LANCZOS)
+
+    foot_gap = int(SIDE * 0.016)
+    bottom = int(SIDE * 0.935)                   # clear of the home indicator
+    tt_top = bottom - tt_h
+    by_top = tt_top - foot_gap - byline.size[1]
+    place_mask(byline, oklch(0.60, 0.02, 262), W / 2, by_top)
+    place(TT, tt_w, W / 2, tt_top)
 
     OUT.mkdir(parents=True, exist_ok=True)
     write_png(OUT / name, SIDE, SIDE, canvas)
