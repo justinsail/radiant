@@ -1404,7 +1404,12 @@ function DevicesPane () {
                 Mac is reachable from anywhere without being exposed to the internet.
                 {share.phone?.ready
                   ? ' It is set up here, and Radiant configured the rest for you.'
-                  : ' Install it on this Mac and your iPhone and sign in to both with the same account; Radiant does the rest.'}
+                  : share.phone?.reason === 'no-serve'
+                    // ⚠️ TAILSCALE IS THERE BUT THE DOOR IS NOT UP. Saying
+                    // "install Tailscale" to someone who already has it is how
+                    // you lose their trust in the rest of the panel.
+                    ? ' Tailscale is running here, but the secure address is not up yet — quit and reopen Radiant, and it will set it up.'
+                    : ' Install it on this Mac and your iPhone and sign in to both with the same account; Radiant does the rest.'}
                 {' '}
                 <a href='https://tailscale.com/download' target='_blank' rel='noreferrer'>tailscale.com/download</a>
               </div>

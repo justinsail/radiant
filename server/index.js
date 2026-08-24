@@ -6,6 +6,7 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs'
 import { execFileSync } from 'node:child_process'
+import { promises as dnsp } from 'node:dns'
 import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
@@ -107,83 +108,76 @@ function tokenOk (req) {
   return presentedToken(req) === SHARE_TOKEN
 }
 /**
- * The https address Tailscale Serve puts in front of this server, if any.
+ * The https address a phone can use to reach this Mac from anywhere.
  *
- * ⚠️ THE RAW 100.x ADDRESS CANNOT WORK FROM AN iPHONE, and offering it is what
- * sent Tony round in circles: he picked `100.64.118.54:5834` out of this app's
- * own list and the phone said it couldn't reach the server. Both readings fail —
- * as http, iOS App Transport Security refuses a plain-text connection to a bare
- * IP; as https, nothing is doing TLS on that port. Measured on dev-mbp:
- *     http://100.64.118.54:5834/api/config    -> 401  (server is right there)
- *     https://100.64.118.54:5834/api/config   -> TLS failure
- *     https://dev-mbp.<tailnet>.ts.net/...    -> 401  (this is the one)
- * Serve terminates TLS with a real certificate and proxies to our loopback port,
- * which is exactly what the phone needs and what its own footer already promises.
+ * ⚠️ DERIVED AND VERIFIED — NOT ASKED OF A CLI. The first version shelled out to
+ * the `tailscale` binary at three guessed paths. On Tony's dev-mbp that failed
+ * silently: the machine demonstrably had Serve running (its https address
+ * answered 401 in 45ms) and the panel still offered a Wi-Fi address, because the
+ * binary was not where I guessed or could not be executed from the packaged app.
+ * A detector that reports "no" when the answer is "yes" is worse than none — it
+ * sent him to an address that cannot work from a phone.
+ *
+ * Two steps, neither of which needs a binary:
+ *  1. REVERSE-DNS the tailnet address. MagicDNS publishes PTR records, so
+ *     100.64.118.54 resolves to dev-mbp.tail1207dc.ts.net with a plain lookup.
+ *  2. ACTUALLY FETCH IT. Deriving the name proves nothing about whether Serve is
+ *     in front of it — so the URL is only offered once it has answered. 401 is
+ *     the expected answer here and counts: it means Radiant is behind it and
+ *     wants a token.
  */
+let remoteUrl = null          // last verified https address, or null
+let remoteCheckedAt = 0
+
+function tailnetAddress () {
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' || a.internal) continue
+      if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)) return a.address
+    }
+  }
+  return null
+}
+
+async function refreshRemoteUrl () {
+  remoteCheckedAt = Date.now()
+  const ip = tailnetAddress()
+  if (!ip) { remoteUrl = null; return null }
+  let name
+  try { [name] = await dnsp.reverse(ip) } catch { remoteUrl = null; return null }
+  if (!name) { remoteUrl = null; return null }
+  const url = `https://${String(name).replace(/\.$/, '')}`
+  try {
+    const r = await fetch(url + '/api/config', { signal: AbortSignal.timeout(5000) })
+    // 401 is success for this purpose: something is serving Radiant over TLS.
+    remoteUrl = (r.status === 401 || r.ok) ? url : null
+  } catch { remoteUrl = null }
+  return remoteUrl
+}
+
 /**
- * Where the Tailscale CLI is, if it is here at all.
+ * Ask Tailscale to put the https front door up, when its CLI is available.
  *
- * The Mac App Store build hides it inside the .app; Homebrew puts it on PATH.
+ * ⚠️ BEST EFFORT ONLY, AND NOTHING DEPENDS ON IT. If the binary is missing or
+ * unrunnable this quietly does nothing, and refreshRemoteUrl() still finds the
+ * address when Serve was configured some other way — which is exactly the case
+ * that was broken before.
+ *
+ * ⚠️ SERVE, NEVER FUNNEL. Serve publishes to the user's own tailnet, which is
+ * what "share with my devices" asks for. Funnel would publish to the open
+ * internet. One word apart; only one of them is consented to.
  */
-function tailscaleBin () {
+function enableTailscaleServe (port) {
   const bins = [
     '/Applications/Tailscale.app/Contents/MacOS/Tailscale',
     '/usr/local/bin/tailscale',
     '/opt/homebrew/bin/tailscale'
   ]
-  return bins.find(b => { try { fs.accessSync(b); return true } catch { return false } }) || null
-}
-
-function tailscaleRun (args, timeout = 6000) {
-  const bin = tailscaleBin()
-  if (!bin) return null
+  const bin = bins.find(b => { try { fs.accessSync(b); return true } catch { return false } })
+  if (!bin) return
   try {
-    return execFileSync(bin, args, { encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'ignore'] })
-  } catch { return null }
-}
-
-/**
- * Turn on the https front door, so the user does not have to.
- *
- * ⚠️ THIS USED TO BE THE USER'S JOB AND THAT WAS WRONG. The sharing panel told
- * people to "run `tailscale serve --bg 5834` on this Mac". Tony: "what exactly
- * are users supposed to do here? this all sounds very confusing." Nobody
- * installing a chat app should meet a terminal command, and there is no reason
- * they should — it is one command and Radiant can run it.
- *
- * ⚠️ SERVE, NEVER FUNNEL. `serve` publishes to the user's own tailnet, which is
- * exactly what ticking "share on my network" asks for. `funnel` would publish to
- * the open internet. They are one word apart and only one of them is consented
- * to here.
- */
-function enableTailscaleServe (port) {
-  if (!tailscaleBin()) return { ok: false, reason: 'not-installed' }
-  const status = tailscaleRun(['status', '--json'])
-  if (!status) return { ok: false, reason: 'not-running' }
-  try {
-    const j = JSON.parse(status)
-    if (j?.BackendState && j.BackendState !== 'Running') return { ok: false, reason: 'not-signed-in' }
-  } catch { /* fall through and let serve report */ }
-  const already = tailscaleServeUrl()
-  if (already) return { ok: true, url: already }
-  tailscaleRun(['serve', '--bg', String(port)], 15000)
-  const url = tailscaleServeUrl()
-  return url ? { ok: true, url } : { ok: false, reason: 'failed' }
-}
-
-function tailscaleServeUrl () {
-  if (!tailscaleBin()) return null
-  const run = tailscaleRun
-  // Serve must actually be configured — an unconfigured tailnet would otherwise
-  // be handed a URL that 502s, which is a worse lie than the IP.
-  const serve = run(['serve', 'status'])
-  if (!serve || /no serve config/i.test(serve)) return null
-  const statusRaw = run(['status', '--json'])
-  if (!statusRaw) return null
-  try {
-    const dns = String(JSON.parse(statusRaw)?.Self?.DNSName || '').replace(/\.$/, '')
-    return dns ? `https://${dns}` : null
-  } catch { return null }
+    execFileSync(bin, ['serve', '--bg', String(port)], { timeout: 15000, stdio: 'ignore' })
+  } catch { /* already configured, or not permitted — refreshRemoteUrl decides */ }
 }
 
 /**
@@ -193,24 +187,15 @@ function tailscaleServeUrl () {
  * heard of Tailscale Serve, because they should not have to.
  */
 function phoneStatus () {
-  const url = tailscaleServeUrl()
-  if (url) return { ready: true, url, kind: 'anywhere' }
-  if (!tailscaleBin()) return { ready: false, reason: 'no-tailscale' }
-  const status = tailscaleRun(['status', '--json'])
-  if (!status) return { ready: false, reason: 'tailscale-off' }
-  try {
-    const j = JSON.parse(status)
-    if (j?.BackendState && j.BackendState !== 'Running') return { ready: false, reason: 'tailscale-off' }
-  } catch { /* ignore */ }
-  return { ready: false, reason: 'setting-up' }
+  if (remoteUrl) return { ready: true, url: remoteUrl, kind: 'anywhere' }
+  if (!tailnetAddress()) return { ready: false, reason: 'no-tailscale' }
+  return { ready: false, reason: remoteCheckedAt ? 'no-serve' : 'setting-up' }
 }
 
 // LAN / Tailscale addresses this host is reachable at
 function hostAddresses () {
   const out = []
-  // Serve first and clearly labelled: it is the only entry an iPhone can use.
-  const serveUrl = tailscaleServeUrl()
-  if (serveUrl) out.push({ address: serveUrl, label: 'Tailscale Serve', url: serveUrl, phone: true })
+  if (remoteUrl) out.push({ address: remoteUrl, label: 'Tailscale', url: remoteUrl, phone: true })
   const ifaces = os.networkInterfaces()
   for (const name of Object.keys(ifaces)) {
     for (const a of ifaces[name] || []) {
@@ -305,7 +290,7 @@ app.post('/api/share', (req, res) => {
   // Turning sharing on turns the https front door on too. The user asked to
   // share with their devices; wiring up the only transport an iPhone accepts is
   // part of doing that, not a separate chore to hand back to them.
-  if (enabled) enableTailscaleServe(PORT)
+  if (enabled) { try { enableTailscaleServe(PORT) } catch {} ; refreshRemoteUrl().catch(() => {}) }
   res.json({ desired: enabled, enabled: SHARE_ENABLED, token, needsRelaunch: enabled !== SHARE_ENABLED, port: PORT, addresses: hostAddresses(), phone: phoneStatus() })
 })
 
@@ -1744,10 +1729,11 @@ export const ready = new Promise((resolve, reject) => {
 // toggle meant everyone who had ALREADY enabled sharing never got one, which is
 // exactly the state Tony was in when nothing worked from outside the house.
 if (SHARE_ENABLED) {
-  try {
-    const r = enableTailscaleServe(PORT)
-    if (r?.ok) console.log(`radiant reachable from anywhere at ${r.url}`)
-  } catch { /* never block startup on this */ }
+  // Try to raise the front door, then find out the truth either way.
+  try { enableTailscaleServe(PORT) } catch { /* never block startup */ }
+  refreshRemoteUrl()
+    .then(u => { if (u) console.log(`radiant reachable from anywhere at ${u}`) })
+    .catch(() => {})
 }
 
 ready.then(port => console.log(`radiant server listening on http://${BIND_HOST}:${port}${SHARE_ENABLED ? ' (shared — token required for remote clients)' : ''}`))
