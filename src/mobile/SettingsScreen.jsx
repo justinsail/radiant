@@ -99,14 +99,14 @@ export default function SettingsScreen ({
         either way — it is a branded moment, like the launch screen.
       </p>
 
-      <h2 className="rx-section-header">Colour</h2>
+      <h2 className="rx-section-header">Color</h2>
       <div className="rx-group rx-swatches">
         {THEMES.map(t => (
           <Swatch key={t.id} theme={t} selected={t.id === appearance.themeId} onPick={pick} />
         ))}
       </div>
       <p className="rx-section-footer">
-        The colour runs through the whole app — buttons, the glow behind the
+        The color runs through the whole app — buttons, the glow behind the
         logo, and the ring while a model downloads.
       </p>
 
@@ -125,12 +125,16 @@ export default function SettingsScreen ({
       <h2 className="rx-section-header">Models</h2>
       <div className="rx-group">
         <Row label="On this iPhone" value={`${downloaded.length} · ${fmt(used)}`} />
+        {/* NOT a delete. This row looked exactly like the inert one above it and
+            removed a multi-gigabyte model on one tap, with no confirmation, no
+            undo and no destructive treatment — while its own sibling below is
+            red and does confirm. Listing is all it does now; removing one model
+            belongs in the sheet that already has a proper "Remove model". */}
         {downloaded.map(m => (
           <Row
             key={m.id}
             label={m.name}
             value={`${Number(m.sizeGB).toFixed(1)} GB`}
-            onTap={() => local.remove?.(m.id)}
           />
         ))}
         {downloaded.length > 0 && (

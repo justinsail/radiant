@@ -197,17 +197,13 @@ function useDynamicType (rootRef) {
   }, [rootRef])
 }
 
-/**
- * Status bar. Capacitor's Style.Dark means DARK CONTENT on a LIGHT bar, so the
- * mapping reads backwards from the name: system light appearance wants 'DARK'.
- * Getting it the other way round paints white glyphs on a white bar, which is
- * invisible rather than merely wrong.
- */
-function useStatusBar (dark) {
-  useEffect(() => {
-    window.Capacitor?.Plugins?.StatusBar?.setStyle?.({ style: dark ? 'LIGHT' : 'DARK' })
-  }, [dark])
-}
+/* The status bar is written by theme.js:syncNativeChrome() and by NOTHING
+   ELSE. There used to be a useStatusBar() here as well, keyed off
+   prefers-color-scheme and with the opposite polarity, and because its effect
+   ran last it won — so with the phone in Dark the clock and battery rendered as
+   dark glyphs on a dark bar at 1.02:1, invisible, for the app's own default
+   audience. Two owners of one piece of native chrome is the bug; deleting one
+   is the fix. */
 
 /**
  * Keyboard metrics, published as --rx-kb (px) and --rx-kb-dur (ms) on the shell
@@ -596,6 +592,14 @@ function Layer ({
       ref={layerRef}
       className="rx-shell-layer"
       aria-hidden={inert ? 'true' : undefined}
+      // ⚠️ `inert`, not just aria-hidden + pointer-events. Those two hide a
+      // buried layer from the eye and the finger and leave every control on it
+      // FOCUSABLE: with Settings open, ten controls on the Models screen
+      // underneath were still reachable by keyboard, and Enter on one started an
+      // 0.8 GB download on a screen the user cannot see. aria-hidden over a
+      // focusable control is also a straight WCAG 4.1.2 failure. `inert` removes
+      // a subtree from focus, hit-testing and the accessibility tree at once.
+      inert={inert ? '' : undefined}
       style={{
         position: 'absolute', inset: 0,
         background: BG[config.bg],
@@ -708,7 +712,6 @@ export default function MobileShell () {
   const reduce = useMedia('(prefers-reduced-motion: reduce)')
 
   useDynamicType(rootRef)
-  useStatusBar(dark)
   useKeyboardMetrics(rootRef)
 
   useEffect(() => { document.documentElement.classList.add('is-native') }, [])
@@ -1179,7 +1182,12 @@ export default function MobileShell () {
               trailing={trailingFor(entry)}
               layerRef={b.layerRef}
               dimRef={b.dimRef}
-              inert={entry.key !== topKey && !popping}
+              // A presented sheet makes EVERY layer inert, not just the ones
+              // buried under another layer. The sheet is an overlay sibling
+              // rather than a pushed layer, so without this the whole Models
+              // screen stays keyboard-reachable behind it — thirteen controls,
+              // including the ones that start a multi-gigabyte download.
+              inert={sheetOpen || (entry.key !== topKey && !popping)}
             >
               {renderScreen(entry)}
             </Layer>

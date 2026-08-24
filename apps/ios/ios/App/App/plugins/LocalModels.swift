@@ -76,12 +76,25 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     ///    which it is entitled to do, since that is where the weights live —
     ///    leaving the app offering a model that is no longer there.
     ///
-    /// The files are the truth. 60% of the catalog size is the threshold: high
-    /// enough that a handful of stray config files never counts as a model,
-    /// low enough to survive the catalog's rounded sizes.
+    /// ⚠️ AND, NOT OR — both halves are load-bearing.
+    ///
+    /// A size threshold ALONE says yes to a download the user stopped: cancel
+    /// deliberately leaves partial bytes so a restart can resume, and a stop at
+    /// 60% then reads as a finished model — hero says "Ready on this iPhone",
+    /// the row shows a tick, and tapping it opens a chat with weights that are
+    /// not all there. That is the same defect as the flag, inverted: the flag
+    /// lied about absence, a bare threshold lies about presence.
+    ///
+    /// So: the RECEIPT says the load once completed (written only after
+    /// `#huggingFaceLoadModelContainer` returns), and the FILES say it is still
+    /// there (iOS may purge Caches under storage pressure, which is where the
+    /// weights live). Either one alone is a lie in one direction.
     private func isOnDisk(_ entry: Entry) -> Bool {
+        guard downloadedIds().contains(entry.id) else { return false }
         guard let dir = cacheDir(for: entry.config.name),
               FileManager.default.fileExists(atPath: dir.path) else { return false }
+        // 60% of the catalogue size: high enough that stray config files never
+        // count, low enough to survive the catalogue's rounded numbers.
         return Double(size(of: dir)) >= entry.gb * 1_000_000_000 * 0.6
     }
 

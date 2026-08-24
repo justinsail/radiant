@@ -6,7 +6,7 @@
  * theme that could darken the tint could make the app unreadable.
  *
  * The phone is always dark (Tony, 2026-08-24), so the Mac's light/medium/dark
- * modes do not come across — only the colour does. Hues and chromas are copied
+ * modes do not come across — only the color does. Hues and chromas are copied
  * from src/theme.js so the two apps cannot drift.
  */
 export const THEMES = [
@@ -88,8 +88,10 @@ function syncNativeChrome () {
   // nav bar and composer over a black transcript. One flag, written here.
   root.setAttribute('data-rx-dark', dark ? 'true' : 'false')
   const bar = window.Capacitor?.Plugins?.StatusBar
-  // Style.Dark means DARK CONTENT on a light bar, which is the opposite of what
-  // the name suggests. Getting this backwards is the classic iOS mistake.
+  // Capacitor's Style.Dark means LIGHT text, for a dark background; Style.Light
+  // means dark text. So a dark app asks for DARK. (An earlier comment here
+  // claimed the reverse — it was wrong, and a second writer elsewhere in the
+  // shell had actually implemented the reverse, which is what shipped.)
   bar?.setStyle?.({ style: dark ? 'DARK' : 'LIGHT' })
 }
 

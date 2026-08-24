@@ -49,9 +49,10 @@ const SECTIONS = [
     ]
   },
   {
-    title: 'Colour',
+    title: 'How it looks',
     body: [
-      'Settings → Appearance carries the same themes as the Mac app. The colour runs through everything — buttons, the glow behind the logo, and the ring while a model downloads. The app stays dark whatever your phone is set to.'
+      'Settings → Appearance chooses Dark, Medium, Light, or System — Medium is dark without the true black, and System follows your phone. Radiant opens dark unless you change it.',
+      'Settings → Color carries the same themes as the Mac app. The color runs through everything: buttons, the glow behind the logo, and the ring while a model downloads. The welcome screen stays dark whichever you pick, because it is built against black.'
     ]
   }
 ]

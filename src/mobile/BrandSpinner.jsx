@@ -1,10 +1,10 @@
 /**
- * The Radiant swirl, in whatever colour the app is themed.
+ * The Radiant swirl, in whatever color the app is themed.
  *
  * ⚠️ IT IS A MASK, NOT A PICTURE. The Mac paints the mark by masking
  * src/assets/logo-mark.png — a white swirl on transparent — with the current
  * accent (see `.logo-mark` in src/styles.css). This does the same, so picking a
- * theme recolours the swirl everywhere, exactly as it does on the Mac.
+ * theme recolors the swirl everywhere, exactly as it does on the Mac.
  *
  * That is why this uses logo-mark.png and NOT brand/radiant-mark.png. The brand
  * PNG is a filled disc: masking with it would give a plain circle, because its

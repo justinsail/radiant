@@ -43,7 +43,7 @@ export default function FirstRun ({ onChooseModel, onConnectMac }) {
         </span>
 
         {/* Artwork, not type — the wordmark is the logo, not a font choice. But
-            masked rather than drawn, so it takes the theme colour the way the
+            masked rather than drawn, so it takes the theme color the way the
             Mac's .wordmark does. Its alpha IS the letterforms, so the shapes
             are still exactly the brand's. */}
         <span

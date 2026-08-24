@@ -561,7 +561,17 @@
   /* the blur was carrying the edge; without it the bar needs a real one */
   .is-native .rx-navbar,
   .is-native .rx-composer,
-  .is-native .rx-storage { border-color: var(--rx-separator); }
+  /* The scroller's bottom spacer is hard-coded to this strip's DEFAULT height, so
+   at accessibility sizes the strip grows to three wrapped lines (~167pt) and
+   permanently slices the "Connect to a Mac" row in half — unreachable, however
+   far you scroll. Above the AX breakpoint it stops being an overlay and joins
+   the flow, where nothing can hide under it. */
+.is-native[data-ax='true'] .rx-storage {
+  position: static !important;
+  margin-top: 12px;
+}
+
+.is-native .rx-storage { border-color: var(--rx-separator); }
 }
 
 
@@ -1894,6 +1904,22 @@
 
 /* text size, as a segmented control */
 .is-native .rx-seg { display: flex; padding: 6px; gap: 4px; }
+/* At accessibility sizes a row of N equal-flex labels stops fitting and the
+   words overlap into a mash — "Mediulmght" — from the FIRST AX step, and the
+   last option runs off the screen edge entirely. Adding Medium made a
+   three-up four-up and worse. Above the AX breakpoint the whole thing becomes a
+   stacked list, which is what iOS does with a segmented control that no longer
+   fits. Same [data-ax] breakpoint the catalogue rows already use. */
+.is-native[data-ax='true'] .rx-seg {
+  flex-direction: column;
+  gap: 2px;
+}
+.is-native[data-ax='true'] .rx-seg-item {
+  flex: 0 0 auto;
+  text-align: left;
+  padding: 11px 12px;
+  white-space: normal;
+}
 .is-native .rx-seg-item {
   flex: 1 1 0;
   min-width: 0;
@@ -2026,5 +2052,18 @@
   padding: 0 16px 12px;
   font: -apple-system-footnote;
   color: var(--rx-label-3);
+}
+
+/* Present to a screen reader, absent to everything else. Not display:none and
+   not visibility:hidden — both remove it from the accessibility tree, which is
+   the one place it needs to exist. */
+.is-native .rx-visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 

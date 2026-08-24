@@ -226,6 +226,37 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
 
 /* ── the screen ───────────────────────────────────────────────────────────── */
 
+/**
+ * One polite live region for the whole screen. Download start, progress,
+ * completion and failure all changed the screen silently — a VoiceOver user got
+ * no signal that a gigabyte-scale download had finished or failed. Polite, and
+ * only at coarse milestones: announcing every percent would talk over the user
+ * for ten minutes.
+ */
+function Announcer ({ models, jobs, progress, failures }) {
+  const say = React.useMemo(() => {
+    const failed = Object.keys(failures || {})[0]
+    if (failed) {
+      const m = models.find(x => x.id === failed)
+      return `${m?.name || 'Download'} failed. ${failures[failed]}`
+    }
+    const running = Object.keys(jobs || {}).find(id => jobs[id] === 'downloading')
+    if (!running) return ''
+    const m = models.find(x => x.id === running)
+    const p = progress?.[running]
+    const pct = p && typeof p.pct === 'number' ? Math.round(p.pct * 100) : null
+    // every 25%, not every 1%
+    if (pct === null) return `Downloading ${m?.name || 'model'}`
+    return `Downloading ${m?.name || 'model'}, ${Math.floor(pct / 25) * 25} percent`
+  }, [models, jobs, progress, failures])
+
+  return (
+    <div className="rx-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+      {say}
+    </div>
+  )
+}
+
 export default function ModelsScreen ({
   local = {},
   models = [],
@@ -266,6 +297,7 @@ export default function ModelsScreen ({
 
       <div className="rx-section">
         <div className="rx-section-header">Available</div>
+      <Announcer models={models} jobs={jobs} progress={progress} failures={failures} />
         <div className="rx-group">
           {models.map(m => {
             const blocked = !m.downloaded && !canFit(m)
