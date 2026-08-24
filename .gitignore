@@ -3,3 +3,7 @@ dist/
 release/
 build/icon.iconset/
 .DS_Store
+
+# iOS build products — the Xcode project itself IS tracked
+apps/ios/ios/App/App/public/
+apps/ios/ios/DerivedData/

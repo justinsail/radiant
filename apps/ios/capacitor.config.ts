@@ -1,0 +1,34 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+// ⚠️ THIS IS NOT SHAPED LIKE THE MeOS APP, ON PURPOSE.
+//
+// MeOS sets `server.url` to a hosted address, so its shell is a window onto one
+// known site. Radiant has no such address: the server is the user's own Mac, a
+// different host for every person, unknown at build time. So the shell BUNDLES
+// the built UI (webDir) and the UI connects outward — Radiant's client already
+// supports a remote base + access token (see setServer/apiUrl in src/api.js),
+// which is the same path the phone browser already uses.
+//
+// ⚠️ THE MAC MUST BE REACHED OVER HTTPS. WKWebView blocks a plain-http request
+// from a secure app origin, and Radiant's server speaks http. Tailscale Serve
+// fronts it with a real certificate on the tailnet — that is why TG-219 blocks
+// this. Do not "fix" it by loosening App Transport Security; that ships a
+// weaker app to everyone to work around one machine's setup.
+const config: CapacitorConfig = {
+  appId: 'com.templetongroup.radiant',
+  appName: 'Radiant',
+  webDir: '../../dist',
+  ios: {
+    // the page owns scrolling; the shell should not add its own bounce
+    contentInset: 'never',
+    backgroundColor: '#0f1116',
+    // only tailnet hosts — the app never needs the open web
+    limitsNavigationsToAppBoundDomains: false
+  },
+  server: {
+    // no `url`: the bundled UI loads first and asks which Mac to connect to
+    iosScheme: 'radiant'
+  }
+};
+
+export default config;
