@@ -1,32 +1,37 @@
 /**
- * ModelsScreen — the root. The shell owns the scroller and the large title, so
- * this file starts at the hero and ends at the storage line.
+ * ModelsScreen — the root. The shell owns the scroller, the large title and the
+ * nav bar, so this file starts at the hero and ends at the storage line.
  *
- * Information architecture IS the argument here: a resident model gets the
- * whole top of the screen with no card and no plate, the catalog is an ordinary
- * inset grouped list, and "Connect to a Mac" is one plain row two sections
- * down. On-device is the product; the Mac is one tap away and weighs nothing.
+ * Information architecture IS the argument here: the gauge owns the top of the
+ * screen in every state, the catalog is one ordinary inset grouped list, and
+ * "Connect to a Mac" is a single plain row two sections down. On-device is the
+ * product; the Mac is one tap away and weighs nothing.
  *
- * ⚠️ THREE THINGS ON THIS SCREEN ARE DELIBERATE REVERSALS OF THE SPEC, all from
- * measuring it beside Settings on the same simulator:
+ * ⚠️ THREE THINGS ON THIS SCREEN HAVE BEEN ROUND-TRIPPED. Read before changing:
  *
- * 1. NO LEADING GAUGE ON AN UNDOWNLOADED ROW. At 29pt the iris's three strokes
- *    render sub-pixel and collapse into a pale grey blob ~22pt wide. Five of
- *    them down the left edge read as broken image placeholders next to
- *    Settings' crisp 30pt icons, and they carried zero information because
- *    every row was in the same state. The gauge now appears only when it has
- *    something to say — resident, or downloading — and the trailing accessory
- *    carries state for the rest. That also returns ~41pt to the text column.
+ * 1. THE ROW IS NAME OVER BLURB, AND THE SIZE IS IN THE TRAILING COLUMN.
+ *    The size was welded onto the front of the blurb once ("0.7 GB · Fastest…",
+ *    the App Store idiom) to get it out of --rx-label-3. Every one of the five
+ *    blurbs then wrapped, the rows measured 84.9pt against Settings' 44 on the
+ *    same device, and the privacy footer and the Mac row fell below the fold —
+ *    which is to say the load-bearing product claim became invisible on launch.
+ *    The contrast fix was --rx-label-2, not the relocation. Rows are 60pt now
+ *    and the blurb is one line; it reflows only at AX sizes.
  *
- * 2. THE SIZE LEADS THE BLURB. It used to sit under the trailing accessory in
- *    --rx-label-3 (2.4:1 on white — it fails AA and reads as disabled) and ate
- *    ~90pt of the width the blurb needed. "0.7 GB · Fastest…" is the App
- *    Store/Podcasts idiom and leaves the trailing column as one 44pt target.
+ * 2. THERE IS NO LEADING GAUGE ON A CATALOG ROW. Five of them taught the mark
+ *    in the first two seconds — in theory. Measured, the three-ring spiral has
+ *    no legibility budget under about 26pt: at 29 the radial gap between the A
+ *    and B strokes is 1.3pt and the whole thing renders as a smudge. Five
+ *    smudges down the left edge is worse than no mark. The gauge now appears at
+ *    64 in the hero, 26 in a downloading row's accessory (where it is moving,
+ *    which is what makes it legible), 120 on the sheet and 128 on first run.
  *
- * 3. NO GREY-DONUT EMPTY HERO. With nothing downloaded the largest object on
- *    the launch screen was a 96pt mid-grey ring resolving to "No model yet".
- *    Settings puts its highest-value actionable content in that slot, so this
- *    does too: the recommended model, in its own section, with a Get capsule.
+ * 3. THE HERO IS LEFT-ALIGNED AND SMALL. A 96pt centred gauge over centred text
+ *    above a left-aligned list is two competing alignment axes, and in the
+ *    ABSENT state a 96pt --rx-label-3 ring reads as a broken image. It is one
+ *    horizontal unit on the same 20pt axis as the cards now. It is still drawn
+ *    in both states and it is still a tap target in both — deleting the empty
+ *    hero once left the launch screen with no gauge on it at all.
  */
 import React from 'react'
 import Gauge from './Gauge.jsx'
@@ -37,7 +42,7 @@ import { GB } from './useLocalModels.js'
 const fmtGB = (gb) => `${Number(gb || 0).toFixed(1)} GB`
 
 // The one model the sheet also pre-highlights. Falls back to the smallest entry
-// so a catalog change can never leave this screen with no recommendation.
+// so a catalog change can never leave the empty hero with nothing to open.
 const RECOMMENDED_ID = 'qwen3-1.7b'
 const recommend = (models) =>
   models.find(m => m.id === RECOMMENDED_ID) ||
@@ -46,17 +51,20 @@ const recommend = (models) =>
 
 /* ── glyphs: SF Symbols geometry, drawn rather than imported ─────────────── */
 
-const ArrowDownCircle = ({ size = 28 }) => (
-  <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true">
-    <circle cx="14" cy="14" r="12.6" stroke="currentColor" strokeWidth="1.6" />
-    <path d="M14 7.8v11.2M9.4 14.6 14 19.2l4.6-4.6" stroke="currentColor" strokeWidth="1.8"
+// arrow.down.circle at SF Symbol Regular optical weight. The ring used to be a
+// hairline with a small arrowhead rattling inside it, which reads as a generic
+// web download icon; the stroke is 1.7pt at 22 and the arrow fills the ring.
+const ArrowDownCircle = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden="true">
+    <circle cx="11" cy="11" r="9.7" stroke="currentColor" strokeWidth="1.7" />
+    <path d="M11 5.9v10.2M6.6 11.7 11 16.1l4.4-4.4" stroke="currentColor" strokeWidth="1.9"
       strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 )
 
-const Checkmark = ({ size = 22 }) => (
+const Checkmark = ({ size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden="true">
-    <path d="M3.6 11.6 8.4 16.4 18.4 5.6" stroke="currentColor" strokeWidth="2.2"
+    <path d="M3.6 11.6 8.4 16.4 18.4 5.6" stroke="currentColor" strokeWidth="2.4"
       strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 )
@@ -68,30 +76,44 @@ const Chevron = () => (
   </svg>
 )
 
-/* ── the hero: only ever drawn when a model is actually resident ──────────── */
+/* ── the hero: the mark, in whichever state is true, on the layout margin ─── */
 
-function Hero ({ model, onOpen }) {
-  const press = usePress(() => onOpen?.(model.id), {
-    label: `Chat with ${model.name}, ready on this iPhone`
-  })
+function Hero ({ model, onOpen, onChoose, canChoose }) {
+  const resident = !!model
+  const press = usePress(
+    () => (resident ? onOpen?.(model.id) : onChoose?.()),
+    {
+      label: resident
+        ? `${model.name}, ready on this iPhone, ${fmtGB(model.sizeGB)}. Opens the conversation.`
+        : 'No model yet. Choose a model to download.'
+    }
+  )
+  const interactive = resident || canChoose
+  const handlers = interactive ? press.handlers : {}
+
   return (
-    <div className={'rx-hero rx-pressable' + press.className} {...press.handlers}>
-      {/* 64pt, not 96: at 96 the ring took ~28% of the first screen and pushed
-          the list — the thing you came for — below the fold. */}
-      <Gauge size={64} state="resident" />
+    <div
+      className={'rx-hero' + (interactive ? ' rx-pressable' + press.className : '')}
+      data-absent={resident ? undefined : 'true'}
+      {...handlers}
+    >
+      <Gauge size={64} state={resident ? 'resident' : 'absent'} />
       <div className="rx-hero-label">
-        <div className="rx-headline" style={{ textAlign: 'center' }}>{model.name}</div>
-        <div className="rx-footnote rx-tabular" style={{ textAlign: 'center' }}>
-          Ready on this iPhone · {fmtGB(model.sizeGB)}
+        <div className="rx-title-3">{resident ? model.name : 'No model yet'}</div>
+        <div className={'rx-footnote' + (resident ? ' rx-tabular' : '')}>
+          {resident
+            ? `Ready on this iPhone · ${fmtGB(model.sizeGB)}`
+            : 'Choose a model to run on this iPhone'}
         </div>
       </div>
+      {resident && <Chevron />}
     </div>
   )
 }
 
 /* ── one catalog row ──────────────────────────────────────────────────────── */
 
-function ModelRow ({ model, state, progress, unavailable, shortBy, prominent, onTap, onAccessory }) {
+function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAccessory }) {
   const pct = typeof progress === 'number' ? Math.round(progress * 100) : null
   const row = usePress(() => onTap?.(model), {
     label: `${model.name}, ${fmtGB(model.sizeGB)}` + (
@@ -102,67 +124,51 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, prominent, on
   })
   const acc = usePress((e) => { e.stopPropagation?.(); onAccessory?.(model) }, {
     haptic: 'MEDIUM',
-    // the trailing control is a glyph or a two-letter capsule; without this it
-    // is announced as "button" five times down the screen
+    // the trailing control is a glyph; without this it is announced as
+    // "button" five times down the screen
     label: model.downloaded ? `Chat with ${model.name}` : `Download ${model.name}`
   })
 
   const downloading = state === 'downloading'
-  // The leading slot only appears when it has something to say.
-  const leading = model.downloaded
-    ? <Gauge size={29} state="resident" />
-    : downloading
-      ? <Gauge size={29} state="working" progress={progress} />
-      : null
 
-  const trailing = model.downloaded
+  // The trailing column: glyph over the size, both quiet. The one moment the
+  // gauge appears in a row is mid-download, at 26pt, where it is turning — and
+  // motion is what carries a mark this small, not stroke weight.
+  const glyph = model.downloaded
     ? <span className="rx-tinted"><Checkmark /></span>
     : downloading
-      ? null   // the leading gauge is already spinning; exactly one at a time
-      : prominent
-        ? <span className="rx-get">{state === 'failed' ? 'Retry' : 'Get'}</span>
-        : <span className={state === 'failed' ? 'rx-destructive' : undefined}><ArrowDownCircle /></span>
+      ? <Gauge size={26} state="working" progress={typeof progress === 'number' ? progress : null} />
+      : <span className={state === 'failed' ? 'rx-destructive' : undefined}><ArrowDownCircle /></span>
+
+  // Always the weight, because that is the decision the row is asking for —
+  // except mid-download, where the percentage is the only thing worth reading.
+  const caption = downloading
+    ? (pct === null ? '' : `${pct}%`)
+    : fmtGB(model.sizeGB)
 
   return (
     <div
       className={'rx-row rx-row-2line' + row.className}
       {...row.handlers}
       data-unavailable={unavailable ? 'true' : undefined}
-      // The separator aligns with this row's own text column: 16pt margin plus
-      // the leading glyph and its 12pt gutter when there is one, plain 16pt
-      // when there is not.
-      style={{ '--rx-sep-inset': leading ? '57px' : '16px' }}
     >
-      {leading}
       <div className="rx-row-text">
         <div className="rx-headline">{model.name}</div>
         <div className="rx-row-blurb">
-          <span className="rx-row-size">{fmtGB(model.sizeGB)}</span>
-          {' · '}
           {state === 'failed'
             ? 'That download did not finish. Tap to try again.'
-            : downloading
-              // A 2.4 GB download over a phone connection is the longest wait in
-              // the app. The blurb is worth nothing here; the number is worth
-              // everything. Spoken by the row's own label, so aria-hidden.
-              ? <span className="rx-tabular" aria-hidden="true">
-                  {pct === null ? 'Downloading…' : `Downloading… ${pct}%`}
-                </span>
+            : unavailable
+              ? <span className="rx-warm">Needs {fmtGB(shortBy / GB)} more room</span>
               : model.blurb}
         </div>
-        {unavailable && (
-          <div className="rx-footnote rx-warm">Needs {fmtGB(shortBy / GB)} more room</div>
-        )}
       </div>
-      {trailing && (
-        <div
-          className={(prominent && !model.downloaded ? 'rx-get-hit' : 'rx-accessory') +
-            ' rx-pressable' + acc.className}
-          {...(model.downloaded ? { 'aria-hidden': 'true' } : acc.handlers)}
-        >
-          {trailing}
-        </div>
-      )}
+      <div
+        className={'rx-accessory rx-pressable' + acc.className}
+        {...(model.downloaded ? { 'aria-hidden': 'true' } : acc.handlers)}
+      >
+        {glyph}
+        <span className="rx-row-size" aria-hidden="true">{caption}</span>
+      </div>
     </div>
   )
 }
@@ -190,49 +196,43 @@ export default function ModelsScreen ({
     jobs[m.id] === 'downloading' ? 'downloading' : failures[m.id] ? 'failed' : 'idle'
   )
 
-  const rowFor = (m, prominent) => {
-    const blocked = !m.downloaded && !canFit(m)
-    return (
-      <ModelRow
-        key={m.id}
-        model={m}
-        state={stateOf(m)}
-        progress={progress[m.id]}
-        unavailable={blocked}
-        shortBy={shortBy(m)}
-        prominent={prominent}
-        onTap={() => (blocked ? null : onGetModel?.(m.id))}
-        onAccessory={() => {
-          if (blocked) return
-          if (m.downloaded) onOpenChat?.(m.id)
-          else download?.(m.id)
-        }}
-      />
-    )
-  }
-
-  // Nothing on the phone yet: lead with one recommendation rather than an empty
-  // hero, and keep the other four one section below — five plain-English rows
-  // is not the wall of quantization suffixes anybody was worried about.
-  const nothingYet = downloaded.length === 0 && models.length > 0
-  const pick = nothingYet ? recommend(models) : null
-  const rest = nothingYet ? models.filter(m => m !== pick) : models
+  const pick = recommend(models)
+  // The strip earns its place only once there is a segment to draw. An empty
+  // 4pt track over "0 GB of 995 GB used by models." reads as a stuck download,
+  // in the most valuable strip on the screen.
+  const showStorage = !!(disk && disk.total && downloaded.length > 0)
 
   return (
     <>
-      {activeModel && <Hero model={activeModel} onOpen={onOpenChat} />}
-
-      {pick && (
-        <div className="rx-section">
-          <div className="rx-section-header">Recommended</div>
-          <div className="rx-group">{rowFor(pick, true)}</div>
-        </div>
-      )}
+      <Hero
+        model={activeModel}
+        onOpen={onOpenChat}
+        canChoose={!!pick}
+        onChoose={() => onGetModel?.(pick?.id)}
+      />
 
       <div className="rx-section">
-        <div className="rx-section-header">{nothingYet ? 'All models' : 'Available'}</div>
+        <div className="rx-section-header">Available</div>
         <div className="rx-group">
-          {rest.map(m => rowFor(m, false))}
+          {models.map(m => {
+            const blocked = !m.downloaded && !canFit(m)
+            return (
+              <ModelRow
+                key={m.id}
+                model={m}
+                state={stateOf(m)}
+                progress={progress[m.id]}
+                unavailable={blocked}
+                shortBy={shortBy(m)}
+                onTap={() => (blocked ? null : onGetModel?.(m.id))}
+                onAccessory={() => {
+                  if (blocked) return
+                  if (m.downloaded) onOpenChat?.(m.id)
+                  else download?.(m.id)
+                }}
+              />
+            )
+          })}
           {models.length === 0 && (
             <div className="rx-row">
               <div className="rx-row-text">
@@ -260,9 +260,11 @@ export default function ModelsScreen ({
       </div>
 
       {/* room for the storage line, which is pinned over the scroller */}
-      <div style={{ height: 76 }} aria-hidden="true" />
+      <div style={{ height: showStorage ? 76 : 24 }} aria-hidden="true" />
 
-      <StorageLine downloaded={downloaded} disk={disk} usedBytes={usedBytes} bytesOf={bytesOf} />
+      {showStorage && (
+        <StorageLine downloaded={downloaded} disk={disk} usedBytes={usedBytes} bytesOf={bytesOf} />
+      )}
     </>
   )
 }

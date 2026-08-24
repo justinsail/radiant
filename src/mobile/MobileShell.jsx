@@ -275,6 +275,33 @@ const Chevron = ({ size = 17 }) => (
   </svg>
 )
 
+/**
+ * gearshape. Eight teeth as trapezoids around a ring, which is what the SF
+ * Symbol is — an earlier attempt drew eight radial strokes on a circle and read
+ * as a sun with uneven rays, which is why the bar sat empty for a while. The
+ * bar is not allowed to sit empty: a nav bar with nothing in it is 100pt of
+ * dead chrome at the top of the launch screen.
+ */
+const Gearshape = ({ size = 22 }) => {
+  const teeth = []
+  for (let i = 0; i < 8; i++) {
+    teeth.push(
+      <rect
+        key={i} x="10.05" y="0.6" width="1.9" height="4.6" rx="0.75"
+        fill="currentColor"
+        transform={`rotate(${i * 45} 11 11)`}
+      />
+    )
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden="true">
+      {teeth}
+      <circle cx="11" cy="11" r="6.6" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="11" cy="11" r="2.5" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  )
+}
+
 const EllipsisCircle = ({ size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <circle cx="12" cy="12" r="10.1" stroke="currentColor" strokeWidth="1.7" />
@@ -309,7 +336,7 @@ const barButtonStyle = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   // 44pt of hit area from padding around a 21pt glyph. Taking it from
   // width: 44 instead would shove the glyph off the bar's optical margin.
-  minWidth: 44, height: 44, padding: '0 12px',
+  minWidth: 44, height: 44, padding: '0 16px',
   appearance: 'none', border: 0, background: 'none',
   color: 'var(--rx-tint, #3F69A7)',
   touchAction: 'manipulation'
@@ -329,7 +356,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
     const el = barRef.current
     if (el) {
       el.style.borderBottomColor = on
-        ? 'var(--rx-separator, rgba(60,60,67,0.29))'
+        ? 'var(--rx-hairline, rgba(60,60,67,0.12))'
         : 'transparent'
       el.dataset.solid = on ? 'true' : 'false'
     }
@@ -355,9 +382,11 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
         paddingTop: 'env(safe-area-inset-top)',
-        // 0.5px, not 1px: on a @3x screen a 1px rule renders as three device
-        // pixels and looks drawn on rather than etched
-        borderBottom: '0.5px solid transparent',
+        // 1px of --rx-hairline. The spec's 0.5px was a guess that measured
+        // wrong: on this simulator it renders as TWO device pixels, and at the
+        // 0.29-alpha separator that is twice the ink of Apple's own hairline,
+        // which is 1pt of #E8E8E8. See the token in mobile.css.
+        borderBottom: '1px solid transparent',
         transition: 'border-bottom-color 180ms linear'
       }}
     >
@@ -510,7 +539,13 @@ function Layer ({
         <h1
           ref={largeRef}
           style={{
-            margin: 0, padding: '4px 16px 6px',
+            // no bottom padding: a 34px line box already carries ~9pt of empty
+            // descender space under a word with no descenders, and the block
+            // below adds its own 16. Padding here on top of both measured 71pt
+            // of dead air on the launch screen — Settings runs about 10.
+            // 20, not 16: the large title shares the layout margin with the
+            // cards below it, and Settings on this simulator puts both at 20.
+            margin: 0, padding: '4px 20px 0',
             fontSize: 'calc(34px * var(--rx-dt, 1))',
             lineHeight: 1.21, fontWeight: 700,
             // the only place tracking is set by hand; SF's optical tracking is
@@ -600,7 +635,7 @@ function MenuRow ({ item, first, onClose }) {
         display: 'flex', alignItems: 'center', width: '100%',
         minHeight: 44, padding: '0 16px',
         appearance: 'none', border: 0, background: 'transparent', textAlign: 'left',
-        borderTop: first ? 'none' : '0.5px solid var(--rx-separator, rgba(60,60,67,0.29))',
+        borderTop: first ? 'none' : '1px solid var(--rx-hairline, rgba(60,60,67,0.12))',
         color: item.destructive ? 'var(--rx-red-text, #D70015)' : 'var(--rx-label, #000)',
         fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400, touchAction: 'manipulation'
       }}
@@ -675,7 +710,9 @@ export default function MobileShell () {
   })
   const [popping, setPopping] = useState(null)
   const [sheet, setSheet] = useState(null)
-  const [menuOpen, setMenuOpen] = useState(false)
+  // One context menu, and the bar button that opens it says which one. `chat`
+  // is the ellipsis on Chat; `models` is the gear on the root screen.
+  const [menuOpen, setMenuOpen] = useState(null)
   const [chromeMap, setChromeMap] = useState({})
 
   const stackRef = useRef(stack); stackRef.current = stack
@@ -931,7 +968,8 @@ export default function MobileShell () {
     push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, depth: stack.length
   }), [push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, stack.length])
 
-  const menuPress = usePress(() => setMenuOpen(true))
+  const menuPress = usePress(() => setMenuOpen('chat'))
+  const gearPress = usePress(() => setMenuOpen('models'))
 
   // ── render ────────────────────────────────────────────────────────────────
 
@@ -985,15 +1023,16 @@ export default function MobileShell () {
 
   const trailingFor = (entry) => {
     if (entry.key !== topKey) return null
-    // ⚠️ NO TRAILING BUTTON ON MODELS, and that is the fix, not an omission.
-    // It used to be a "gear" drawn as a circle with eight radial strokes, which
-    // at 21pt reads as a sun with uneven rays — the only tinted glyph above the
-    // fold, doing nothing the "Connect to a Mac" row two sections down does not
-    // already do. A decorative control in the chrome is a webview tell.
     if (entry.route === 'chat') {
       return (
         <button type="button" className="rx-shell-barbtn" {...menuPress}
           aria-label="More" style={barButtonStyle}><EllipsisCircle /></button>
+      )
+    }
+    if (entry.route === 'models') {
+      return (
+        <button type="button" className="rx-shell-barbtn" {...gearPress}
+          aria-label="Settings" style={barButtonStyle}><Gearshape /></button>
       )
     }
     return null
@@ -1006,6 +1045,21 @@ export default function MobileShell () {
     { key: 'new', label: 'New conversation', run: () => emitChatAction('new') },
     { key: 'info', label: 'Model info', run: () => presentSheet(activeModel?.id) },
     { key: 'delete', label: 'Delete conversation', destructive: true, run: () => emitChatAction('delete') }
+  ]
+
+  // The gear's menu. Both items are real work the root screen cannot do inline:
+  // the Mac path (which also has its own row, because that row IS the argument
+  // that on-device is the product) and reclaiming the disk in one move.
+  const modelsMenu = [
+    { key: 'mac', label: 'Connect to a Mac', run: () => connectMac() },
+    ...(local.downloaded?.length
+      ? [{
+          key: 'purge',
+          label: `Remove all models · ${(local.usedBytes / 1e9).toFixed(1)} GB`,
+          destructive: true,
+          run: () => { local.downloaded.forEach(m => local.remove?.(m.id)) }
+        }]
+      : [])
   ]
 
   const sheetOpen = !!sheet && !!GetModelSheet
@@ -1089,7 +1143,11 @@ export default function MobileShell () {
       </div>
 
       {menuOpen && (
-        <ContextMenu items={chatMenu} reduce={reduce} onClose={() => setMenuOpen(false)} />
+        <ContextMenu
+          items={menuOpen === 'models' ? modelsMenu : chatMenu}
+          reduce={reduce}
+          onClose={() => setMenuOpen(null)}
+        />
       )}
 
       {sheetOpen && (

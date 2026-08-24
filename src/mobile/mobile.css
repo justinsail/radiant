@@ -45,6 +45,13 @@
   --rx-cell-2: #F2F2F7;            /* code wells */
   --rx-separator: rgba(60, 60, 67, 0.29);
   --rx-separator-opaque: #C6C6C8;
+  /* ⚠️ MEASURED, NOT SPECIFIED. The spec said "0.5px so it renders as one
+     device pixel"; on this simulator 0.5px renders as TWO device pixels, and at
+     0.29 alpha that is #C6C6C8 — twice the ink of Apple's. Settings on the same
+     iPhone 17 Pro draws its cell separator as three device pixels (1pt) of
+     #E8E8E8. So: 1px tall, and this much lighter token. Do not "restore" the
+     0.5px; it was measured wrong. */
+  --rx-hairline: rgba(60, 60, 67, 0.12);   /* #E8E8E8 over white */
   --rx-label: #000000;
   --rx-label-2: rgba(60, 60, 67, 0.60);   /* 5.23:1 on white, 4.69:1 on grouped */
   --rx-label-3: rgba(60, 60, 67, 0.30);
@@ -91,10 +98,12 @@
   --rx-dt: 1;
 
   /* radii — continuous-corner FEEL from generous values, not squircle math */
-  /* Measured against Settings on the same simulator: Apple's inset-grouped
-     card corner is ~17pt, not the 10pt the spec inherited from an older iOS.
-     At 10px the cards read boxy and dated in a side-by-side. */
-  --rx-r-cell: 16px;               /* the grouped card group's outer corners */
+  /* Measured against Settings on the same simulator (iPhone 17 Pro, iOS 26):
+     Apple's inset-grouped card corner reaches the card edge 22pt down from the
+     top — a continuous corner whose circular equivalent is ~25pt, not the 10pt
+     the spec inherited from an older iOS and not the 16 that replaced it. At 16
+     the cards read one generation old beside the stock app. */
+  --rx-r-cell: 24px;               /* the grouped card group's outer corners */
   --rx-r-bubble: 20px;
   --rx-r-button: 14px;
   --rx-r-field: 18px;
@@ -225,6 +234,7 @@
     --rx-cell-2: #2C2C2E;
     --rx-separator: rgba(84, 84, 88, 0.65);
     --rx-separator-opaque: #38383A;
+    --rx-hairline: rgba(235, 235, 245, 0.14);   /* ≈#38383A over #1C1C1E */
     --rx-label: #FFFFFF;
     --rx-label-2: rgba(235, 235, 245, 0.60);  /* 6.44:1 on #000, 5.22:1 on cell */
     --rx-label-3: rgba(235, 235, 245, 0.30);
@@ -519,12 +529,13 @@
 
 
 /* ═══ hairlines ════════════════════════════════════════════════════════════
-   0.5px, not 1px. On a @3x screen 0.5px renders at one device pixel and 1px
-   renders at three, which looks drawn-on. Separators between grouped cells are
-   INSET to the text column — full-bleed separators read as not-Apple instantly. */
+   1px of --rx-hairline, which is a MEASUREMENT off Settings on this simulator
+   and not the spec's 0.5px — see the token. Separators between grouped cells
+   are INSET to the text column at both ends; full-bleed separators read as
+   not-Apple instantly. */
 
-.is-native .rx-hairline-top { border-top: 0.5px solid var(--rx-separator); }
-.is-native .rx-hairline-bottom { border-bottom: 0.5px solid var(--rx-separator); }
+.is-native .rx-hairline-top { border-top: 1px solid var(--rx-hairline); }
+.is-native .rx-hairline-bottom { border-bottom: 1px solid var(--rx-hairline); }
 
 
 /* ═══ the nav stack ════════════════════════════════════════════════════════
@@ -608,11 +619,11 @@
   min-height: var(--rx-sp-44);
   padding: 0 var(--rx-sp-16);
   padding-top: var(--rx-safe-top);
-  border-bottom: 0.5px solid transparent;
+  border-bottom: 1px solid transparent;
   /* only the border animates; the material must not fade in and out */
   transition: border-color 180ms var(--rx-down);
 }
-.is-native .rx-navbar[data-scrolled='true'] { border-bottom-color: var(--rx-separator); }
+.is-native .rx-navbar[data-scrolled='true'] { border-bottom-color: var(--rx-hairline); }
 
 /* Large title → inline title is a continuous crossfade driven by scroll offset,
    not a class flip at a threshold. Phone.jsx / the screen writes --rx-collapse
@@ -689,21 +700,45 @@
 
 /* the large title lives inside the scroller, not the bar, so it scrolls away */
 .is-native .rx-title-block {
-  padding: var(--rx-sp-8) var(--rx-sp-16) 0;
+  padding: var(--rx-sp-8) var(--rx-sp-20) 0;
 }
 /* ⚠️ THE ROOT SCREEN HAS EXACTLY TWO VERTICAL INTERVALS: 24 from the title to
    the first block, 32 between blocks. It used to have four unrelated gaps
-   (48 / 26 / 17 / 31) and nothing grouped. Settings uses two on this screen. */
+   (48 / 26 / 17 / 31) and nothing grouped. Settings uses two on this screen.
+   The 24 is OPTICAL, measured from the baseline of "Models" rather than from
+   the bottom of its line box — a 34px line box carries ~9px of descender space
+   under a word with no descenders, so the declared margin is 16 and the title's
+   own bottom padding is 0. Setting 24 here on top of a 6px pad measured 71pt on
+   an empty screen, which is a third of the phone. */
+/* ⚠️ THE HERO IS LEFT-ALIGNED TO THE LAYOUT MARGIN, AND SMALL. It used to be a
+   96pt gauge centred over centred text, sitting above a left-aligned list —
+   two competing alignment axes on one screen, which is a thing Apple never
+   does, and at --rx-label-3 the empty-state ring read as a broken image rather
+   than as an absence. It is now one horizontal unit on the same 20pt axis as
+   the cards: the mark at 64pt, the model name at title 3, the state in a
+   footnote. Same information, one axis, a third of the height. */
 .is-native .rx-hero {
-  margin-top: var(--rx-sp-24);
+  margin-top: var(--rx-sp-16);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--rx-sp-16);            /* inside one unit, not between blocks */
+  padding: 0 var(--rx-sp-20);
+  min-height: var(--rx-sp-44);
+  text-align: left;
+}
+.is-native .rx-hero-label {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--rx-sp-12);            /* inside one unit, not between blocks */
-  padding: 0 var(--rx-sp-16);
-  min-height: var(--rx-sp-44);
+  gap: var(--rx-sp-2);
 }
-.is-native .rx-hero-label { display: flex; flex-direction: column; gap: var(--rx-sp-2); }
+/* The hero is a control in both states — resident opens the conversation,
+   empty opens the picker — so it takes the prominent-control scale from
+   .rx-pressable. No plate, no fill: a tinted rectangle here would be exactly
+   the branded-web-app wash the palette bans. */
+.is-native .rx-hero { transform-origin: 20px 50%; }
 
 
 /* ═══ inset grouped list ═══════════════════════════════════════════════════ */
@@ -712,13 +747,15 @@
 
 /* Sentence case, not uppercase: SHOUTING GROUPED HEADERS are the iOS 7–13
    idiom and current Apple sets them at footnote in sentence case. */
+/* Header and footer text align with the CELL LABEL, not the card edge: the
+   card sits at 20 and its content inset is 16, so both start at 36. */
 .is-native .rx-section-header {
   font-family: var(--rx-font);
   font-size: calc(13px * var(--rx-dt));
   line-height: 1.385;
   font-weight: 400;
   color: var(--rx-label-2);
-  padding: 0 var(--rx-sp-16) var(--rx-sp-6);
+  padding: 0 calc(var(--rx-sp-20) + var(--rx-sp-16)) var(--rx-sp-6);
 }
 .is-native .rx-section-footer {
   font-family: var(--rx-font);
@@ -726,50 +763,25 @@
   line-height: 1.333;
   font-weight: 400;
   color: var(--rx-label-2);
-  padding: var(--rx-sp-6) var(--rx-sp-16) 0;
+  padding: var(--rx-sp-6) calc(var(--rx-sp-20) + var(--rx-sp-16)) 0;
   /* keeps "device." off a line of its own */
   text-wrap: pretty;
 }
 
 .is-native .rx-group {
-  margin: 0 var(--rx-sp-16);
+  /* 20, measured off Settings on this simulator. 16 is the pre-iOS-26 inset and
+     reads a generation old in a side-by-side. */
+  margin: 0 var(--rx-sp-20);
   background: var(--rx-cell);
   /* radius on the GROUP's outer corners only — the cells inside are square */
   border-radius: var(--rx-r-cell);
   overflow: hidden;
 }
 
-/* The App Store's GET idiom: a low-ink capsule, tint label on a neutral fill.
-   It exists so the root screen's first frame is actionable when nothing is
-   downloaded yet — the screen used to open on a 96pt grey donut reading "No
-   model yet", which is the weakest possible first frame. 28pt visual inside a
-   44pt hit area, from padding, never from `width: 44px`. */
-.is-native .rx-get-hit {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: var(--rx-sp-44);
-  min-height: var(--rx-sp-44);
-  padding: var(--rx-sp-8);
-  margin: calc(-1 * var(--rx-sp-8)) calc(-1 * var(--rx-sp-8)) calc(-1 * var(--rx-sp-8)) 0;
-}
-.is-native .rx-get {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 72px;
-  height: 28px;
-  padding: 0 var(--rx-sp-16);
-  border-radius: var(--rx-r-capsule);
-  background: var(--rx-fill-2);
-  color: var(--rx-tint);
-  font-family: var(--rx-font);
-  font-size: calc(15px * var(--rx-dt));
-  line-height: 1;
-  font-weight: 600;
-}
-.is-native .rx-get-hit.is-pressed .rx-get { background: var(--rx-fill-1); }
+/* ⚠️ THERE IS NO "GET" CAPSULE ON THE ROOT SCREEN. A previous pass added one
+   to make the launch screen actionable after the empty hero was deleted; the
+   hero is back, so the trailing accessory is the iCloud-download idiom on every
+   undownloaded row, which needs no label. */
 
 .is-native .rx-row {
   position: relative;
@@ -778,7 +790,10 @@
   gap: var(--rx-sp-12);
   width: 100%;
   min-height: var(--rx-sp-44);
-  padding: var(--rx-sp-12) var(--rx-sp-16);
+  /* 8, not 12. A two-line row is 22 (headline) + 2 + 20 (subhead) = 44 of
+     content; 8 top and bottom lands it on exactly 60, which is Apple's two-line
+     cell. At 12 it measured 85 and five of them destroyed the list rhythm. */
+  padding: var(--rx-sp-8) var(--rx-sp-16);
   text-align: left;
   background: transparent;
   color: var(--rx-label);
@@ -799,8 +814,8 @@
   /* stops 16pt short of the card's trailing edge, as Apple's does. Running it
      to `right: 0` is a small thing that reads as not-Apple immediately. */
   right: var(--rx-sp-16);
-  height: 0.5px;
-  background: var(--rx-separator);
+  height: 1px;
+  background: var(--rx-hairline);
 }
 
 .is-native .rx-row-text {
@@ -810,29 +825,36 @@
   flex-direction: column;
   gap: var(--rx-sp-2);
 }
-/* ⚠️ WRAPS. It used to be `white-space: nowrap`, which truncated all five
-   catalog blurbs mid-word and produced a stacked column of five ellipses at
-   almost the same x. Nothing in an Apple stock app truncates 100% of its
-   secondary text — Settings wraps the Apple Account subtitle to two lines
-   rather than clip it. The two-line clamp is unconditional now, not an AX-only
-   fallback, and the row is already 60pt so it costs nothing. */
+/* ⚠️ ONE LINE AT LARGE. It wrapped to two for a while, on the argument that
+   nothing in an Apple stock app truncates its secondary text. What it actually
+   produced was five 85pt slabs where Settings fits eight scannable rows: the
+   size string had been welded onto the front of the blurb, every one of the
+   five wrapped, and the privacy footer and the Mac row fell below the fold.
+   The size moved back to the trailing column where the spec put it, the blurbs
+   now fit, and the list has a rhythm again. */
 .is-native .rx-row-blurb {
   font-family: var(--rx-font);
   font-size: calc(15px * var(--rx-dt));
   line-height: 1.333;
   font-weight: 400;
   color: var(--rx-label-2);
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
 }
-/* At AX sizes the row grows instead of clamping harder: the blurb gets a third
-   line and the row stops pretending it can hold two. Phone.jsx sets data-ax on
-   the root when the measured --rx-dt clears 1.2; a CSS-only test is impossible
-   because custom properties cannot be used in a media query. */
-.is-native[data-ax='true'] .rx-row-blurb { -webkit-line-clamp: 3; }
+/* At AX sizes the row grows rather than clipping: the blurb reflows to three
+   lines and the name is allowed to wrap. Phone.jsx sets data-ax on the root
+   when the measured --rx-dt clears 1.2; a CSS-only test is impossible because
+   custom properties cannot be used in a media query. */
+.is-native[data-ax='true'] .rx-row-blurb {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  text-overflow: clip;
+}
 .is-native[data-ax='true'] .rx-row { min-height: 60px; }
+.is-native[data-ax='true'] .rx-row .rx-headline { white-space: normal; }
 
 /* a row the device cannot honor: not enough free disk. Dimmed, with an amber
    footnote naming the shortfall — failing a 2.3 GB download at 90% is far worse
@@ -845,8 +867,15 @@
   color: var(--rx-label-3);
 }
 
-/* The download accessory. 28pt glyph inside 8pt of padding = a 44pt hit area.
-   Getting the target from `width: 44px` instead unbalances the row. */
+/* The download accessory: a 22pt glyph over the size, inside 8pt of padding
+   for a 44pt hit area. Getting the target from `width: 44px` instead
+   unbalances the row.
+
+   ⚠️ IT IS GREY, NOT TINT. Five full-tint arrow.down.circle glyphs down the
+   right edge were the loudest thing on the root screen and blew the 8%
+   containment budget on their own. Apple's chevron is tertiary and nobody
+   mistakes it for decoration. Tint is reserved for the checkmark on a row that
+   is actually resident. */
 .is-native .rx-accessory {
   flex: 0 0 auto;
   display: inline-flex;
@@ -858,14 +887,20 @@
   margin: calc(-1 * var(--rx-sp-8)) calc(-1 * var(--rx-sp-8)) calc(-1 * var(--rx-sp-8)) 0;
   min-width: var(--rx-sp-44);
   min-height: var(--rx-sp-44);
-  color: var(--rx-tint);
+  color: var(--rx-label-3);
 }
-/* The size used to live under the accessory in --rx-label-3 — 2.4:1 on white,
-   failing AA, reading as disabled, and eating ~90pt of the width the blurb
-   needed. It now leads the blurb ("0.7 GB · Fastest…"), which is the App Store
-   idiom, and the trailing column is one clean 44pt hit area. */
+.is-native .rx-accessory .rx-tinted { color: var(--rx-tint); }
+/* The size sits under the accessory, as the spec had it. It was moved into the
+   blurb once, to keep it out of --rx-label-3 (2.4:1 on white — it fails AA and
+   reads as disabled); the fix for that is --rx-label-2, not relocating it into
+   the one line of text that had no room for it. */
 .is-native .rx-row-size {
   color: var(--rx-label-2);
+  font-family: var(--rx-font);
+  font-size: calc(13px * var(--rx-dt));
+  line-height: 1.231;
+  font-weight: 400;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
 }
@@ -1127,7 +1162,7 @@
   /* the safe-area pad collapses once the keyboard has covered the home
      indicator, so it is only applied when --rx-kb is 0 (set by the component) */
   padding-bottom: var(--rx-composer-pad, var(--rx-pad-bottom));
-  border-top: 0.5px solid var(--rx-separator);
+  border-top: 1px solid var(--rx-hairline);
   background: var(--rx-mat-regular-bg);
   -webkit-backdrop-filter: var(--rx-mat-regular-blur);
   backdrop-filter: var(--rx-mat-regular-blur);
@@ -1264,7 +1299,7 @@
   gap: var(--rx-sp-4);
   padding: 0 var(--rx-sp-8);
 }
-.is-native .rx-stat + .rx-stat { border-left: 0.5px solid var(--rx-separator); }
+.is-native .rx-stat + .rx-stat { border-left: 1px solid var(--rx-hairline); }
 .is-native .rx-stat-key {
   font-family: var(--rx-font);
   font-size: calc(11px * var(--rx-dt));
@@ -1305,8 +1340,8 @@
   right: 0;
   bottom: 0;
   z-index: 20;
-  padding: var(--rx-sp-10) var(--rx-sp-16) var(--rx-pad-bottom);
-  border-top: 0.5px solid var(--rx-separator);
+  padding: var(--rx-sp-10) var(--rx-sp-20) var(--rx-pad-bottom);
+  border-top: 1px solid var(--rx-hairline);
   background: var(--rx-mat-regular-bg);
   -webkit-backdrop-filter: var(--rx-mat-regular-blur);
   backdrop-filter: var(--rx-mat-regular-blur);
