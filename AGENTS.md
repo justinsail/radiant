@@ -96,3 +96,51 @@ advertised 0.6.74 while 0.6.100 was current.
 - The updater stages a download in `~/Library/Caches/radiant-updater/pending`
   and installs it on quit. It must always hold the newest release or the user
   gets walked up one version at a time.
+
+## The iPhone app
+
+`apps/ios` is a real Capacitor shell around a **separate** UI in `src/mobile`.
+It shares no styling with the desktop build: `App.jsx` lazy-imports
+`mobile/Phone.jsx` only when `window.Capacitor.isNativePlatform()` is true, so
+`mobile.css` and the whole tree stay out of the Mac bundle's entry chunk. Keep
+it that way — check `vite build` still emits a separate `Phone-*.js` chunk.
+
+**Building it takes two non-obvious flags.** Plain `xcodebuild` fails twice:
+
+```bash
+cd apps/ios && xcodebuild -project ios/App/App.xcodeproj -scheme App \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -configuration Debug CODE_SIGNING_ALLOWED=NO \
+  -skipPackagePluginValidation -skipMacroValidation build
+```
+
+- Without `-skipPackagePluginValidation`, it dies on "Validate plug-in CudaBuild
+  in package mlx-swift" — an unapproved build-tool plugin, normally a GUI trust
+  prompt.
+- Do **not** pass `-sdk iphonesimulator`. It forces the host toolchain to that
+  SDK and MLX's macro target then cannot resolve SwiftSyntax.
+
+**A Debug build's code is not in `App.app/App`.** That is a 40 KB launcher stub;
+the real binary is `App.app/App.debug.dylib` (~79 MB). Verify a Swift change
+landed by checking the dylib, not the stub:
+
+```bash
+strings -a "$APP/App.debug.dylib" | grep -c downloadProgress
+```
+
+**Previewing the phone UI without a device.** The native gate means a browser
+shows the desktop app. Serve `dist/` with a script that defines
+`window.Capacitor` — `isNativePlatform`, `getPlatform`, `nativePromise`,
+`addListener` — before the bundle loads, and the phone UI renders at 375×812.
+Match the real contracts or you will chase ghosts: sizes are **`sizeGB`** (not
+bytes), disk comes from `Device.getInfo().realDiskTotal/realDiskFree`, and the
+download events are **`downloadStarted` / `downloadProgress` / `downloadDone` /
+`downloadFailed`**. Note a hidden browser pane suspends rAF and clamps
+`setTimeout` to ~1s, so screen-push animations never settle and stubbed
+progress loops crawl — neither is an app bug.
+
+- **Every control in `src/mobile` is a `div`**, so `usePress` carries the
+  semantics: `role`, `tabIndex`, `aria-label`, and Enter/Space. Use it for
+  anything tappable and pass `label` for an icon-only control. Do not
+  reintroduce `outline: none` on `:focus-visible` — it never matches a tap, and
+  a phone can have a keyboard, Full Keyboard Access or Switch Control.
