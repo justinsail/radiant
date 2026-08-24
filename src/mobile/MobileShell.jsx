@@ -332,7 +332,9 @@ const EllipsisCircle = ({ size = 22 }) => (
 const SCREENS = {
   // Home is the root. Models used to be, which is why the app opened onto an
   // inventory of files to install rather than somewhere to arrive.
-  home: { title: 'Radiant', large: true, scroll: true, bg: 'grouped' },
+  // no large title: Home's own lockup is its header, and 'Radiant' set in
+  // the bar above a RADIANT wordmark would be the name twice.
+  home: { title: '', large: false, scroll: true, bg: 'grouped' },
   models: { title: 'Models', large: true, scroll: true, bg: 'grouped' },
   // `bare` means the screen draws its own nav bar too. Chat does: its title,
   // its composer and its transcript scroller are one layout, and splitting the

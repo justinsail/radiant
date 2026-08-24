@@ -2105,25 +2105,29 @@
    to", the actions answer "what now", and Recent answers "what was I doing" —
    in that order, because that is the order the questions occur. */
 .is-native .rx-home-head {
-  padding: 4px calc(var(--rx-sp-20) + var(--rx-sp-16)) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 18px calc(var(--rx-sp-20) + var(--rx-sp-16)) 0;
+}
+/* masked, so both follow the theme the user picked */
+.is-native .rx-home-mark { display: block; }
+.is-native .rx-home-word {
+  display: block;
+  width: 132px;
+  /* a mask has no intrinsic size; the box carries the artwork's 1180 x 210 */
+  aspect-ratio: 1180 / 210;
+  background: var(--rx-tint);
+  margin-top: 10px;
 }
 .is-native .rx-home-greeting {
-  margin: 0 0 10px;
-  font: -apple-system-title3;
-  font-weight: 600;
-  color: var(--rx-label);
+  margin: 14px 0 0;
+  font: -apple-system-subheadline;
+  color: var(--rx-label-2);
 }
-.is-native .rx-home-model {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--rx-r-cell, 24px);
-  background: var(--rx-cell, rgba(120,120,128,0.12));
-}
-.is-native .rx-home-model-text { min-width: 0; }
 .is-native .rx-home-empty {
-  margin: 0;
+  margin: 10px 0 0;
   max-width: 30em;
   font: -apple-system-subheadline;
   line-height: 1.45;

@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import usePress from './usePress.js'
 import { BrandMark } from './BrandSpinner.jsx'
+import wordUrl from '../assets/brand/radiant-wordmark.png'
 import { listChats, deleteChat, whenLabel, onChatsChanged } from './chats.js'
 
 /** Time of day, because a greeting that never changes stops being one. */
@@ -86,28 +87,32 @@ export default function HomeScreen ({
 
   return (
     <>
+      {/* The lockup IS the header — which is why the route carries no large
+          title: "Radiant" set in the nav bar above a RADIANT wordmark would be
+          the name twice. The model card that used to sit here is gone; the
+          model is named on the button that uses it. */}
       <div className="rx-home-head">
+        <span className="rx-home-mark"><BrandMark size={72} /></span>
+        <span
+          className="rx-home-word"
+          role="img"
+          aria-label="Radiant"
+          style={{
+            WebkitMask: `url(${wordUrl}) center / contain no-repeat`,
+            mask: `url(${wordUrl}) center / contain no-repeat`
+          }}
+        />
         <p className="rx-home-greeting">{greeting()}</p>
-        {activeModel
-          ? (
-            <div className="rx-home-model">
-              <BrandMark size={26} />
-              <div className="rx-home-model-text">
-                <div className="rx-headline">{activeModel.name}</div>
-                <div className="rx-row-blurb">Ready on this iPhone</div>
-              </div>
-            </div>
-            )
-          : (
-            <p className="rx-home-empty">
-              No model on this iPhone yet. Choose one and it runs here, offline.
-            </p>
-            )}
+        {!activeModel && (
+          <p className="rx-home-empty">
+            No model on this iPhone yet. Choose one and it runs here, offline.
+          </p>
+        )}
       </div>
 
       <div className="rx-home-actions">
         <button type="button" className={'rx-intro-cta' + start.className} {...start.handlers}>
-          New chat
+          {activeModel ? `New chat with ${activeModel.name}` : 'New chat'}
         </button>
         <button type="button" className={'rx-intro-second' + choose.className} {...choose.handlers}>
           {downloaded.length ? 'Models' : 'Choose a model'}
