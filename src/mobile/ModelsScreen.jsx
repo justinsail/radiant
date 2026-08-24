@@ -145,6 +145,36 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
 
 /* ── one catalog row ──────────────────────────────────────────────────────── */
 
+/**
+ * A model you already have: name, size, and a tap that starts talking to it.
+ *
+ * Deliberately NOT the same component as ModelRow. That one is about acquiring
+ * a model — its trailing control is a download arrow and its subtitle is a
+ * sales line. This one is about using one, so the subtitle is the size on disk
+ * and the trailing control is a disclosure into managing it.
+ */
+function InstalledRow ({ model, active, onOpen, onInfo }) {
+  const row = usePress(() => onOpen?.(), {
+    label: `Chat with ${model.name}${active ? ', current model' : ''}`
+  })
+  const manage = usePress((e) => { e.stopPropagation?.(); onInfo?.() }, {
+    label: `Manage ${model.name}`
+  })
+  return (
+    <div className={'rx-row rx-row-2line rx-pressable' + row.className} {...row.handlers}>
+      <span className="rx-row-lead"><BrandMark size={29} /></span>
+      <div className="rx-row-text">
+        <div className="rx-headline">
+          {model.name}
+          {active && <span className="rx-installed-now">Current</span>}
+        </div>
+        <div className="rx-row-blurb">{fmtGB(model.sizeGB)} on this iPhone</div>
+      </div>
+      <span className={'rx-row-remove' + manage.className} {...manage.handlers}>Manage</span>
+    </div>
+  )
+}
+
 function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, onAccessory }) {
   // ⚠️ THE VERDICT LABELS, IT DOES NOT FORBID — see the same note in
   // ModelPicker. Memory is an estimate and downloading is a disk operation;
@@ -183,10 +213,14 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, o
       // iCloud idiom, where the progress indicator IS the cancel target. A
       // separate ✕ elsewhere in the row would break the single-glyph trailing
       // column every other row keeps.
-      ? <span className="rx-stoppable">
-          <BrandSpinner size={26} progress={progress && typeof progress.pct === 'number' ? progress.pct : null} />
-          <span className="rx-stop-square" aria-hidden="true" />
-        </span>
+      // ⚠️ ONE THING TURNS, AND IT IS THE ONE ON THE LEFT. Tony: "for the model
+      // download we only need to spinning swirl logo at the left. the button on
+      // the right (stop button) doesnt need animation or a circle around it
+      // while downloading." Two spinning marks on one row is the same
+      // information twice, and the eye cannot settle on either. The trailing
+      // control goes back to being a plain control: a stop square, nothing
+      // orbiting it.
+      ? <span className="rx-stop-plain" aria-hidden="true" />
       : <span className={state === 'failed' ? 'rx-destructive' : undefined}><ArrowDownCircle /></span>
 
   return (
@@ -321,6 +355,33 @@ export default function ModelsScreen ({
         canChoose={!!pick}
         onChoose={() => onGetModel?.(pick?.id)}
       />
+
+      {/* ⚠️ WHAT IS ALREADY HERE COMES FIRST. Tony: "shouldnt the model download
+          page show all the models installed and be able to start a chat from
+          each. its awkward to start a chat from a new model." It was: the only
+          route into a conversation with a model you already had was to find it
+          inside its maker's shelf, among forty-three you do not have, and tap a
+          tick. Downloaded models are the ones you own — they get their own
+          section, at the top, and tapping one starts talking to it. */}
+      {downloaded.length > 0 && (
+        <div className="rx-section">
+          <div className="rx-section-header">On this iPhone</div>
+          <div className="rx-group">
+            {models.filter(m => m.downloaded).map(m => (
+              <InstalledRow
+                key={m.id}
+                model={m}
+                active={m.id === activeModel?.id}
+                onOpen={() => onOpenChat?.(m.id)}
+                onInfo={() => onGetModel?.(m.id)}
+              />
+            ))}
+          </div>
+          <div className="rx-section-footer">
+            Tap one to start a conversation with it. Tap Manage to remove it.
+          </div>
+        </div>
+      )}
 
       <div className="rx-section">
         <Announcer models={models} jobs={jobs} progress={progress} failures={failures} />

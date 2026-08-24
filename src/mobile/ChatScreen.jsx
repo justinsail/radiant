@@ -37,7 +37,7 @@ function migrateLegacy () {
   } catch { return null }
 }
 
-export default function ChatScreen ({ nav, model, onModelInfo, chatId }) {
+export default function ChatScreen ({ nav, model, onModelInfo, chatId, downloadedModels, onSwitchModel }) {
   // A chat route always resolves to an id: the one it was opened with, the most
   // recent, a migrated legacy transcript, or a fresh one.
   const [id] = useState(() => {
@@ -77,6 +77,8 @@ export default function ChatScreen ({ nav, model, onModelInfo, chatId }) {
       model={model}
       onBack={back}
       onModelInfo={onModelInfo}
+      downloadedModels={downloadedModels}
+      onSwitchModel={onSwitchModel}
       initialMessages={nonce === 0 ? initial : []}
       onMessagesChange={onMessagesChange}
       onDeleteConversation={onDeleteConversation}

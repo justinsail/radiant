@@ -178,6 +178,13 @@ const NewChatGlyph = () => (
     <path d='M12.6 2.2l3.2 3.2-5.6 5.6-3.8.6.6-3.8 5.6-5.6z' stroke='currentColor' strokeWidth='1.5' strokeLinejoin='round' />
   </svg>
 )
+const TickGlyph = () => (
+  <svg viewBox='0 0 16 16' width='16' height='16' aria-hidden='true'>
+    <path d='M3.5 8.5l3 3 6-7' fill='none' stroke='currentColor' strokeWidth='1.8'
+          strokeLinecap='round' strokeLinejoin='round' />
+  </svg>
+)
+
 const InfoGlyph = () => (
   <svg width='18' height='18' viewBox='0 0 18 18' fill='none' aria-hidden='true'>
     <circle cx='9' cy='9' r='7.4' stroke='currentColor' strokeWidth='1.5' />
@@ -260,6 +267,8 @@ export default function MobileChat ({
   model,
   onBack,
   onModelInfo,
+  downloadedModels = [],
+  onSwitchModel,
   initialMessages = [],
   onMessagesChange,
   onDeleteConversation
@@ -270,6 +279,7 @@ export default function MobileChat ({
   const [scrolled, setScrolled] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [menu, setMenu] = useState(false)
+  const [pickModel, setPickModel] = useState(false)
   const [rate, setRate] = useState(null) // tok/s, or null when we cannot say honestly
 
   const rootRef = useRef(null)
@@ -619,8 +629,32 @@ export default function MobileChat ({
             <Chevron />
             <span>Models</span>
           </button>
-          <div className='rx-chat-title'>
-            <div className='rx-chat-title-1'>{model?.name || 'No model'}</div>
+          {/* ⚠️ THE TITLE IS THE MODEL SWITCHER. Tony: "while inside a chat,
+              there should be a way to switch models on the fly." Putting it
+              behind the ⋯ menu would hide the one control people reach for
+              most; a tappable title with a chevron is what every chat app of
+              this shape does, and it needs no new chrome. It is only a control
+              when there is something to switch TO. */}
+          <div
+            className={'rx-chat-title' + (downloadedModels.length > 1 ? ' is-switch' : '')}
+            {...(downloadedModels.length > 1
+              ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-haspopup': 'menu',
+                  'aria-label': `Model: ${model?.name || 'none'}. Change model.`,
+                  onClick: () => setPickModel(true)
+                }
+              : {})}
+          >
+            <div className='rx-chat-title-1'>
+              {model?.name || 'No model'}
+              {downloadedModels.length > 1 && (
+                <svg className='rx-chat-title-chev' viewBox='0 0 10 6' width='9' height='6' aria-hidden='true'>
+                  <path d='M1 1l4 4 4-4' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round' />
+                </svg>
+              )}
+            </div>
             {/* The privacy promise lives permanently in the chrome, in the
                 quietest possible place. A banner would cheapen it. */}
             <div className={'rx-chat-title-2' + (rate ? ' is-mono' : '')}>
@@ -733,6 +767,21 @@ export default function MobileChat ({
             {generating ? <StopSquare /> : <ArrowUp />}
           </button>
         </div>
+
+        {pickModel && (
+          <div className='rx-chat-menulayer' onTouchStart={() => setPickModel(false)} onClick={() => setPickModel(false)}>
+            <div className='rx-chat-menu rx-chat-models' role='menu' onTouchStart={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+              {downloadedModels.map(m => (
+                <MenuRow
+                  key={m.id}
+                  label={m.name}
+                  glyph={m.id === model?.id ? <TickGlyph /> : <span style={{ width: 16 }} />}
+                  onPick={() => { setPickModel(false); if (m.id !== model?.id) onSwitchModel?.(m.id) }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {menu && (
           <div className='rx-chat-menulayer' onTouchStart={() => setMenu(false)} onClick={() => setMenu(false)}>

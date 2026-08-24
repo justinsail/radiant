@@ -1081,7 +1081,14 @@ export default function MobileShell () {
             {...common}
             modelId={activeModel?.id || activeModelId}
             model={activeModel}
+            downloadedModels={downloaded}
             onModelInfo={() => presentSheet(activeModel?.id)}
+            onSwitchModel={(id) => {
+              // Switching mid-conversation KEEPS the conversation: the messages
+              // belong to the chat, not to the model that answered them.
+              setActiveModelId(id)
+              try { localStorage.setItem(ACTIVE_MODEL_KEY, id) } catch { /* private mode */ }
+            }}
           />
         )
       case 'home':

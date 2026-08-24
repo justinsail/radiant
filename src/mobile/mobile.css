@@ -2268,8 +2268,12 @@
 /* The picker injects its own rx-mp-* copy of these; the two must stay in step.
    Shared behavior lives in MakerSection.jsx — only appearance is here. */
 .is-native .rx-makerhead{
-  display:flex; align-items:center; gap:10px; width:100%;
-  margin:8px 0 0; padding:12px 16px;
+  display:flex; align-items:center; gap:10px;
+  /* ⚠️ SAME INSET AS .rx-group, or the header and the rows it opens are two
+     different widths stacked on each other — which is exactly what made the
+     open shelf look like a misplaced panel rather than one card. `width:100%`
+     is gone with it: with side margins it would overflow by 40px. */
+  margin:8px var(--rx-sp-20) 0; padding:12px 16px;
   background:var(--rx-cell); border:0; border-radius:12px;
   font:inherit; color:var(--rx-label); text-align:left;
   -webkit-tap-highlight-color:transparent;
@@ -2346,3 +2350,22 @@
    Amber, because it is a limitation worth noticing — not red, because nothing
    is broken. */
 .is-native .rx-specs-capped{color:var(--rx-amber)}
+
+/* The stop control during a download: a square, and nothing else. The spinning
+   mark beside the model name is what says "working"; this says "stop". */
+.is-native .rx-stop-plain {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  background: var(--rx-tint);
+}
+
+/* "Current" beside an installed model's name — a quiet state, not a badge to
+   celebrate; it answers "which one am I talking to" and nothing more. */
+.is-native .rx-installed-now {
+  margin-left: 8px;
+  font-size: 0.82em;
+  font-weight: 400;
+  color: var(--rx-tint);
+}
