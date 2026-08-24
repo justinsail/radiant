@@ -72,3 +72,36 @@ export function looksWrong (provider, value) {
   }
   return null
 }
+
+const PC = () => (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.ProviderChat : null)
+
+/**
+ * The provider's own model list. Asked of the vendor rather than hard-coded,
+ * so it shows what this key can actually reach and cannot go stale when a new
+ * model ships.
+ */
+export async function fetchModels (provider) {
+  const pc = PC()
+  if (!pc?.models) throw new Error('This build cannot reach cloud providers.')
+  const r = await pc.models({ provider: provider.id, baseUrl: provider.baseUrl })
+  return r?.models || []
+}
+
+const CHOSEN = 'radiant.phone.cloudModel'
+
+/** { providerId, model } or null — the cloud model the user last chose. */
+export function loadChosen () {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CHOSEN) || 'null')
+    return raw && PROVIDERS.some(p => p.id === raw.providerId) ? raw : null
+  } catch { return null }
+}
+
+export function saveChosen (chosen) {
+  try {
+    if (chosen) localStorage.setItem(CHOSEN, JSON.stringify(chosen))
+    else localStorage.removeItem(CHOSEN)
+  } catch { /* private mode */ }
+}
+
+export const providerById = id => PROVIDERS.find(p => p.id === id) || null

@@ -1980,3 +1980,35 @@
   font: -apple-system-body;
 }
 
+/* the provider's own model list, as pills under its row */
+.is-native .rx-provider-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 16px 12px;
+}
+.is-native .rx-model-pill {
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--rx-fill-3, rgba(120,120,128,0.16));
+  font: -apple-system-footnote;
+  color: var(--rx-label-2);
+  /* model ids are long and must not wrap mid-token */
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.is-native .rx-model-pill.is-pressed { opacity: 0.6; }
+.is-native .rx-model-pill.is-on {
+  background: var(--rx-tint);
+  color: var(--rx-on-tint);
+  font-weight: 600;
+}
+.is-native .rx-provider-note {
+  margin: 0;
+  padding: 0 16px 12px;
+  font: -apple-system-footnote;
+  color: var(--rx-label-3);
+}
+

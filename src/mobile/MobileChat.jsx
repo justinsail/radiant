@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import Gauge from './Gauge.jsx'
 import * as haptics from './haptics.js'
 import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
+import { loadChosen, providerById } from './providers.js'
 
 // The conversation, running on this phone.
 //
@@ -449,7 +450,7 @@ export default function MobileChat ({
       if (follow.current) requestAnimationFrame(() => stick())
     }
 
-    const offToken = listen(lm, 'token', e => {
+    const onToken = e => {
       const r = run.current
       if (!r || r.done) return
       const chunk = e?.text
@@ -475,11 +476,11 @@ export default function MobileChat ({
           r.raf = requestAnimationFrame(() => { r.raf = 0; if (follow.current) stick() })
         }
       }
-    })
+    }
 
-    const offDone = listen(lm, 'done', () => finish(bufRef.current.trim(), null))
+    const onDone = () => finish(bufRef.current.trim(), null)
 
-    const offFailed = listen(lm, 'failed', e => {
+    const onFailed = e => {
       const r = run.current
       if (!r || r.done) return
       // A deliberate cancel comes back as a cancelled Task and must never
@@ -491,9 +492,21 @@ export default function MobileChat ({
       if (r.stoppedAt) return finish(bufRef.current.trim(), null)
       haptics.notification?.('ERROR')
       finish(bufRef.current.trim(), e?.message || 'Generation failed.')
-    })
+    }
 
-    return () => { offToken(); offDone(); offFailed() }
+    // Both sources, one set of handlers — the transcript does not care whether
+    // the text came from the model on this phone or from a provider.
+    const pc = plugins().ProviderChat
+    const offs = [
+      listen(lm, 'token', onToken),
+      listen(lm, 'done', onDone),
+      listen(lm, 'failed', onFailed),
+      listen(pc, 'cloudToken', onToken),
+      listen(pc, 'cloudDone', onDone),
+      listen(pc, 'cloudFailed', onFailed)
+    ]
+
+    return () => offs.forEach(off => off())
   }, [stick])
 
   const send = useCallback(text => {
@@ -519,6 +532,33 @@ export default function MobileChat ({
     follow.current = true
     setShowJump(false)
     requestAnimationFrame(() => stick())
+
+    // A chosen cloud model wins over the on-device one. The request is made
+    // NATIVELY — see ProviderChat.swift — so the API key never enters this web
+    // layer; from here the two paths are identical, because the cloud plugin
+    // emits the same token / done / failed shape LocalModels does.
+    const cloud = loadChosen()
+    const pc = typeof window !== 'undefined' ? window.Capacitor?.Plugins?.ProviderChat : null
+    if (cloud && pc?.send) {
+      const provider = providerById(cloud.providerId)
+      if (provider) {
+        pc.send({
+          provider: provider.id,
+          baseUrl: provider.baseUrl,
+          model: cloud.model,
+          // the transcript, not a flattened prompt: a cloud model has real
+          // multi-turn memory and flattening it away would throw that out
+          messages: [
+            ...messages.slice(-12).map(m => ({
+              role: m.role === 'user' ? 'user' : 'assistant',
+              content: m.text
+            })),
+            { role: 'user', content: body }
+          ]
+        }).catch(() => { /* cloudFailed carries the message */ })
+        return
+      }
+    }
 
     lm.generate({ id: model.id, prompt }).catch(() => {
       // The rejection and the `failed` event describe the same failure; the

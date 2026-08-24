@@ -11,13 +11,42 @@
  */
 import React, { useCallback, useEffect, useState } from 'react'
 import usePress from './usePress.js'
-import { PROVIDERS, connectedProviders, saveKey, removeKey, looksWrong } from './providers.js'
+import {
+  PROVIDERS, connectedProviders, saveKey, removeKey, looksWrong,
+  fetchModels, loadChosen, saveChosen
+} from './providers.js'
 
-function Provider ({ p, connected, onChanged }) {
+function ModelPick ({ id, on, onPick }) {
+  const press = usePress(onPick, { label: `${id}${on ? ', selected' : ''}`, haptic: 'selection' })
+  return (
+    <span className={'rx-model-pill' + (on ? ' is-on' : '') + press.className} {...press.handlers}>
+      {id}
+    </span>
+  )
+}
+
+function Provider ({ p, connected, chosen, onChoose, onChanged }) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [models, setModels] = useState([])
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [modelError, setModelError] = useState(null)
+
+  // A saved key is only worth something if it actually reaches the vendor, so
+  // the list doubles as the proof: models arriving IS the key working, and the
+  // vendor's own refusal is a better message than any we could invent.
+  useEffect(() => {
+    let alive = true
+    if (!connected) { setModels([]); setModelError(null); return }
+    setLoadingModels(true); setModelError(null)
+    fetchModels(p)
+      .then(list => { if (alive) setModels(list) })
+      .catch(e => { if (alive) setModelError(e?.message || 'Could not reach this provider.') })
+      .finally(() => { if (alive) setLoadingModels(false) })
+    return () => { alive = false }
+  }, [connected, p])
 
   const head = usePress(() => { setOpen(o => !o); setError(null); setValue('') }, {
     label: `${p.name}${connected ? ', connected' : ''}`,
@@ -55,6 +84,20 @@ function Provider ({ p, connected, onChanged }) {
         {connected && <span className="rx-provider-on">Connected</span>}
       </div>
 
+      {connected && models.length > 0 && (
+        <div className="rx-provider-models">
+          {models.map(m => {
+            const on = chosen?.providerId === p.id && chosen?.model === m
+            return <ModelPick key={m} id={m} on={on} onPick={() => onChoose(p.id, m)} />
+          })}
+        </div>
+      )}
+
+      {connected && loadingModels && (
+        <p className="rx-provider-note">Asking {p.name} what it can run…</p>
+      )}
+      {connected && modelError && <p className="rx-provider-error">{modelError}</p>}
+
       {open && (
         <div className="rx-provider-edit">
           <input
@@ -89,11 +132,20 @@ function Provider ({ p, connected, onChanged }) {
 
 export default function ProvidersScreen () {
   const [connected, setConnected] = useState([])
+  const [chosen, setChosen] = useState(() => loadChosen())
 
   const refresh = useCallback(async () => {
     setConnected(await connectedProviders())
   }, [])
   useEffect(() => { refresh() }, [refresh])
+
+  const choose = useCallback((providerId, model) => {
+    const next = chosen?.providerId === providerId && chosen?.model === model
+      ? null                        // tapping the chosen one clears it
+      : { providerId, model }
+    setChosen(next)
+    saveChosen(next)
+  }, [chosen])
 
   return (
     <>
@@ -108,6 +160,8 @@ export default function ProvidersScreen () {
             key={p.id}
             p={p}
             connected={connected.includes(p.id)}
+            chosen={chosen}
+            onChoose={choose}
             onChanged={refresh}
           />
         ))}
