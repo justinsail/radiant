@@ -157,7 +157,17 @@ export async function testServer (base, token) {
     })
   } catch (e) {
     if (e?.name === 'AbortError') {
-      throw new Error(`No answer from that Mac after ${TEST_TIMEOUT_MS / 1000} seconds. It is probably asleep, or you are not on the tailnet right now.`)
+      // ⚠️ NAME THE MISTAKE IF WE CAN SEE IT. A raw Tailscale address times out
+      // in a way that looks identical to a sleeping Mac, and Tony lost an
+      // evening to exactly that: he picked 100.64.118.54:5834 from the Mac's own
+      // list, and both readings of it dead-end — plain http is refused by iOS,
+      // and there is no TLS on that port to fall back to, so the handshake just
+      // hangs. Telling him "your Mac is probably asleep" when it was answering
+      // in 45ms sent him looking in the wrong place.
+      if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(new URL(url).hostname)) {
+        throw new Error("That is a Tailscale IP address, and iPhone can't use one — it needs the https address instead. On your Mac, Settings → Devices shows it; it looks like https://your-mac.your-tailnet.ts.net")
+      }
+      throw new Error(`No answer from that Mac after ${TEST_TIMEOUT_MS / 1000} seconds. Check Radiant is open on it, and that both devices are on Tailscale.`)
     }
     throw new Error("Couldn't reach that server. Check the address is right, Radiant is running and shared on the host (v0.6.9+), and both devices are on Tailscale.")
   } finally {

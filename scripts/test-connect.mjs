@@ -81,6 +81,14 @@ globalThis.fetch = async (_u, opts) => new Promise((_res, rej) => {
     const e = new Error('aborted'); e.name = 'AbortError'; rej(e)
   })
 })
+// ⚠️ A TAILSCALE IP MUST SAY SO. It times out identically to a sleeping Mac,
+// and the generic message sends people to check a Mac that is answering fine.
+{
+  const msg = await err(() => testServer('100.64.118.54:5834', ''))
+  is('a Tailscale IP explains itself', /Tailscale IP/.test(msg || ''), true)
+  is('and points at the https address', /https:\/\//.test(msg || ''), true)
+}
+
 const started = Date.now()
 const msg = await err(() => testServer('https://asleep.ts.net', ''))
 const waited = Date.now() - started
