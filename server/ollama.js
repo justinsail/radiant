@@ -10,11 +10,22 @@ const EXTRA_DIRS = ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', p
 
 export const SPAWN_ENV = { ...process.env, PATH: [...EXTRA_DIRS, process.env.PATH || ''].filter(Boolean).join(':') }
 
-let cached
-export function ollamaBin () {
-  if (cached) return cached
-  if (process.env.OLLAMA_BIN && fs.existsSync(process.env.OLLAMA_BIN)) return (cached = process.env.OLLAMA_BIN)
-  for (const d of EXTRA_DIRS) { const p = path.join(d, 'ollama'); if (fs.existsSync(p)) return (cached = p) }
-  try { const p = execSync('command -v ollama', { env: SPAWN_ENV, encoding: 'utf8' }).trim(); if (p && fs.existsSync(p)) return (cached = p) } catch {}
-  return (cached = 'ollama') // last resort; will ENOENT if truly not installed
+// ⚠️ EVERY SPAWNED TOOL NEEDS THIS, NOT JUST OLLAMA. The Hermes relay called
+// bare spawn('hermes') and died with ENOENT for every user who launched Radiant
+// from the Dock, while working perfectly from a terminal — which is exactly how
+// it got tested. Resolve through here, and pass SPAWN_ENV.
+const cache = new Map()
+export function resolveBin (name, envVar) {
+  if (cache.has(name)) return cache.get(name)
+  const set = v => { cache.set(name, v); return v }
+  if (envVar && process.env[envVar] && fs.existsSync(process.env[envVar])) return set(process.env[envVar])
+  for (const d of EXTRA_DIRS) { const p = path.join(d, name); if (fs.existsSync(p)) return set(p) }
+  try {
+    const p = execSync(`command -v ${name}`, { env: SPAWN_ENV, encoding: 'utf8' }).trim()
+    if (p && fs.existsSync(p)) return set(p)
+  } catch {}
+  return set(name) // last resort; ENOENTs if genuinely not installed
 }
+
+export const ollamaBin = () => resolveBin('ollama', 'OLLAMA_BIN')
+export const hermesBin = () => resolveBin('hermes', 'HERMES_BIN')

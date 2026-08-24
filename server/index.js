@@ -13,7 +13,7 @@ import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSe
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken, startDevice, pollDevice } from './oauth.js'
 import { checkForUpdate } from './updater.js'
-import { ollamaBin, SPAWN_ENV } from './ollama.js'
+import { ollamaBin, hermesBin, SPAWN_ENV } from './ollama.js'
 import { commandRisk } from './util.js'
 import { listFacts, addFacts, addFactManual, deleteFact, clearFacts, relevantFacts } from './memory.js'
 import { shouldReflect, reflectionPrompt, parseProposal, addSuggestion } from './skillsmith.js'
@@ -474,8 +474,11 @@ function runHermesRelay ({ text, emit, signal, session }) {
     const finish = () => { if (!settled) { settled = true; resolve(acc) } }
     let child
     try {
-      child = spawn('hermes', ['-z', String(text || '')], {
-        env: process.env,
+      child = spawn(hermesBin(), ['-z', String(text || '')], {
+        // SPAWN_ENV, not process.env: hermes is a shell script that execs a
+          // python venv, so it needs the augmented PATH too — resolving the
+          // binary alone is not enough.
+          env: SPAWN_ENV,
         cwd: (session && session.cwd) || undefined,
         stdio: ['ignore', 'pipe', 'pipe']
       })

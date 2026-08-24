@@ -21,9 +21,15 @@ const config: CapacitorConfig = {
   ios: {
     // the page owns scrolling; the shell should not add its own bounce
     contentInset: 'never',
-    backgroundColor: '#0f1116',
+    // true black, not the Mac app's tinted #121417: on an OLED iPhone a tinted
+    // near-black is exactly what makes a dark UI read as a web page
+    backgroundColor: '#000000',
     // only tailnet hosts — the app never needs the open web
     limitsNavigationsToAppBoundDomains: false
+  },
+  plugins: {
+    // the composer rides visualViewport itself; the web view must not resize
+    Keyboard: { resize: 'none' }
   },
   server: {
     // no `url`: the bundled UI loads first and asks which Mac to connect to

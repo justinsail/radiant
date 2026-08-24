@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { execFile, spawn } from 'child_process'
+import { SPAWN_ENV } from './ollama.js'
 import { searchSessions } from './config.js'
 
 const MAX_OUTPUT = 40_000
@@ -10,7 +11,11 @@ const MAX_OUTPUT = 40_000
 const jobs = new Map()
 function newJob (command, cwd) {
   const id = 'job_' + crypto.randomBytes(3).toString('hex')
-  const proc = spawn('bash', ['-lc', command], { cwd, detached: false })
+  // ⚠️ SPAWN_ENV OR THE AGENT LOSES HALF ITS TOOLS. A Dock-launched app has
+  // PATH=/usr/bin:/bin:/usr/sbin:/sbin, so anything in Homebrew or ~/.local/bin
+  // is "command not found" — while working perfectly when the server is started
+  // from a terminal, which is how this kept getting tested.
+  const proc = spawn('bash', ['-lc', command], { cwd, detached: false, env: SPAWN_ENV })
   const job = { id, command, output: '', done: false, exitCode: null, startedAt: Date.now(), proc }
   const cap = d => { job.output = (job.output + d.toString()).slice(-200_000) }
   proc.stdout.on('data', cap)
@@ -181,7 +186,7 @@ export async function runTool (name, input, cwd) {
           return `Started in the background as ${id}. Use job_output("${id}") to check on it, job_kill("${id}") to stop it.`
         }
         return await new Promise(resolve => {
-          execFile('bash', ['-c', input.command], { cwd, timeout: 120_000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+          execFile('bash', ['-lc', input.command], { cwd, timeout: 120_000, maxBuffer: 10 * 1024 * 1024, env: SPAWN_ENV }, (err, stdout, stderr) => {
             let out = ''
             if (stdout) out += stdout
             if (stderr) out += (out ? '\n--- stderr ---\n' : '') + stderr
