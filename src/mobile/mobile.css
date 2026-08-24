@@ -1605,7 +1605,18 @@
   position: absolute;
   inset: -45%;
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(0.70 0.18 var(--rx-accent-h) / 0.55), transparent 62%);
+  /* ⚠️ A RING, NOT A DISC. The mark's centre is genuinely hollow — the PNG is
+     fully transparent there — but this glow used to peak at its own centre,
+     which is exactly the hole, so the ground showing through was the BRIGHTEST
+     part of the halo and the swirl read as having a filled blue middle. Tony:
+     "the circle in the center of the swirl should be transparent so the
+     background comes through." The light now starts at the swirl's inner edge
+     and falls away outward, leaving the hole dark. */
+  background: radial-gradient(circle,
+    transparent 0%,
+    transparent 26%,
+    oklch(0.70 0.18 var(--rx-accent-h) / 0.55) 40%,
+    transparent 62%);
   filter: blur(6px);
 }
 .is-native .rx-brand-mark {
@@ -1735,7 +1746,18 @@
   position: absolute;
   inset: -46%;
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(0.70 0.18 var(--rx-accent-h) / 0.55), transparent 62%);
+  /* ⚠️ A RING, NOT A DISC. The mark's centre is genuinely hollow — the PNG is
+     fully transparent there — but this glow used to peak at its own centre,
+     which is exactly the hole, so the ground showing through was the BRIGHTEST
+     part of the halo and the swirl read as having a filled blue middle. Tony:
+     "the circle in the center of the swirl should be transparent so the
+     background comes through." The light now starts at the swirl's inner edge
+     and falls away outward, leaving the hole dark. */
+  background: radial-gradient(circle,
+    transparent 0%,
+    transparent 26%,
+    oklch(0.70 0.18 var(--rx-accent-h) / 0.55) 40%,
+    transparent 62%);
   filter: blur(7px);
   transform: scale(0.6);
   opacity: 0;
@@ -2203,6 +2225,14 @@
 }
 /* the name is the part worth reading; the label is scaffolding */
 .is-native .rx-home-current-name { color: var(--rx-label); font-weight: 600; }
+
+/* ⚠️ NO GLOW ON HOME. .rx-intro-cta carries a 44px coloured drop shadow, which
+   belongs to the first-run hero — a screen made of glows. On Home it sits on a
+   plain grouped background and reads as a smudge under the button rather than
+   as light. Tony: "there also appears to be a blue glow behind the New Chat
+   button. remove it." Scoped here rather than deleted from the shared class, so
+   the intro keeps its hero treatment. */
+.is-native .rx-home-actions .rx-intro-cta { box-shadow: none; }
 
 .is-native .rx-home-actions {
   display: flex;

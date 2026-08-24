@@ -187,6 +187,44 @@ def build(_a, _b, name):
                     base = canvas[o + k]
                     canvas[o + k] = min(255, int(base + (col[k] - base * col[k] / 255) * a))
 
+    def ring(cx, cy, r_in, r_out, col, peak):
+        """A glow that is DARK IN THE MIDDLE.
+
+        ⚠️ THE MARK'S CENTRE IS HOLLOW AND MUST STAY THAT WAY. radiant-mark.png
+        is fully transparent through the middle — it is a swirl, not a disc — so
+        whatever is painted behind it shows through the hole. The halo used to be
+        a filled wash peaking at its own centre, which put the BRIGHTEST blue in
+        the app exactly where the ground was supposed to show, and the logo read
+        as having a solid middle. Tony: "the circle in the center of the swirl
+        should be transparent so the background comes through."
+
+        So the light lives in a band around the swirl and falls to nothing
+        inside r_in.
+        """
+        x0, x1 = max(0, int(cx - r_out)), min(W, int(cx + r_out) + 1)
+        y0, y1 = max(0, int(cy - r_out)), min(H, int(cy + r_out) + 1)
+        mid = (r_in + r_out) / 2.0
+        half = max(1.0, (r_out - r_in) / 2.0)
+        for y in range(y0, y1):
+            dy = y - cy
+            row = y * W
+            for x in range(x0, x1):
+                d = math.hypot(x - cx, dy)
+                if d >= r_out or d <= r_in * 0.55:
+                    continue
+                # Asymmetric falloff: quick on the way in so the hole stays
+                # clean, slow on the way out so the glow is atmosphere rather
+                # than a drawn ring. A symmetric curve made a visible donut that
+                # competed with the swirl.
+                t = (d - mid) / half
+                a = peak * (max(0.0, 1.0 - abs(t)) ** (2.6 if t < 0 else 1.15))
+                if a <= 0.002:
+                    continue
+                o = (row + x) * 3
+                for k in range(3):
+                    base = canvas[o + k]
+                    canvas[o + k] = min(255, int(base + (col[k] - base * col[k] / 255) * a))
+
     wash(W * 0.50, -H * 0.10, W * 0.60, H * 0.80, GLOW_A, 0.55, 1.7)
     wash(W * 0.82, H * 0.08, W * 0.40, H * 0.60, GLOW_B, 0.34, 1.7)
     # the low quiet one, matching .rx-intro-glow-c
@@ -246,7 +284,9 @@ def build(_a, _b, name):
     block = mark_w + gap + word_h
     top = (SIDE - block) // 2 - int(SIDE * 0.03)
 
-    wash(W / 2, top + mark_w / 2, mark_w * 1.5, mark_w * 1.5, HALO, 0.62, 2.1)
+    # The halo hugs the swirl instead of filling it: inner edge just inside the
+    # ring of the mark, outer edge well past it.
+    ring(W / 2, top + mark_w / 2, mark_w * 0.34, mark_w * 1.55, HALO, 0.34)
     _, dh = place(MARK, mark_w, W / 2, top)
     place(WORD, word_w, W / 2, top + dh + gap)
 
