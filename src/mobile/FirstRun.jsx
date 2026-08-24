@@ -17,24 +17,24 @@ import React from 'react'
 import usePress from './usePress.js'
 import { BrandMark } from './BrandSpinner.jsx'
 import wordUrl from '../assets/brand/radiant-wordmark.png'
-import fieldUrl from '../assets/brand/node-field.png'
 
-export default function FirstRun ({ onChooseModel, onConnectMac }) {
-  const choose = usePress(() => onChooseModel?.(), { label: 'Choose a model' })
+export default function FirstRun ({ onChooseModel, onConnectMac, onStartChat, hasModel }) {
+  // Start Chat leads, but only when there is something to chat WITH. With an
+  // empty phone it would open a conversation with nothing behind it, so it
+  // steps aside and Choose Model takes the primary slot — the screen offers the
+  // action that can actually be completed.
+  const start = usePress(() => onStartChat?.(), { label: 'Start chat', disabled: !hasModel })
+  const choose = usePress(() => onChooseModel?.(), { label: 'Choose model' })
   const mac = usePress(() => onConnectMac?.(), { label: 'Connect to a Mac instead' })
 
   return (
     <div className="rx-cover rx-intro">
-      {/* Ground, in layers. Three glows and the node field, aria-hidden: this is
+      {/* Ground, in layers. Three glows, aria-hidden: this is
           atmosphere, and a screen reader announcing it would be noise. */}
       <div className="rx-intro-sky" aria-hidden="true">
         <span className="rx-intro-glow rx-intro-glow-a" />
         <span className="rx-intro-glow rx-intro-glow-b" />
         <span className="rx-intro-glow rx-intro-glow-c" />
-        {/* the connected-node field from templetongroup.dev's hero, rendered
-            once into a PNG rather than run on a canvas — same file the launch
-            image uses, which is what keeps the handoff exact */}
-        <span className="rx-intro-net" style={{ backgroundImage: `url(${fieldUrl})` }} />
       </div>
 
       <div className="rx-intro-stage">
@@ -76,12 +76,17 @@ export default function FirstRun ({ onChooseModel, onConnectMac }) {
       </div>
 
       <div className="rx-intro-actions">
+        {hasModel && (
+          <button type="button" className={'rx-intro-cta' + start.className} {...start.handlers}>
+            Start chat
+          </button>
+        )}
         <button
           type="button"
-          className={'rx-intro-cta' + choose.className}
+          className={(hasModel ? 'rx-intro-second' : 'rx-intro-cta') + choose.className}
           {...choose.handlers}
         >
-          Choose a model
+          Choose model
         </button>
         <button
           type="button"

@@ -1710,19 +1710,6 @@
   background: radial-gradient(circle, oklch(0.52 0.13 var(--rx-accent-h) / 0.26), transparent 62%);
   animation-delay: 240ms;
 }
-/* templetongroup.dev's node field, as a still. It fades in behind the lockup
-   and then holds — the site animates it forever, this phone is about to run a
-   language model. */
-.is-native .rx-intro-net {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  opacity: 0;
-  animation: rx-net 1600ms ease-out 180ms forwards;
-}
-@keyframes rx-net { to { opacity: 1; } }
-
 .is-native .rx-intro-stage {
   position: relative;
   flex: 1 1 auto;
@@ -1824,6 +1811,21 @@
   transition: transform 200ms var(--rx-ease, cubic-bezier(.22,1,.36,1));
 }
 .is-native .rx-intro-cta.is-pressed { transform: scale(0.97); }
+/* The second action. Same geometry as the primary — height, radius, padding,
+   label baseline — so the pair reads as a set; only the fill differs, which is
+   what carries the rank. Peer buttons that disagree on geometry are the fastest
+   way to make a screen look assembled rather than designed. */
+.is-native .rx-intro-second {
+  min-height: 54px;
+  border: 0;
+  border-radius: 16px;
+  font: -apple-system-headline;
+  color: var(--rx-tint);
+  background: color-mix(in srgb, var(--rx-tint) 16%, transparent);
+  transition: transform 200ms var(--rx-ease, cubic-bezier(.22,1,.36,1));
+}
+.is-native .rx-intro-second.is-pressed { transform: scale(0.97); }
+
 .is-native .rx-intro-alt {
   min-height: 44px;
   border: 0;
@@ -1845,7 +1847,6 @@
    half-state, and never nothing at all. */
 @media (prefers-reduced-motion: reduce) {
   .is-native .rx-intro-glow,
-  .is-native .rx-intro-net,
   .is-native .rx-intro-mark,
   .is-native .rx-intro-halo,
   .is-native .rx-intro-word,

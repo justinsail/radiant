@@ -1232,6 +1232,8 @@ export default function MobileShell () {
             models={models}
             onChooseModel={() => { finishFirstRun(); presentSheet(null) }}
             onConnectMac={() => { finishFirstRun(); connectMac() }}
+            onStartChat={() => { finishFirstRun(); openChat(activeModel?.id || downloaded[0]?.id) }}
+            hasModel={downloaded.length > 0}
           />
         </div>
       )}
