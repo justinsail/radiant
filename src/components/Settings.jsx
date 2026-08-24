@@ -1284,6 +1284,8 @@ function AboutPane ({ config, onSettings }) {
 
 function DevicesPane () {
   const [share, setShare] = useState(null)
+  // The token is a credential; it starts hidden. See the note beside it.
+  const [showToken, setShowToken] = useState(false)
   const server = getServer()
   const [base, setBase] = useState(server.base || '')
   const [token, setToken] = useState(server.token || '')
@@ -1309,50 +1311,96 @@ function DevicesPane () {
     <div className='set-section'>
       <h3>Devices &amp; sharing</h3>
 
+      {/*
+        ⚠️ REWRITTEN BECAUSE IT WAS UNUSABLE. Tony: "this whole window is now a
+        confusing mess. fix it." It was: a checkbox, a raw secret token printed
+        in full, two bare IP:port rows labelled "Tailscale" and "en8", four
+        identical-looking Copy buttons, a red error telling the user to run a
+        terminal command, and a paragraph about a button that no longer had that
+        name. Six things competing, none of them the answer to the only question
+        being asked — "how do I use this on my phone?"
+
+        Now: one switch, then the two values the phone asks for, in the order the
+        phone asks for them. Everything else is either done automatically or
+        folded away.
+      */}
       <div className='set-block'>
-        <div className='set-block-title'>Share this Mac's server</div>
-        <p className='hint' style={{ marginTop: 2 }}>Let your other Macs and your phone use this machine's models, agents, and sessions. Best on an always-on Mac; reach it over Tailscale. Changing this needs a Radiant relaunch.</p>
-        <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(share?.desired)} onChange={toggleShare} /> Share on my network</label>
-        {share && share.desired !== share.enabled && <div className='error-note' style={{ marginTop: 6 }}>Quit and reopen Radiant to {share.desired ? 'start' : 'stop'} sharing.</div>}
-        {share?.desired && share?.token && (
-          <div style={{ marginTop: 10 }}>
-            <div className='connect-field'>Access token
-              <div className='row'><code className='mono share-token'>{share.token}</code><button className='small-btn' onClick={() => copy(share.token)}>Copy</button></div>
-            </div>
-            <div className='connect-field' style={{ marginTop: 8 }}>Other devices connect to:
-              {(share.addresses || []).length
-                ? share.addresses.map(a => {
-                    // ⚠️ ONLY THE SERVE URL WORKS FROM AN iPHONE. A raw 100.x
-                    // address is plain http, which iOS App Transport Security
-                    // refuses outright — and there is no TLS on that port to
-                    // fall back to. Tony picked one of these IPs out of this
-                    // very list and spent an evening on "couldn't reach that
-                    // server". The rows now say which is which instead of
-                    // presenting them as equals.
-                    const shown = a.phone ? a.address : `${a.address}:${share.port}`
-                    const link = a.phone
-                      ? `${a.address}/?token=${encodeURIComponent(share.token)}`
-                      : `http://${a.address}:${share.port}/?token=${encodeURIComponent(share.token)}`
-                    return (
-                      <div key={a.address} className='row' style={{ marginTop: 4 }}>
-                        <code className='mono'>{shown}</code>
-                        <span className={'fit-badge ' + (a.phone ? 'fit-ok' : '')} style={a.phone ? undefined : { opacity: 0.8 }}>{a.label}</span>
-                        {a.phone && <span className='v-meta'>use this on iPhone</span>}
-                        <button className='small-btn' onClick={() => copy(shown)}>Copy</button>
-                        <button className='small-btn' title={a.phone ? 'Link with the token built in — open it once on the phone and it stays signed in' : 'Other Macs only — iPhone will refuse a plain http address'} onClick={() => copy(link)}>Copy {a.phone ? 'phone ' : ''}link</button>
-                      </div>)
-                  })
-                : <div className='v-meta'>No network address found — is Tailscale running?</div>}
-              {!(share.addresses || []).some(a => a.phone) && (
-                <div className='error-note' style={{ marginTop: 8 }}>
-                  Nothing here will work from an iPhone yet. iOS refuses plain http,
-                  so the phone needs an https address — run{' '}
-                  <code className='mono'>tailscale serve --bg {share.port}</code>{' '}
-                  on this Mac and this list will gain one.
+        <div className='set-block-title'>Use Radiant on your other devices</div>
+        <p className='hint' style={{ marginTop: 2 }}>
+          Your iPhone and your other Macs can use this machine's models, agents and
+          sessions. Best on a Mac that stays awake.
+        </p>
+        <label className='agent-skill-chk'>
+          <input type='checkbox' checked={Boolean(share?.desired)} onChange={toggleShare} /> Share with my devices
+        </label>
+        {share && share.desired !== share.enabled && (
+          <div className='error-note' style={{ marginTop: 6 }}>
+            Quit and reopen Radiant to {share.desired ? 'start' : 'stop'} sharing.
+          </div>
+        )}
+
+        {share?.desired && share?.enabled && share?.token && (
+          <div style={{ marginTop: 14 }}>
+            {share.phone?.ready ? (
+              <>
+                {/* The whole point of the panel, in the order the phone asks. */}
+                <div className='set-block-title' style={{ fontSize: 13 }}>On your iPhone</div>
+                <p className='hint' style={{ marginTop: 2 }}>
+                  Open Radiant, tap <b>Connect to a Mac</b>, and enter these two.
+                </p>
+                <div className='connect-field' style={{ marginTop: 10 }}>Address
+                  <div className='row'>
+                    <code className='mono'>{share.phone.url}</code>
+                    <button className='small-btn' onClick={() => copy(share.phone.url)}>Copy</button>
+                  </div>
                 </div>
-              )}
-              <div className='hint' style={{ marginTop: 8 }}>“Copy phone link” carries the token, so opening it on your phone signs that device in for good — then Add to Home Screen. The token is dropped from the address bar right after, so it won’t sit in history.</div>
-            </div>
+                <div className='connect-field' style={{ marginTop: 8 }}>Access token
+                  <div className='row'>
+                    {/* ⚠️ A SECRET, NOT A LABEL. It was printed in full on a
+                        settings screen anyone walking past could read — and it
+                        grants access to every model, agent and session here. */}
+                    <code className='mono share-token'>{showToken ? share.token : '•'.repeat(24)}</code>
+                    <button className='small-btn' onClick={() => setShowToken(v => !v)}>{showToken ? 'Hide' : 'Show'}</button>
+                    <button className='small-btn' onClick={() => copy(share.token)}>Copy</button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className='hint'>
+                {share.phone?.reason === 'no-tailscale' && (
+                  <>Your devices reach each other through <b>Tailscale</b>, a free private
+                  network. Install it on this Mac and on your iPhone, sign in to both with
+                  the same account, then come back — the address will appear here.</>
+                )}
+                {share.phone?.reason === 'tailscale-off' && (
+                  <>Tailscale is installed but not signed in. Open Tailscale, sign in, then
+                  come back here.</>
+                )}
+                {(share.phone?.reason === 'setting-up' || share.phone?.reason === 'failed' || !share.phone) && (
+                  <>Setting up a secure address for your phone. This takes a few seconds —
+                  reopen this panel in a moment.</>
+                )}
+              </div>
+            )}
+
+            {/* Folded away: the raw addresses. They work between Macs on the same
+                network and never from an iPhone, so they are not the answer to
+                the question this panel exists to answer. */}
+            {(share.addresses || []).some(a => !a.phone) && (
+              <details style={{ marginTop: 14 }}>
+                <summary className='hint' style={{ cursor: 'pointer' }}>Other Macs on this network</summary>
+                <p className='hint' style={{ marginTop: 6 }}>
+                  Another Mac can use a plain address. An iPhone cannot — iOS only
+                  accepts secure connections, which is what the address above is for.
+                </p>
+                {(share.addresses || []).filter(a => !a.phone).map(a => (
+                  <div key={a.address} className='row' style={{ marginTop: 4 }}>
+                    <code className='mono'>{a.address}:{share.port}</code>
+                    <button className='small-btn' onClick={() => copy(`${a.address}:${share.port}`)}>Copy</button>
+                  </div>
+                ))}
+              </details>
+            )}
           </div>
         )}
       </div>

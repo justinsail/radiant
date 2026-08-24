@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import os from 'os'
 import path from 'path'
 import fs from 'fs'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
@@ -119,20 +120,60 @@ function tokenOk (req) {
  * Serve terminates TLS with a real certificate and proxies to our loopback port,
  * which is exactly what the phone needs and what its own footer already promises.
  */
-function tailscaleServeUrl () {
+/**
+ * Where the Tailscale CLI is, if it is here at all.
+ *
+ * The Mac App Store build hides it inside the .app; Homebrew puts it on PATH.
+ */
+function tailscaleBin () {
   const bins = [
     '/Applications/Tailscale.app/Contents/MacOS/Tailscale',
     '/usr/local/bin/tailscale',
     '/opt/homebrew/bin/tailscale'
   ]
-  const bin = bins.find(b => { try { fs.accessSync(b); return true } catch { return false } })
+  return bins.find(b => { try { fs.accessSync(b); return true } catch { return false } }) || null
+}
+
+function tailscaleRun (args, timeout = 6000) {
+  const bin = tailscaleBin()
   if (!bin) return null
-  const run = (args) => {
-    try {
-      return require('node:child_process')
-        .execFileSync(bin, args, { encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] })
-    } catch { return null }
-  }
+  try {
+    return execFileSync(bin, args, { encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'ignore'] })
+  } catch { return null }
+}
+
+/**
+ * Turn on the https front door, so the user does not have to.
+ *
+ * ⚠️ THIS USED TO BE THE USER'S JOB AND THAT WAS WRONG. The sharing panel told
+ * people to "run `tailscale serve --bg 5834` on this Mac". Tony: "what exactly
+ * are users supposed to do here? this all sounds very confusing." Nobody
+ * installing a chat app should meet a terminal command, and there is no reason
+ * they should — it is one command and Radiant can run it.
+ *
+ * ⚠️ SERVE, NEVER FUNNEL. `serve` publishes to the user's own tailnet, which is
+ * exactly what ticking "share on my network" asks for. `funnel` would publish to
+ * the open internet. They are one word apart and only one of them is consented
+ * to here.
+ */
+function enableTailscaleServe (port) {
+  if (!tailscaleBin()) return { ok: false, reason: 'not-installed' }
+  const status = tailscaleRun(['status', '--json'])
+  if (!status) return { ok: false, reason: 'not-running' }
+  try {
+    const j = JSON.parse(status)
+    if (j?.BackendState && j.BackendState !== 'Running') return { ok: false, reason: 'not-signed-in' }
+  } catch { /* fall through and let serve report */ }
+  const already = tailscaleServeUrl()
+  if (already) return { ok: true, url: already }
+  tailscaleRun(['serve', '--bg', String(port)], 15000)
+  const url = tailscaleServeUrl()
+  return url ? { ok: true, url } : { ok: false, reason: 'failed' }
+}
+
+function tailscaleServeUrl () {
+  if (!tailscaleBin()) return null
+  const run = tailscaleRun
   // Serve must actually be configured — an unconfigured tailnet would otherwise
   // be handed a URL that 502s, which is a worse lie than the IP.
   const serve = run(['serve', 'status'])
@@ -143,6 +184,25 @@ function tailscaleServeUrl () {
     const dns = String(JSON.parse(statusRaw)?.Self?.DNSName || '').replace(/\.$/, '')
     return dns ? `https://${dns}` : null
   } catch { return null }
+}
+
+/**
+ * Can a phone reach this Mac, and if not, what does the PERSON need to do?
+ *
+ * Every `reason` here is written to be shown verbatim to someone who has never
+ * heard of Tailscale Serve, because they should not have to.
+ */
+function phoneStatus () {
+  const url = tailscaleServeUrl()
+  if (url) return { ready: true, url }
+  if (!tailscaleBin()) return { ready: false, reason: 'no-tailscale' }
+  const status = tailscaleRun(['status', '--json'])
+  if (!status) return { ready: false, reason: 'tailscale-off' }
+  try {
+    const j = JSON.parse(status)
+    if (j?.BackendState && j.BackendState !== 'Running') return { ready: false, reason: 'tailscale-off' }
+  } catch { /* ignore */ }
+  return { ready: false, reason: 'setting-up' }
 }
 
 // LAN / Tailscale addresses this host is reachable at
@@ -216,7 +276,8 @@ app.get('/api/share', (req, res) => {
     desired: Boolean(config.settings.share?.enabled),
     token: SHARE_TOKEN,
     port: PORT,
-    addresses: hostAddresses()
+    addresses: hostAddresses(),
+    phone: phoneStatus()
   })
 })
 
@@ -227,7 +288,11 @@ app.post('/api/share', (req, res) => {
   const token = cur.token || crypto.randomBytes(24).toString('base64url')
   config.settings.share = { enabled, token }
   saveConfig(config)
-  res.json({ desired: enabled, enabled: SHARE_ENABLED, token, needsRelaunch: enabled !== SHARE_ENABLED, port: PORT, addresses: hostAddresses() })
+  // Turning sharing on turns the https front door on too. The user asked to
+  // share with their devices; wiring up the only transport an iPhone accepts is
+  // part of doing that, not a separate chore to hand back to them.
+  if (enabled) enableTailscaleServe(PORT)
+  res.json({ desired: enabled, enabled: SHARE_ENABLED, token, needsRelaunch: enabled !== SHARE_ENABLED, port: PORT, addresses: hostAddresses(), phone: phoneStatus() })
 })
 
 app.post('/api/providers/:id/key', (req, res) => {
