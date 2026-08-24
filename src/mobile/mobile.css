@@ -2133,6 +2133,9 @@
   line-height: 1.45;
   color: var(--rx-label-2);
 }
+/* A block, so the two sentences never share a line however the text scales. */
+.is-native .rx-home-empty-2 { display: block; }
+
 .is-native .rx-home-current {
   margin: 12px 0 0;
   text-align: center;
@@ -2155,3 +2158,11 @@
   .is-native:not([data-ax='true']) .rx-home-actions > * { flex: 1 1 0; min-width: 0; }
 }
 
+/* Home's foot. Quieter than the intro's byline — that one sits under a hero
+   and this one closes a scroll — but the same words in the same voice. */
+.is-native .rx-home-byline {
+  margin: 28px 0 8px;
+  text-align: center;
+  font: -apple-system-caption2;
+  color: var(--rx-label-2);
+}

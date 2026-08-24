@@ -47,6 +47,19 @@ const hapt = {
 // first entry rather than rendering a picker with no hero.
 const RECOMMENDED_ID = 'qwen3-1.7b'
 
+// The catalogue is seventeen models, and one undifferentiated list of them is
+// the wall of names this screen exists to avoid. So it is banded by download
+// size — which is the one thing that genuinely decides whether a given iPhone
+// can run a given model, and therefore the only heading here that tells the
+// reader something true rather than tidying the page. Bands are computed from
+// sizeGB, not hard-coded per model, so adding a model to the Swift catalogue
+// files it correctly without touching this screen.
+const BANDS = [
+  { title: 'Runs on any iPhone', holds: gb => gb <= 1.0 },
+  { title: 'Most recent iPhones', holds: gb => gb > 1.0 && gb <= 2.0 },
+  { title: 'Needs a Pro, and room', holds: gb => gb > 2.0 }
+]
+
 // Decimal GB, matching how Apple reports storage in Settings. Using 2^30 here
 // would make every size on screen disagree with the number the user can check.
 const GB = 1e9
@@ -609,25 +622,29 @@ export default function ModelPicker ({
             />
           )}
 
-          {rest.length > 0 && (
-            <>
-              <h2 className="rx-mp-sechead">All models</h2>
-              <ul className="rx-mp-group">
-                {rest.map(m => (
-                  <Row
-                    key={m.id}
-                    model={m}
-                    Gauge={Gauge}
-                    job={jobs[m.id]}
-                    done={justDone === m.id}
-                    busyElsewhere={!!downloadingId && downloadingId !== m.id}
-                    shortfall={shortfallFor(m)}
-                    onCommit={() => commit(m)}
-                  />
-                ))}
-              </ul>
-            </>
-          )}
+          {BANDS.map(band => {
+            const rows = rest.filter(m => band.holds(m.sizeGB))
+            if (!rows.length) return null
+            return (
+              <React.Fragment key={band.title}>
+                <h2 className="rx-mp-sechead">{band.title}</h2>
+                <ul className="rx-mp-group">
+                  {rows.map(m => (
+                    <Row
+                      key={m.id}
+                      model={m}
+                      Gauge={Gauge}
+                      job={jobs[m.id]}
+                      done={justDone === m.id}
+                      busyElsewhere={!!downloadingId && downloadingId !== m.id}
+                      shortfall={shortfallFor(m)}
+                      onCommit={() => commit(m)}
+                    />
+                  ))}
+                </ul>
+              </React.Fragment>
+            )
+          })}
 
           {list.length > 0 && (
             <p className="rx-mp-secfoot">

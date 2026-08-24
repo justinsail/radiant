@@ -105,7 +105,11 @@ export default function HomeScreen ({
         <p className="rx-home-greeting">{greeting()}</p>
         {!activeModel && (
           <p className="rx-home-empty">
-            No model on this iPhone yet. Choose one and it runs here, offline.
+            No model on this iPhone yet.
+            {/* Its own line: the first sentence is the state, the second is
+                what to do about it, and running them together made one long
+                wrap that read as neither. */}
+            <span className="rx-home-empty-2">Choose one and it runs here, offline.</span>
           </p>
         )}
       </div>
@@ -148,6 +152,13 @@ export default function HomeScreen ({
       </div>
       <p className="rx-section-footer">
         Reach the models, agents and sessions on your Mac from this phone.
+      </p>
+
+      {/* The byline the first-run screen carries, kept at the foot of Home —
+          once the intro stops appearing, Home is the only screen anyone sees
+          on launch, and it was the only place the product said whose it is. */}
+      <p className="rx-home-byline">
+        Radiant is a Templeton&nbsp;Technologies product.
       </p>
     </>
   )

@@ -17,6 +17,19 @@ import Tokenizers
 /// The web UI drives this over Capacitor. Downloads and generation both report
 /// progress as events rather than blocking, because a 1–4 GB download and a
 /// token stream both need to show something while they work.
+/// A catalogue row for a HuggingFace repo MLX has no registry entry for.
+///
+/// `stop` is the chat template's turn-end token, passed as an extra EOS. Omit
+/// it only when the repo's own `eos_token` is already that token — true for the
+/// Qwen, LFM2, Llama, Granite, Mistral and DeepSeek rows, and false for every
+/// Gemma and for Phi.
+///
+/// File scope rather than a method: `catalog` is a stored property, and its
+/// initialiser runs before there is a `self` to call a method on.
+private func rxRepo(_ id: String, stop: String? = nil) -> ModelConfiguration {
+    ModelConfiguration(id: id, extraEOSTokens: stop.map { Set([$0]) } ?? [])
+}
+
 @objc(LocalModels)
 public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "LocalModels"
@@ -47,32 +60,86 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     /// ⚠️ SIZES ARE MEASURED, NOT ESTIMATED. Each is the summed blob size from
     /// huggingface.co/api/models/<id>?blobs=true, because the download progress
     /// bar divides by this number — a guessed size shows a wrong percentage.
-    /// Re-check them when the catalogue changes.
+    /// Re-measure when the catalogue changes.
     ///
-    /// Chosen against what MLX can actually run today (LLMModelFactory's
-    /// registry, 67 entries) rather than what was current when this was
-    /// written: Qwen 3.5 and Gemma 3n are both here now, and Gemma 3n E4B is
-    /// the one Locally leads with. Ordered smallest first, which is also
-    /// slowest-phone first.
+    /// ⚠️ AND SO ARE THE STOP TOKENS. `stop:` here is the token the model's CHAT
+    /// TEMPLATE ends a turn with, which is frequently NOT the `eos_token` in its
+    /// tokenizer config — every Gemma declares `<eos>` and then ends turns with
+    /// `<end_of_turn>` (Gemma 3) or `<turn|>` (Gemma 4); Phi declares
+    /// `<|endoftext|>` and ends with `<|end|>`. Get it wrong and the model never
+    /// stops: it answers, then keeps going, writing the user's next turn for
+    /// them. Each one below was read from that repo's own chat template, not
+    /// assumed from the family.
+    ///
+    /// ⚠️ THE REGISTRY IS NOT THE MENU. `LLMRegistry` is MLX's sample list, and
+    /// picking only from it is what made this catalogue six models: it has no
+    /// entry for the Gemma 4 QAT mobile builds, for Ministral, for Granite 4.1,
+    /// or for LFM2.5. What actually gates a model is `LLMTypeRegistry` — the 62
+    /// ARCHITECTURES MLX implements — so any HuggingFace repo whose config.json
+    /// names one of those loads through `ModelConfiguration(id:)`, registry
+    /// entry or not. That is why most rows below are repo ids.
+    ///
+    /// What is NOT loadable, whatever its name: GGUF (llama.cpp's format) and
+    /// bitsandbytes 4-bit — which is everything Unsloth publishes. MLX reads
+    /// safetensors with MLX quantisation metadata. A repo is eligible here only
+    /// if mlx-community, or the lab itself, has converted it.
     private let catalog: [Entry] = [
-        Entry(id: "lfm2-1.2b", name: "LFM2 1.2B",
-              blurb: "Fastest, and built for phones. Good for quick questions.", gb: 0.7,
-              config: LLMRegistry.lfm2_1_2b_4bit),
+        // ---- runs on anything, including an older iPhone ----
+        Entry(id: "qwen3-0.6b", name: "Qwen 3 0.6B",
+              blurb: "Tiny and instant. Good for quick questions and rewriting.", gb: 0.35,
+              config: LLMRegistry.qwen3_0_6b_4bit),
+        Entry(id: "lfm2.5-1.2b", name: "LFM2.5 1.2B",
+              blurb: "Liquid AI's, designed for phones. Fastest of the capable ones.", gb: 0.66,
+              config: rxRepo("mlx-community/LFM2.5-1.2B-Instruct-4bit")),
+        Entry(id: "exaone4-1.2b", name: "EXAONE 4.0 1.2B",
+              blurb: "LG's. Small, and unusually good at following instructions.", gb: 0.73,
+              config: LLMRegistry.exaone_4_0_1_2b_4bit),
+        Entry(id: "gemma3-1b", name: "Gemma 3 1B",
+              blurb: "Google's smallest, quantisation-aware trained. Steady writer.", gb: 0.77,
+              config: LLMRegistry.gemma3_1B_qat_4bit),
+
+        // ---- the middle: what most people should use ----
         Entry(id: "qwen3-1.7b", name: "Qwen 3 1.7B",
-              blurb: "The best all-rounder on any recent iPhone.", gb: 1.0,
+              blurb: "The best all-rounder on any recent iPhone.", gb: 0.98,
               config: LLMRegistry.qwen3_1_7b_4bit),
+        Entry(id: "deepseek-r1-1.5b", name: "DeepSeek R1 1.5B",
+              blurb: "Thinks before it answers. Slower, better at problems.", gb: 1.01,
+              config: rxRepo("mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit")),
+        Entry(id: "lfm2.5-2.6b", name: "LFM2.5 2.6B",
+              blurb: "The bigger Liquid model. Still quick, noticeably more able.", gb: 1.45,
+              config: rxRepo("mlx-community/LFM2.5-2.6B-mxfp4")),
         Entry(id: "qwen3.5-2b", name: "Qwen 3.5 2B",
-              blurb: "Newest generation. Sharper reasoning for its size.", gb: 1.8,
+              blurb: "Newest generation. Sharper reasoning for its size.", gb: 1.75,
               config: LLMRegistry.qwen3_5_2b_4bit),
+        Entry(id: "smollm3-3b", name: "SmolLM3 3B",
+              blurb: "Hugging Face's own. Open training data, strong at chat.", gb: 1.75,
+              config: LLMRegistry.smollm3_3b_4bit),
         Entry(id: "llama3.2-3b", name: "Llama 3.2 3B",
-              blurb: "Meta's. Strong at everyday writing and rewriting.", gb: 1.8,
+              blurb: "Meta's. Strong at everyday writing and rewriting.", gb: 1.82,
               config: LLMRegistry.llama3_2_3B_4bit),
-        Entry(id: "qwen3-4b", name: "Qwen 3 4B",
-              blurb: "Noticeably smarter. Wants a Pro with headroom.", gb: 2.3,
-              config: LLMRegistry.qwen3_4b_4bit),
-        Entry(id: "gemma3n-e4b", name: "Gemma 3n E4B",
-              blurb: "Google's phone-tuned flagship. Needs room and a recent Pro.", gb: 3.9,
-              config: LLMRegistry.gemma3n_E4B_it_lm_4bit)
+        Entry(id: "granite4.1-3b", name: "Granite 4.1 3B",
+              blurb: "IBM's, built for work. Summarising, extraction, tool use.", gb: 1.82,
+              config: rxRepo("mlx-community/granite-4.1-3b-mxfp4")),
+
+        // ---- wants a Pro, and room on the phone ----
+        Entry(id: "phi4-mini", name: "Phi 4 mini",
+              blurb: "Microsoft's. Punches above its size at maths and code.", gb: 2.18,
+              config: rxRepo("mlx-community/Phi-4-mini-instruct-4bit", stop: "<|end|>")),
+        Entry(id: "nemotron3-4b", name: "Nemotron 3 Nano 4B",
+              blurb: "NVIDIA's. Built for reasoning and calling tools.", gb: 2.25,
+              config: rxRepo("mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit")),
+        Entry(id: "gemma4-e2b", name: "Gemma 4 E2B",
+              blurb: "Google's newest, in the build they made for phones.", gb: 2.43,
+              config: rxRepo("mlx-community/gemma-4-E2B-it-qat-mobile", stop: "<turn|>")),
+        Entry(id: "ministral3-3b", name: "Ministral 3 3B",
+              blurb: "Mistral's edge model. Fluent, and good in French.", gb: 2.78,
+              config: rxRepo("mlx-community/Ministral-3-3B-Instruct-2512-4bit")),
+        Entry(id: "qwen3.5-4b", name: "Qwen 3.5 4B",
+              blurb: "The most capable all-rounder here. Wants headroom.", gb: 3.06,
+              config: rxRepo("mlx-community/Qwen3.5-4B-MLX-4bit")),
+        Entry(id: "gemma4-e4b", name: "Gemma 4 E4B",
+              blurb: "Google's phone flagship. The best of these, and the largest.", gb: 3.49,
+              config: rxRepo("mlx-community/gemma-4-E4B-it-qat-mobile", stop: "<turn|>"))
     ]
 
     private var loaded: (id: String, container: ModelContainer)?
