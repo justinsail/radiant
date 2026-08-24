@@ -194,7 +194,7 @@ function tailscaleServeUrl () {
  */
 function phoneStatus () {
   const url = tailscaleServeUrl()
-  if (url) return { ready: true, url }
+  if (url) return { ready: true, url, kind: 'anywhere' }
   if (!tailscaleBin()) return { ready: false, reason: 'no-tailscale' }
   const status = tailscaleRun(['status', '--json'])
   if (!status) return { ready: false, reason: 'tailscale-off' }
@@ -216,9 +216,23 @@ function hostAddresses () {
     for (const a of ifaces[name] || []) {
       if (a.family !== 'IPv4' || a.internal) continue
       const tailscale = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)
-      out.push({ address: a.address, label: tailscale ? 'Tailscale' : name, phone: false })
+      // ⚠️ A WI-FI ADDRESS IS PHONE-USABLE; A TAILSCALE IP IS NOT.
+      // iOS allows plain http to RFC1918 addresses (NSAllowsLocalNetworking),
+      // which is how LM Studio and Locally do this and is the everyday case:
+      // both devices on the same network, no third-party app at all.
+      // 100.64/10 only LOOKS private — it is RFC6598 shared space and ATS
+      // treats it as public, so a Tailscale user needs the Serve URL above.
+      const local = /^(10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address)
+      out.push({
+        address: a.address,
+        label: tailscale ? 'Tailscale' : 'Wi-Fi',
+        phone: local && !tailscale,
+        wifi: local && !tailscale
+      })
     }
   }
+  // Wi-Fi before Tailscale-only IPs: it is the one most people can use today.
+  out.sort((x, y) => (y.phone ? 1 : 0) - (x.phone ? 1 : 0))
   return out
 }
 

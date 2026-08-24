@@ -38,9 +38,32 @@ globalThis.fetch = async (url) => {
 is('a bare hostname gains https', await testServer('mac.tailnet.ts.net', ''), 'https://mac.tailnet.ts.net')
 is('a trailing slash is trimmed', await testServer('https://mac.ts.net/', ''), 'https://mac.ts.net')
 
+// ⚠️ YOUR OWN WI-FI IS THE POINT OF THE FEATURE. Tony: "the whole point of this
+// is so they can run real model on the desktop app and share them with the
+// phone like LM studio does in locally." That is a home-network connection, and
+// iOS allows plain http there via NSAllowsLocalNetworking — so the app must too,
+// and must ASSUME http for a bare local address rather than https.
+globalThis.fetch = async (url) => {
+  const u = new URL(String(url))
+  if (u.protocol === 'http:' && !/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.|169\.254\.)/.test(u.hostname) && !u.hostname.endsWith('.local') && u.hostname !== 'localhost') {
+    throw new Error(`ATS would refuse plain http to ${u.hostname}`)
+  }
+  return { ok: true, status: 200, json: async () => ({ models: [] }) }
+}
+is('a bare Wi-Fi address assumes http', await testServer('192.168.1.50:5834', ''), 'http://192.168.1.50:5834')
+is('10.x is local too', await testServer('10.0.0.5:5834', ''), 'http://10.0.0.5:5834')
+is('172.16-31 is local', await testServer('172.20.3.4:5834', ''), 'http://172.20.3.4:5834')
+is('a .local name assumes http', await testServer('mac.local:5834', ''), 'http://mac.local:5834')
+is('explicit local http is accepted', await testServer('http://192.168.1.50:5834', ''), 'http://192.168.1.50:5834')
+// ⚠️ 100.64/10 LOOKS PRIVATE AND IS NOT. Tailscale lives there, but it is
+// RFC6598 shared space and ATS treats it as public — so it must still get https,
+// which is what pushes the user to the Serve address that actually works.
+is('a Tailscale IP is NOT treated as local', await testServer('100.64.118.54', ''), 'https://100.64.118.54')
+is('172.32 is public, not local', (await err(() => testServer('http://172.32.0.1', ''))) !== null, true)
+
 // http is refused before it leaves the app — the screen has always PROMISED
 // this in its footer text, and it was never implemented.
-is('http is refused', (await err(() => testServer('http://mac.ts.net', ''))).includes('https'), true)
+is('http to a public host is refused', (await err(() => testServer('http://mac.ts.net', ''))).includes('Wi-Fi'), true)
 is('an empty address is refused', (await err(() => testServer('   ', ''))) !== null, true)
 
 // ⚠️ 200 IS NOT PROOF. The app's own server returns index.html with status 200.

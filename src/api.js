@@ -80,16 +80,52 @@ export async function connectHere (token) {
  * was never contacted. Assume https rather than fail, since that is what the
  * user meant, and make the http case an explicit refusal.
  */
+/**
+ * Is this host on the user's own network?
+ *
+ * ⚠️ THIS LIST MUST MATCH iOS's IDEA OF "LOCAL", or the app will accept an
+ * address that ATS then refuses and the user gets a failure with no explanation.
+ * NSAllowsLocalNetworking covers RFC1918 (10/8, 172.16/12, 192.168/16),
+ * link-local 169.254/16, and .local names — and NOTHING ELSE.
+ *
+ * ⚠️ 100.64/10 IS NOT IN IT. Tailscale addresses live in that range and look
+ * private, but it is RFC6598 shared address space and ATS treats it as public.
+ * A Tailscale user needs the https Serve address, which is what the Mac now
+ * hands them.
+ */
+function isLocalHost (host) {
+  const h = String(host || '').toLowerCase()
+  if (h === 'localhost' || h.endsWith('.local')) return true
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (!m) return false
+  const [a, b] = [Number(m[1]), Number(m[2])]
+  if (a === 10) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  if (a === 169 && b === 254) return true
+  if (a === 127) return true
+  return false
+}
+
 function normalizeBase (raw) {
   const v = String(raw || '').trim().replace(/\/+$/, '')
   if (!v) throw new Error('Enter the address of the Mac running Radiant.')
-  if (/^http:\/\//i.test(v)) {
-    throw new Error('That address is http. Radiant needs https — Tailscale Serve puts a real certificate in front of it.')
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(v)
+  // A bare address on your own network is the common case — someone typing
+  // what the Mac showed them — so assume http there and https everywhere else.
+  let candidate
+  if (hasScheme) candidate = v
+  else {
+    const host = v.split('/')[0].split(':')[0]
+    candidate = (isLocalHost(host) ? 'http://' : 'https://') + v
   }
-  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? v : 'https://' + v
-  if (!/^https:\/\//i.test(withScheme)) throw new Error('Use an https address.')
-  try { new URL(withScheme) } catch { throw new Error('That does not look like a web address.') }
-  return withScheme
+  let u
+  try { u = new URL(candidate) } catch { throw new Error('That does not look like a web address.') }
+  if (u.protocol === 'http:' && !isLocalHost(u.hostname)) {
+    throw new Error('That address is http, and iPhone only allows that on your own Wi-Fi. Use the https address your Mac shows you.')
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('Use a web address starting http or https.')
+  return candidate.replace(/\/+$/, '')
 }
 
 /**

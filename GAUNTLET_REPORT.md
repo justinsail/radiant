@@ -1,6 +1,6 @@
 # Radiant for iPhone — App Store Submission Gauntlet
 
-**Pass 3** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
+**Pass 4** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
 
 ---
 
@@ -157,13 +157,22 @@ Six `.woff` files, ~48 KB each. Harmless; listed for completeness.
 
 ### 3 — Info.plist and privacy · PASS
 
-- **No protected-data APIs.** Grepped for camera, photos, location, contacts,
-  calendars, Bluetooth, motion, health, HomeKit, speech, Face ID, NFC and ATT
-  across the Swift sources: **none present**, so no usage-description strings are
-  required and none are declared. There is no key without matching code and no
-  code without a matching key.
+- **One protected resource: the local network.** Camera, photos, location,
+  contacts, calendars, Bluetooth, motion, health, HomeKit, speech, Face ID, NFC
+  and ATT are all absent from the Swift sources and correctly undeclared.
+  **`NSLocalNetworkUsageDescription` is declared and used** — connecting to
+  Radiant on a Mac over Wi-Fi is local-network access, and iOS prompts for it.
+  The string names who is being contacted and why, rather than Apple's
+  boilerplate.
+- ⚠️ **ATS carries one narrow exception, and it is justified.**
+  `NSAllowsLocalNetworking` permits plain http to **local addresses only** —
+  10/8, 172.16/12, 192.168/16, 169.254/16 and `.local`. Every other host still
+  requires TLS. This is what makes the product's core promise work — run the
+  model on the Mac, use it from the phone, the way LM Studio and Locally do —
+  without a third-party VPN app. It is **not** `NSAllowsArbitraryLoads`, which
+  would disable ATS globally and deserve a review question.
 - Privacy manifest present and correct (F1).
-- App Transport Security: **no `NSAllowsArbitraryLoads`**, no exception domains.
+- App Transport Security: **no `NSAllowsArbitraryLoads`**, no exception domains — only the scoped local-networking key above.
 - `LSApplicationQueriesSchemes`: absent, which is correct — the app queries none.
 - Launch screen is a storyboard (`RadiantLaunch`), not legacy launch images.
 - Display name `Radiant`, bundle name matches.
@@ -328,6 +337,13 @@ can be finished in one sitting.
 >
 > The app uses the Increased Memory Limit entitlement because model weights must
 > be resident in memory to run.
+>
+> Settings → Connect to a Mac is optional and needs a second machine, so it
+> cannot be exercised in review. It connects to Radiant running on the user's own
+> Mac over their own Wi-Fi, which is why the app declares
+> NSAllowsLocalNetworking (scoped to private address ranges only — not
+> NSAllowsArbitraryLoads) and asks for Local Network permission. No connection is
+> attempted unless the user enters an address and token themselves.
 
 ### 11 — Final archive and validation · PASS, validation BLOCKED
 
