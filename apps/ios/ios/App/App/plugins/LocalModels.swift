@@ -90,12 +90,11 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     /// there (iOS may purge Caches under storage pressure, which is where the
     /// weights live). Either one alone is a lie in one direction.
     private func isOnDisk(_ entry: Entry) -> Bool {
-        guard downloadedIds().contains(entry.id) else { return false }
-        guard let dir = cacheDir(for: entry.config.name),
-              FileManager.default.fileExists(atPath: dir.path) else { return false }
-        // 60% of the catalogue size: high enough that stray config files never
-        // count, low enough to survive the catalogue's rounded numbers.
-        return Double(size(of: dir)) >= entry.gb * 1_000_000_000 * 0.6
+        DownloadMath.isPresent(
+            hasReceipt: downloadedIds().contains(entry.id),
+            bytesInCache: bytesInCache(for: entry.config.name),
+            expected: Int64(entry.gb * 1_000_000_000)
+        )
     }
 
     @objc func list(_ call: CAPPluginCall) {
@@ -146,7 +145,7 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     /// storage pressure. That is survivable — the app re-downloads — but it is
     /// the loader's choice, not ours.
     private func cacheDir(for repo: String) -> URL? {
-        let folder = "models--" + repo.replacingOccurrences(of: "/", with: "--")
+        let folder = DownloadMath.cacheFolderName(for: repo)
         return FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
             .appendingPathComponent("huggingface/hub/\(folder)")
     }
@@ -284,27 +283,34 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             // `remaining` zero, which broke out of the poller before it emitted
             // anything — no number at all, which is what Tony saw. Count only
             // what GROWS from here, on each independently.
-            let cacheBase = bytesInCache(for: repo)
-            let tmpBase = bytesInFlight()
-            let remaining = max(expected - cacheBase, 1)
+            let start = DownloadMath.Sizes(
+                cache: bytesInCache(for: repo),
+                inFlight: bytesInFlight()
+            )
             let poller = Task { [weak self] in
                 var lastPct = -1
+                var lastMB: Int64 = -1
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     if Task.isCancelled { break }
                     guard let self else { break }
-                    // Growth in either place counts as progress on this
-                    // download. Never negative: tmp shrinks to zero the moment
-                    // the finished file is moved into the cache.
-                    let grewInCache = max(self.bytesInCache(for: repo) - cacheBase, 0)
-                    let grewInFlight = max(self.bytesInFlight() - tmpBase, 0)
-                    let added = grewInCache + grewInFlight
-                    let done = cacheBase + added
-                    guard added > 0 else { continue }
-                    let f = min(0.999, Double(added) / Double(remaining))
-                    let pct = Int(f * 100)
-                    guard pct != lastPct else { continue }
-                    lastPct = pct
+                    let now = DownloadMath.Sizes(
+                        cache: self.bytesInCache(for: repo),
+                        inFlight: self.bytesInFlight()
+                    )
+                    // ⚠️ The arithmetic lives in DownloadMath and is covered by
+                    // scripts/test-download-math.sh. It broke four times in
+                    // production while it lived inline here, because nothing
+                    // could run it without a device. Change it THERE, with a
+                    // test, not here.
+                    guard let f = DownloadMath.fraction(expected: expected, start: start, now: now)
+                    else { continue }
+                    let done = now.cache + now.inFlight
+                    var mb: Int64 = lastMB
+                    guard DownloadMath.shouldEmit(fraction: f, bytes: done,
+                                                  lastPercent: &lastPct, lastMegabytes: &mb)
+                    else { continue }
+                    lastMB = mb
                     self.notifyListeners("downloadProgress", data: [
                         "id": id, "progress": f,
                         "completedBytes": done, "totalBytes": expected
