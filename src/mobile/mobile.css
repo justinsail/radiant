@@ -1658,14 +1658,14 @@
 
 /* ═══ first run ════════════════════════════════════════════════════════════
    The one screen that is design rather than iOS. It continues the launch image
-   frame-for-frame, so the ground, both glows and the constellation here must
-   stay in step with scripts/make-ios-splash.py — change one, re-run the other.
+   frame-for-frame, so the ground and all three glows here must stay in step
+   with scripts/make-ios-splash.py — change one, re-run the other.
 
    EVERY ANIMATION RUNS ONCE AND HOLDS. No `infinite`, anywhere. The stars are a
    pre-rendered PNG rather than a canvas for the same reason: this phone is
    about to run a language model. */
-/* Pinned dark in every mode. Its ground, three glows, constellation and the
-   launch image it continues are all built against black — a light variant would
+/* Pinned dark in every mode. Its ground, three glows and the launch image it
+   continues are all built against black — a light variant would
    be a different design, not a recolour. Branded moments do this: Apple's own
    light-mode apps still open on dark splash art. */
 .is-native .rx-intro {
@@ -1710,15 +1710,6 @@
   background: radial-gradient(circle, oklch(0.52 0.13 var(--rx-accent-h) / 0.26), transparent 62%);
   animation-delay: 240ms;
 }
-.is-native .rx-intro-field {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center top;
-  opacity: 0;
-  animation: rx-stars 1800ms ease-out 200ms forwards;
-}
-
 .is-native .rx-intro-stage {
   position: relative;
   flex: 1 1 auto;
@@ -1830,7 +1821,6 @@
 .is-native .rx-intro-alt.is-pressed { opacity: 0.6; }
 
 @keyframes rx-sky   { to { opacity: 1; } }
-@keyframes rx-stars { to { opacity: 0.55; } }
 @keyframes rx-bloom { to { opacity: 1; transform: scale(1); } }
 @keyframes rx-rise  { from { transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes rx-sharpen {
@@ -1842,7 +1832,6 @@
    half-state, and never nothing at all. */
 @media (prefers-reduced-motion: reduce) {
   .is-native .rx-intro-glow,
-  .is-native .rx-intro-field,
   .is-native .rx-intro-mark,
   .is-native .rx-intro-halo,
   .is-native .rx-intro-word,

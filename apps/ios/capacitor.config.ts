@@ -40,8 +40,9 @@ const config: CapacitorConfig = {
     // Held for 900ms, then faded over 250ms into the first-run screen it is
     // frame one of, so the handoff still reads as one continuous moment.
     SplashScreen: {
-      launchShowDuration: 900,
-      launchFadeOutDuration: 250,
+      // 900ms still read as a flash. Long enough to actually see and read.
+      launchShowDuration: 1800,
+      launchFadeOutDuration: 320,
       launchAutoHide: true,
       backgroundColor: '#070B13',
       showSpinner: false

@@ -181,23 +181,6 @@ def build(_a, _b, name):
     # the low quiet one, matching .rx-intro-glow-c
     wash(W * 0.32, H * 1.05, W * 0.78, H * 0.46, oklch(0.52, 0.13, 262), 0.26, 1.7)
 
-    # the constellation, from the same file the first-run screen uses
-    fld = build_field()
-    fw, fh = fld.size
-    fpx = fld.load()
-    for y in range(SIDE):
-        sy = min(fh - 1, y * fh // SIDE)
-        row = y * SIDE
-        for x in range(SIDE):
-            sx = min(fw - 1, x * fw // SIDE)
-            r_, g_, b_, a_ = fpx[sx, sy]
-            if not a_:
-                continue
-            o = (row + x) * 3
-            canvas[o] = (r_ * a_ + canvas[o] * (255 - a_)) // 255
-            canvas[o + 1] = (g_ * a_ + canvas[o + 1] * (255 - a_)) // 255
-            canvas[o + 2] = (b_ * a_ + canvas[o + 2] * (255 - a_)) // 255
-
     def place(path, target_w, cx, top):
         """Composite an RGBA brand asset at its own colours."""
         w, h, px = load_rgba(path)
@@ -237,53 +220,6 @@ def build(_a, _b, name):
     write_png(OUT / name, SIDE, SIDE, canvas)
     print(f'  {name}  ground #{BG[0]:02X}{BG[1]:02X}{BG[2]:02X}, mark {mark_w}px, wordmark {word_w}px')
 
-
-
-FIELD = pathlib.Path('src/assets/brand/aurora-field.png')
-
-
-def build_field(side=1400, seed=7):
-    """The site's #field constellation, rendered once as a transparent PNG.
-
-    The site animates this on a canvas forever. A phone that is about to run a
-    language model does not get a perpetual rAF loop, and Tony asked for no
-    continuously running animation — so it is drawn ONCE, here, and the same
-    file is used by both the launch image and the first-run screen. That is also
-    what makes the handoff seamless: the static launch PNG and the live screen
-    are showing literally the same stars.
-    """
-    from PIL import Image, ImageDraw
-    import random
-    rng = random.Random(seed)
-    img = Image.new('RGBA', (side, side), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    n = 46
-    pts = [(rng.uniform(0, side), rng.uniform(0, side * 0.82)) for _ in range(n)]
-    # links first, so dots sit on top of their own threads
-    for i, a in enumerate(pts):
-        for b in pts[i + 1:]:
-            dist = ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
-            lim = side * 0.13
-            if dist < lim:
-                al = int((1 - dist / lim) * 0.14 * 255)
-                d.line([a, b], fill=(0x7A, 0xA2, 0xFF, al), width=max(1, side // 900))
-    r = max(1.4, side / 700)
-    for x, y in pts:
-        d.ellipse([x - r, y - r, x + r, y + r], fill=(0x8F, 0xB0, 0xFF, 128))
-    # the site masks it out toward the bottom
-    px = img.load()
-    for y in range(side):
-        f = 1.0 if y < side * 0.45 else max(0.0, 1 - (y - side * 0.45) / (side * 0.37))
-        if f >= 0.999:
-            continue
-        for x in range(side):
-            r_, g_, b_, a_ = px[x, y]
-            if a_:
-                px[x, y] = (r_, g_, b_, int(a_ * f))
-    FIELD.parent.mkdir(parents=True, exist_ok=True)
-    img.save(FIELD)
-    print(f'  {FIELD.name}  {side}x{side}, {n} points')
-    return img
 
 
 if __name__ == '__main__':
