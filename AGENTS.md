@@ -171,3 +171,15 @@ progress loops crawl — neither is an app bug.
   anything tappable and pass `label` for an icon-only control. Do not
   reintroduce `outline: none` on `:focus-visible` — it never matches a tap, and
   a phone can have a keyboard, Full Keyboard Access or Switch Control.
+
+## Rating work — the star system
+
+`.claude/skills/star-system/` is vendored from
+https://github.com/templetongroup/star-system. Run it when Tony says "rate this"
+or "run the star system" after a deliverable, and follow it exactly: ask for the
+1–5 rating, never assign one yourself, never argue with it, ask fewer questions
+the higher it is, log the round in `ratings.md`, and loop until it reaches 4+.
+
+`ratings.md` at the repo root is the record. Read its **Gold Standards** section
+before building anything in an area that already has one — that is the bar for
+that area, set by Tony, and new work is measured against it.
