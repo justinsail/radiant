@@ -1548,3 +1548,37 @@
   .is-native .rx-storage-seg,
   .is-native .rx-sheet { transition-duration: 200ms; transition-timing-function: linear; }
 }
+
+/* ═══ the brand ════════════════════════════════════════════════════════════
+   The Radiant mark and wordmark, as artwork from src/assets/brand/. These are
+   NOT the Gauge — Gauge is the app's iris, a status object. Anything that is
+   meant to say "this is Radiant" uses these two files, at their own colours.
+   The halo is the marketing site's .swirl::before, held still: without it the
+   brand blue sits flat against a near-black ground. */
+.is-native .rx-brand-halo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.is-native .rx-brand-halo::before {
+  content: '';
+  position: absolute;
+  inset: -45%;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.70 0.18 262 / 0.55), transparent 62%);
+  filter: blur(6px);
+}
+.is-native .rx-brand-mark {
+  position: relative;
+  display: block;
+  width: 128px;
+  height: 128px;
+}
+.is-native .rx-brand-word {
+  display: block;
+  /* sized off the mark, the ratio the marketing site's lockup uses */
+  width: 182px;
+  height: auto;
+  margin-top: 4px;
+}
