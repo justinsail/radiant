@@ -3,29 +3,24 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  ⚠️ STILL NOT WIRED UP. CODE_SIGN_ENTITLEMENTS is deliberately NOT set in
-	  project.pbxproj, because setting it fails the build.
+	  ⚠️ WIRED UP AND SIGNED IN — do not remove CODE_SIGN_ENTITLEMENTS from
+	  project.pbxproj. Both build configurations set it, and dropping either
+	  silently returns the app to the default cap.
 
-	  DONE (2026-08-24): the App ID `com.templetongroup.radiant` is now
-	  registered explicitly in the developer portal with Increased Memory Limit
-	  enabled. It did not exist before — Radiant had been signing against the
-	  XC Wildcard App ID (`*`), and a WILDCARD APP ID CANNOT CARRY CAPABILITIES,
-	  which is why there was no checkbox to find.
+	  Verify it survived a build with:
+	      codesign -d --entitlements - <App.app> | grep increased-memory
 
-	  REMAINING, AND HUMAN-ONLY: Xcode has no Apple ID signed in.
-	      $ defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists
-	      { "IDE.Identifiers.Prod" = ( ); }
-	  With no account, -allowProvisioningUpdates cannot generate a profile for
-	  the new App ID, so the build keeps falling back to the wildcard and fails:
-	      No Accounts: Add a new account in Accounts settings.
-	      Provisioning profile "iOS Team Provisioning Profile: *" doesn't
-	      include the Increased Memory Limit capability.
-	  Signing in requires a password, which no agent may type.
-
-	  ONCE TONY SIGNS IN (Xcode → Settings → Accounts → +, then pick the team
-	  and Download Manual Profiles), add
-	      CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-	  to BOTH build configurations in project.pbxproj and rebuild.
+	  Getting here took three things, and the first two were invisible:
+	   1. The App ID `com.templetongroup.radiant` DID NOT EXIST. Radiant had
+	      been signing against the XC Wildcard App ID (`*`) — hence "iOS Team
+	      Provisioning Profile: *" in the failures — and A WILDCARD APP ID
+	      CANNOT CARRY CAPABILITIES, so there was no checkbox to find. Fixed by
+	      registering it explicitly with Increased Memory Limit enabled.
+	   2. Xcode had NO APPLE ID SIGNED IN, so -allowProvisioningUpdates could
+	      not generate a profile for the new App ID and kept falling back to the
+	      wildcard. `defaults read com.apple.dt.Xcode
+	      DVTDeveloperAccountManagerAppleIDLists` was an empty list.
+	   3. Then, and only then, CODE_SIGN_ENTITLEMENTS.
 
 	  ⚠️ THIS ENTITLEMENT IS WHAT MAKES THE LARGER MODELS POSSIBLE AT ALL.
 
