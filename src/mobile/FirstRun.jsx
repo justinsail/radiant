@@ -16,7 +16,7 @@
  */
 import React from 'react'
 import usePress from './usePress.js'
-import markUrl from '../assets/brand/radiant-mark.png'
+import { BrandMark } from './BrandSpinner.jsx'
 import wordUrl from '../assets/brand/radiant-wordmark.png'
 import fieldUrl from '../assets/brand/aurora-field.png'
 
@@ -38,11 +38,23 @@ export default function FirstRun ({ onChooseModel, onConnectMac }) {
       <div className="rx-intro-stage">
         <span className="rx-intro-mark">
           <span className="rx-intro-halo" aria-hidden="true" />
-          <img src={markUrl} alt="" width={132} height={132} />
+          {/* masked, so it follows the theme like every other mark */}
+          <BrandMark size={132} className="rx-intro-mark-img" />
         </span>
 
-        {/* artwork, not type — the wordmark is the logo, not a font choice */}
-        <img className="rx-intro-word" src={wordUrl} alt="Radiant" />
+        {/* Artwork, not type — the wordmark is the logo, not a font choice. But
+            masked rather than drawn, so it takes the theme colour the way the
+            Mac's .wordmark does. Its alpha IS the letterforms, so the shapes
+            are still exactly the brand's. */}
+        <span
+          className="rx-intro-word"
+          role="img"
+          aria-label="Radiant"
+          style={{
+            WebkitMask: `url(${wordUrl}) center / contain no-repeat`,
+            mask: `url(${wordUrl}) center / contain no-repeat`
+          }}
+        />
 
         {/* Say what the product IS, first. The old line ("A model that lives on
             your iPhone. No account. No network once it's here.") described a

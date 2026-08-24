@@ -1600,19 +1600,24 @@
   justify-content: center;
   color: var(--rx-tint);
 }
-.is-native .rx-brand-spin img {
+.is-native .rx-brand-spin-mark {
   display: block;
   animation: rx-spin 2.4s linear infinite;
 }
 .is-native .rx-brand-spin svg { position: absolute; inset: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .is-native .rx-brand-spin img { animation: none; }
+  .is-native .rx-brand-spin-mark { animation: none; }
 }
 
 /* The mark, wherever it stands for the app rather than for a status. It is
    artwork, so it does not take currentColor — that is the point: one logo,
    one set of colours, everywhere. */
-.is-native .rx-brand-static { display: block; flex: 0 0 auto; }
+.is-native .rx-brand-static {
+  display: block;
+  flex: 0 0 auto;
+  /* the mask is painted with currentColor, so the mark follows the theme */
+  color: var(--rx-tint);
+}
 
 /* ═══ first run ════════════════════════════════════════════════════════════
    The one screen that is design rather than iOS. It continues the launch image
@@ -1692,7 +1697,7 @@
   opacity: 0;
   animation: rx-rise 900ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 260ms forwards;
 }
-.is-native .rx-intro-mark img { display: block; position: relative; }
+.is-native .rx-intro-mark .rx-brand-static { position: relative; }
 .is-native .rx-intro-halo {
   position: absolute;
   inset: -46%;
@@ -1710,7 +1715,10 @@
 .is-native .rx-intro-word {
   display: block;
   width: 208px;
-  height: auto;
+  /* a mask has no intrinsic size, so the box has to carry the aspect ratio the
+     artwork actually has: 1180 x 210 */
+  aspect-ratio: 1180 / 210;
+  background: var(--rx-tint);
   opacity: 0;
   animation: rx-sharpen 900ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 460ms forwards;
 }
