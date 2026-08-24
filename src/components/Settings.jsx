@@ -1321,14 +1321,36 @@ function DevicesPane () {
             </div>
             <div className='connect-field' style={{ marginTop: 8 }}>Other devices connect to:
               {(share.addresses || []).length
-                ? share.addresses.map(a => (
-                    <div key={a.address} className='row' style={{ marginTop: 4 }}>
-                      <code className='mono'>{a.address}:{share.port}</code>
-                      <span className='fit-badge' style={{ opacity: 0.8 }}>{a.label}</span>
-                      <button className='small-btn' onClick={() => copy(`${a.address}:${share.port}`)}>Copy</button>
-                      <button className='small-btn' title='Link with the token built in — open it once on the phone and it stays signed in' onClick={() => copy(`http://${a.address}:${share.port}/?token=${encodeURIComponent(share.token)}`)}>Copy phone link</button>
-                    </div>))
+                ? share.addresses.map(a => {
+                    // ⚠️ ONLY THE SERVE URL WORKS FROM AN iPHONE. A raw 100.x
+                    // address is plain http, which iOS App Transport Security
+                    // refuses outright — and there is no TLS on that port to
+                    // fall back to. Tony picked one of these IPs out of this
+                    // very list and spent an evening on "couldn't reach that
+                    // server". The rows now say which is which instead of
+                    // presenting them as equals.
+                    const shown = a.phone ? a.address : `${a.address}:${share.port}`
+                    const link = a.phone
+                      ? `${a.address}/?token=${encodeURIComponent(share.token)}`
+                      : `http://${a.address}:${share.port}/?token=${encodeURIComponent(share.token)}`
+                    return (
+                      <div key={a.address} className='row' style={{ marginTop: 4 }}>
+                        <code className='mono'>{shown}</code>
+                        <span className={'fit-badge ' + (a.phone ? 'fit-ok' : '')} style={a.phone ? undefined : { opacity: 0.8 }}>{a.label}</span>
+                        {a.phone && <span className='v-meta'>use this on iPhone</span>}
+                        <button className='small-btn' onClick={() => copy(shown)}>Copy</button>
+                        <button className='small-btn' title={a.phone ? 'Link with the token built in — open it once on the phone and it stays signed in' : 'Other Macs only — iPhone will refuse a plain http address'} onClick={() => copy(link)}>Copy {a.phone ? 'phone ' : ''}link</button>
+                      </div>)
+                  })
                 : <div className='v-meta'>No network address found — is Tailscale running?</div>}
+              {!(share.addresses || []).some(a => a.phone) && (
+                <div className='error-note' style={{ marginTop: 8 }}>
+                  Nothing here will work from an iPhone yet. iOS refuses plain http,
+                  so the phone needs an https address — run{' '}
+                  <code className='mono'>tailscale serve --bg {share.port}</code>{' '}
+                  on this Mac and this list will gain one.
+                </div>
+              )}
               <div className='hint' style={{ marginTop: 8 }}>“Copy phone link” carries the token, so opening it on your phone signs that device in for good — then Add to Home Screen. The token is dropped from the address bar right after, so it won’t sit in history.</div>
             </div>
           </div>

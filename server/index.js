@@ -105,18 +105,60 @@ function tokenOk (req) {
   if (!SHARE_TOKEN) return false
   return presentedToken(req) === SHARE_TOKEN
 }
+/**
+ * The https address Tailscale Serve puts in front of this server, if any.
+ *
+ * ⚠️ THE RAW 100.x ADDRESS CANNOT WORK FROM AN iPHONE, and offering it is what
+ * sent Tony round in circles: he picked `100.64.118.54:5834` out of this app's
+ * own list and the phone said it couldn't reach the server. Both readings fail —
+ * as http, iOS App Transport Security refuses a plain-text connection to a bare
+ * IP; as https, nothing is doing TLS on that port. Measured on dev-mbp:
+ *     http://100.64.118.54:5834/api/config    -> 401  (server is right there)
+ *     https://100.64.118.54:5834/api/config   -> TLS failure
+ *     https://dev-mbp.<tailnet>.ts.net/...    -> 401  (this is the one)
+ * Serve terminates TLS with a real certificate and proxies to our loopback port,
+ * which is exactly what the phone needs and what its own footer already promises.
+ */
+function tailscaleServeUrl () {
+  const bins = [
+    '/Applications/Tailscale.app/Contents/MacOS/Tailscale',
+    '/usr/local/bin/tailscale',
+    '/opt/homebrew/bin/tailscale'
+  ]
+  const bin = bins.find(b => { try { fs.accessSync(b); return true } catch { return false } })
+  if (!bin) return null
+  const run = (args) => {
+    try {
+      return require('node:child_process')
+        .execFileSync(bin, args, { encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] })
+    } catch { return null }
+  }
+  // Serve must actually be configured — an unconfigured tailnet would otherwise
+  // be handed a URL that 502s, which is a worse lie than the IP.
+  const serve = run(['serve', 'status'])
+  if (!serve || /no serve config/i.test(serve)) return null
+  const statusRaw = run(['status', '--json'])
+  if (!statusRaw) return null
+  try {
+    const dns = String(JSON.parse(statusRaw)?.Self?.DNSName || '').replace(/\.$/, '')
+    return dns ? `https://${dns}` : null
+  } catch { return null }
+}
+
 // LAN / Tailscale addresses this host is reachable at
 function hostAddresses () {
   const out = []
+  // Serve first and clearly labelled: it is the only entry an iPhone can use.
+  const serveUrl = tailscaleServeUrl()
+  if (serveUrl) out.push({ address: serveUrl, label: 'Tailscale Serve', url: serveUrl, phone: true })
   const ifaces = os.networkInterfaces()
   for (const name of Object.keys(ifaces)) {
     for (const a of ifaces[name] || []) {
       if (a.family !== 'IPv4' || a.internal) continue
       const tailscale = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)
-      out.push({ address: a.address, label: tailscale ? 'Tailscale' : name })
+      out.push({ address: a.address, label: tailscale ? 'Tailscale' : name, phone: false })
     }
   }
-  out.sort((x, y) => (x.label === 'Tailscale' ? -1 : 0) - (y.label === 'Tailscale' ? -1 : 0))
   return out
 }
 
