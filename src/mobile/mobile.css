@@ -238,12 +238,21 @@
   color-scheme: dark;
 }
 .is-native {
-    --rx-tint: #79A6E9;            /* 8.44:1 on #000, 6.84:1 on #1C1C1E */
+    /* ── the accent, themeable ──────────────────────────────────────────────
+       Every blue in the phone UI derives from these two numbers, so a theme is
+       a hue and a chroma and nothing else — the same shape the Mac's twelve
+       themes use in src/theme.js. SettingsScreen writes them; the literals here
+       are Radiant's own and are what an un-themed install gets.
+       Lightness is NOT themeable: it is what keeps contrast legible on black,
+       and a theme that could darken the tint could make the app unreadable. */
+    --rx-accent-h: 262;
+    --rx-accent-c: 0.11;
+    --rx-tint: oklch(0.72 var(--rx-accent-c) var(--rx-accent-h));
     /* Note the flip to a near-black label. White on the dark-mode tint measures
        ~2.4:1 and is the single fastest way to make an iOS button look amateur.
        Apple does exactly this with its own light system colors. */
     --rx-on-tint: #050911;         /* 8.01:1 on the fill */
-    --rx-tint-pressed: #6791CE;
+    --rx-tint-pressed: oklch(0.63 var(--rx-accent-c) var(--rx-accent-h));
 
     /* True black, deliberately diverging from the Mac app's tinted #121417.
        On an OLED iPhone a tinted near-black is precisely what makes a dark UI
@@ -1564,7 +1573,7 @@
   position: absolute;
   inset: -45%;
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(0.70 0.18 262 / 0.55), transparent 62%);
+  background: radial-gradient(circle, oklch(0.70 0.18 var(--rx-accent-h) / 0.55), transparent 62%);
   filter: blur(6px);
 }
 .is-native .rx-brand-mark {
@@ -1635,7 +1644,7 @@
 /* the site's radial-gradient(120% 80% at 50% -10%) */
 .is-native .rx-intro-glow-a {
   left: -10%; top: -34%; width: 120%; height: 80%;
-  background: radial-gradient(circle, oklch(0.40 0.14 262 / 0.55), transparent 62%);
+  background: radial-gradient(circle, oklch(0.40 0.14 var(--rx-accent-h) / 0.55), transparent 62%);
 }
 /* and (80% 60% at 82% 8%), the violet one */
 /* Blue, not violet. The site's second glow is at hue 280 and Tony does not want
@@ -1644,14 +1653,14 @@
    variety comes from light, not from a second colour. */
 .is-native .rx-intro-glow-b {
   left: 42%; top: -12%; width: 80%; height: 60%;
-  background: radial-gradient(circle, oklch(0.58 0.15 262 / 0.34), transparent 60%);
+  background: radial-gradient(circle, oklch(0.58 0.15 var(--rx-accent-h) / 0.34), transparent 60%);
   animation-delay: 120ms;
 }
 /* a third, low and quiet, so the bottom of the screen is not dead black behind
    the button — "glow here and there" */
 .is-native .rx-intro-glow-c {
   left: -6%; bottom: -22%; width: 78%; height: 46%;
-  background: radial-gradient(circle, oklch(0.52 0.13 262 / 0.26), transparent 62%);
+  background: radial-gradient(circle, oklch(0.52 0.13 var(--rx-accent-h) / 0.26), transparent 62%);
   animation-delay: 240ms;
 }
 .is-native .rx-intro-field {
@@ -1688,7 +1697,7 @@
   position: absolute;
   inset: -46%;
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(0.70 0.18 262 / 0.55), transparent 62%);
+  background: radial-gradient(circle, oklch(0.70 0.18 var(--rx-accent-h) / 0.55), transparent 62%);
   filter: blur(7px);
   transform: scale(0.6);
   opacity: 0;
@@ -1714,7 +1723,7 @@
   font: -apple-system-title3;
   font-weight: 600;
   line-height: 1.3;
-  color: oklch(0.965 0.008 262);
+  color: oklch(0.965 0.008 var(--rx-accent-h));
   opacity: 0;
   animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 620ms forwards;
 }
@@ -1723,7 +1732,7 @@
   max-width: 22em;
   font: -apple-system-subheadline;
   line-height: 1.45;
-  color: oklch(0.74 0.022 262);
+  color: oklch(0.74 0.022 var(--rx-accent-h));
   opacity: 0;
   animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 700ms forwards;
 }
@@ -1732,7 +1741,7 @@
   margin: 6px 0 0;
   font: -apple-system-caption1;
   letter-spacing: 0.01em;
-  color: oklch(0.60 0.02 262);
+  color: oklch(0.60 0.02 var(--rx-accent-h));
   opacity: 0;
   animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 860ms forwards;
 }
@@ -1753,11 +1762,11 @@
   border: 0;
   border-radius: 16px;
   font: -apple-system-headline;
-  color: oklch(0.16 0.03 262);
+  color: oklch(0.16 0.03 var(--rx-accent-h));
   /* One blue, lit from above — not a two-hue sweep. The old gradient ran into
      oklch hue 288, which is the violet Tony rejected. */
-  background: linear-gradient(180deg, oklch(0.78 0.16 262), oklch(0.68 0.17 262));
-  box-shadow: 0 16px 44px oklch(0.62 0.16 262 / 0.45);
+  background: linear-gradient(180deg, oklch(0.78 0.16 var(--rx-accent-h)), oklch(0.68 0.17 var(--rx-accent-h)));
+  box-shadow: 0 16px 44px oklch(0.62 0.16 var(--rx-accent-h) / 0.45);
   transition: transform 200ms var(--rx-ease, cubic-bezier(.22,1,.36,1));
 }
 .is-native .rx-intro-cta.is-pressed { transform: scale(0.97); }
@@ -1766,7 +1775,7 @@
   border: 0;
   background: none;
   font: -apple-system-body;
-  color: oklch(0.70 0.17 262);
+  color: oklch(0.70 0.17 var(--rx-accent-h));
 }
 .is-native .rx-intro-alt.is-pressed { opacity: 0.6; }
 
@@ -1802,3 +1811,96 @@
   align-items: center;
   margin-right: 12px;
 }
+
+/* ═══ settings ═════════════════════════════════════════════════════════════
+   The one screen where matching the platform IS the design: someone hunting
+   for a control should find it exactly where every other iOS app puts it. */
+.is-native .rx-set-value {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font: -apple-system-body;
+  color: var(--rx-label-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* the theme picker — a swatch and its name, wrapping */
+.is-native .rx-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+}
+.is-native .rx-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 7px 8px;
+  border-radius: 999px;
+  background: var(--rx-fill-3, rgba(120,120,128,0.16));
+  font: -apple-system-subheadline;
+  color: var(--rx-label);
+  /* 44pt of target without a 44pt-tall pill: padding does the work */
+  min-height: 34px;
+}
+.is-native .rx-swatch.is-pressed { opacity: 0.6; }
+.is-native .rx-swatch.is-on {
+  background: color-mix(in srgb, var(--sw) 22%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--sw);
+}
+.is-native .rx-swatch-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--sw);
+  /* its own light, so a swatch on black is an object rather than a hole */
+  box-shadow: 0 0 10px color-mix(in srgb, var(--sw) 55%, transparent);
+}
+.is-native .rx-swatch-name { white-space: nowrap; }
+
+/* text size, as a segmented control */
+.is-native .rx-seg { display: flex; padding: 6px; gap: 4px; }
+.is-native .rx-seg-item {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  padding: 9px 4px;
+  border-radius: 9px;
+  font: -apple-system-subheadline;
+  color: var(--rx-label);
+  white-space: nowrap;
+}
+.is-native .rx-seg-item.is-pressed { opacity: 0.6; }
+.is-native .rx-seg-item.is-on {
+  background: var(--rx-tint);
+  color: var(--rx-on-tint, #050911);
+  font-weight: 600;
+}
+
+.is-native .rx-about-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 20px calc(env(safe-area-inset-bottom) + 24px);
+}
+.is-native .rx-about-line {
+  margin: 0;
+  font: -apple-system-caption1;
+  color: var(--rx-label-3);
+  text-align: center;
+}
+
+/* the phone's own guide — prose, so it gets a measure and real paragraph rhythm */
+.is-native .rx-readme { padding: 4px 20px 18px; }
+.is-native .rx-readme-title {
+  margin: 14px 0 6px;
+  font: -apple-system-body;
+  font-weight: 600;
+  color: var(--rx-label);
+}
+.is-native .rx-readme-body {
+  margin: 0 0 10px;
+  max-width: 34em;
+  font: -apple-system-subheadline;
+  line-height: 1.5;
+  color: var(--rx-label-2);
+}
+

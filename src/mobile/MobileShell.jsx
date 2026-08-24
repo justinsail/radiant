@@ -46,6 +46,9 @@ import * as ChatScreenMod from './ChatScreen.jsx'
 import * as ConnectMacMod from './ConnectMac.jsx'
 import * as GetModelSheetMod from './GetModelSheet.jsx'
 import * as FirstRunMod from './FirstRun.jsx'
+import SettingsScreen from './SettingsScreen.jsx'
+import ReadMeScreen from './ReadMeScreen.jsx'
+import { loadAppearance, applyAppearance } from './theme.js'
 import * as useLocalModelsMod from './useLocalModels.js'
 import * as hapticsMod from './haptics.js'
 
@@ -331,7 +334,9 @@ const SCREENS = {
   // its composer and its transcript scroller are one layout, and splitting the
   // bar off would put a pinned composer inside somebody else's scroll view.
   chat: { title: '', large: false, scroll: false, bg: 'plain', bare: true },
-  connect: { title: 'Connect to a Mac', large: false, scroll: true, bg: 'grouped' }
+  connect: { title: 'Connect to a Mac', large: false, scroll: true, bg: 'grouped' },
+  settings: { title: 'Settings', large: true, scroll: true, bg: 'grouped' },
+  readme: { title: 'Read me', large: false, scroll: true, bg: 'grouped' }
 }
 
 const BG = {
@@ -774,6 +779,12 @@ export default function MobileShell () {
   // No model on the phone and no Mac configured. It is a cover, not a screen —
   // there is nothing behind it worth showing.
 
+  const [appearance, setAppearance] = useState(() => {
+    const a = loadAppearance()
+    applyAppearance(a)
+    return a
+  })
+
   const [firstRunDone, setFirstRunDone] = useState(() => {
     try { return localStorage.getItem(FIRSTRUN_KEY) === '1' } catch { return true }
   })
@@ -988,7 +999,9 @@ export default function MobileShell () {
   }), [push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, stack.length])
 
   const menuPress = usePress(() => setMenuOpen('chat'))
-  const gearPress = usePress(() => setMenuOpen('models'))
+  // The gear used to open a three-item menu, which is why Tony reported the
+  // app had no settings at all. It pushes a real screen now.
+  const gearPress = usePress(() => push('settings', {}), { label: 'Settings' })
 
   // ── render ────────────────────────────────────────────────────────────────
 
@@ -1025,6 +1038,19 @@ export default function MobileShell () {
         )
       case 'connect':
         return <ConnectMac {...common} onConnected={pop} />
+      case 'readme':
+        return <ReadMeScreen {...common} />
+      case 'settings':
+        return (
+          <SettingsScreen
+            {...common}
+            appearance={appearance}
+            onAppearance={setAppearance}
+            onConnectMac={connectMac}
+            onReadMe={() => push('readme', {})}
+            version={typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : null}
+          />
+        )
       case 'models':
       default:
         return (
