@@ -30,6 +30,22 @@ const config: CapacitorConfig = {
     limitsNavigationsToAppBoundDomains: false
   },
   plugins: {
+    // ⚠️ WITHOUT THIS PLUGIN THERE IS NO SPLASH TO SEE. Capacitor shows the
+    // launch storyboard only until the web view paints its first frame, which
+    // for a bundled app on a fast phone is a flicker — Tony reported "not
+    // seeing the splash page" three times while the storyboard, the imageset and
+    // the Info.plist key were all correct. They were: it was on screen for
+    // roughly a tenth of a second.
+    //
+    // Held for 900ms, then faded over 250ms into the first-run screen it is
+    // frame one of, so the handoff still reads as one continuous moment.
+    SplashScreen: {
+      launchShowDuration: 900,
+      launchFadeOutDuration: 250,
+      launchAutoHide: true,
+      backgroundColor: '#070B13',
+      showSpinner: false
+    },
     // the composer rides visualViewport itself; the web view must not resize
     Keyboard: {
       resize: 'none',

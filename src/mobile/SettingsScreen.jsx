@@ -35,6 +35,26 @@ function Row ({ label, value, onTap, destructive }) {
   )
 }
 
+/** A downloaded model: what it is, what it weighs, and its own way out. */
+function ModelRow ({ model, busy, onRemove }) {
+  const press = usePress(onRemove, {
+    label: `Remove ${model.name}, ${Number(model.sizeGB).toFixed(1)} GB`,
+    haptic: 'MEDIUM',
+    disabled: busy
+  })
+  return (
+    <div className="rx-row">
+      <div className="rx-row-text">
+        <div className="rx-headline">{model.name}</div>
+      </div>
+      <span className="rx-set-value">{Number(model.sizeGB).toFixed(1)} GB</span>
+      <span className={'rx-row-remove' + press.className} {...press.handlers}>
+        Remove
+      </span>
+    </div>
+  )
+}
+
 function Swatch ({ theme, selected, onPick }) {
   const press = usePress(() => onPick(theme.id), {
     label: `${theme.name}${selected ? ', selected' : ''}`,
@@ -76,6 +96,14 @@ export default function SettingsScreen ({
     applyAppearance(next)
     onAppearance?.(next)
   }, [appearance, onAppearance])
+
+  const removeOne = useCallback(async (m) => {
+    if (busy) return
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(`Remove ${m.name}? That frees ${Number(m.sizeGB).toFixed(1)} GB. You can download it again later.`)) return
+    setBusy(true)
+    try { await local.remove?.(m.id) } finally { setBusy(false) }
+  }, [busy, local])
 
   const clearAll = useCallback(async () => {
     if (!downloaded.length || busy) return
@@ -125,16 +153,16 @@ export default function SettingsScreen ({
       <h2 className="rx-section-header">Models</h2>
       <div className="rx-group">
         <Row label="On this iPhone" value={`${downloaded.length} · ${fmt(used)}`} />
-        {/* NOT a delete. This row looked exactly like the inert one above it and
-            removed a multi-gigabyte model on one tap, with no confirmation, no
-            undo and no destructive treatment — while its own sibling below is
-            red and does confirm. Listing is all it does now; removing one model
-            belongs in the sheet that already has a proper "Remove model". */}
+        {/* Each model can be removed on its own — but the row does NOT delete
+            on tap. It used to, looking exactly like the inert row above it,
+            with no confirmation and no undo. The delete is its own labelled,
+            red control at the trailing edge, and it confirms. */}
         {downloaded.map(m => (
-          <Row
+          <ModelRow
             key={m.id}
-            label={m.name}
-            value={`${Number(m.sizeGB).toFixed(1)} GB`}
+            model={m}
+            busy={busy}
+            onRemove={() => removeOne(m)}
           />
         ))}
         {downloaded.length > 0 && (
