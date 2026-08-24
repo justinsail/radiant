@@ -179,11 +179,17 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     ///
     /// The app's own tmp/ is where that in-flight file lives, and it is
     /// otherwise empty in this app, so its size IS the current transfer.
+    private func bytesInCache(for repo: String) -> Int64 {
+        guard let dir = cacheDir(for: repo) else { return 0 }
+        return size(of: dir)
+    }
+
+    private func bytesInFlight() -> Int64 {
+        size(of: FileManager.default.temporaryDirectory)
+    }
+
     private func bytesOnDisk(for repo: String) -> Int64 {
-        var total: Int64 = 0
-        if let dir = cacheDir(for: repo) { total += size(of: dir) }
-        total += size(of: FileManager.default.temporaryDirectory)
-        return total
+        bytesInCache(for: repo) + bytesInFlight()
     }
 
     // MARK: - download
@@ -270,20 +276,30 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             // entirely — present made the very first tick read 100% and stay
             // there. Tony: "now downloading llama starts at 100% and doesnt
             // change." Progress is what THIS download adds, from here.
-            let baseline = bytesOnDisk(for: repo)
-            let remaining = max(expected - baseline, 0)
+            // ⚠️ TWO BASELINES, because the two places bytes live are not the
+            // same kind of thing. The cache holds what is already downloaded;
+            // tmp holds the file currently in flight AND, crucially, whatever a
+            // previous download left behind. Folding both into one baseline let
+            // stale tmp leftovers inflate it past the expected size, which made
+            // `remaining` zero, which broke out of the poller before it emitted
+            // anything — no number at all, which is what Tony saw. Count only
+            // what GROWS from here, on each independently.
+            let cacheBase = bytesInCache(for: repo)
+            let tmpBase = bytesInFlight()
+            let remaining = max(expected - cacheBase, 1)
             let poller = Task { [weak self] in
                 var lastPct = -1
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     if Task.isCancelled { break }
                     guard let self else { break }
-                    // Nothing left to fetch: this is a cache hit and it will
-                    // finish on its own. Reporting a percentage would be
-                    // inventing a wait that is not happening.
-                    guard remaining > 0 else { break }
-                    let added = max(self.bytesOnDisk(for: repo) - baseline, 0)
-                    let done = baseline + added
+                    // Growth in either place counts as progress on this
+                    // download. Never negative: tmp shrinks to zero the moment
+                    // the finished file is moved into the cache.
+                    let grewInCache = max(self.bytesInCache(for: repo) - cacheBase, 0)
+                    let grewInFlight = max(self.bytesInFlight() - tmpBase, 0)
+                    let added = grewInCache + grewInFlight
+                    let done = cacheBase + added
                     guard added > 0 else { continue }
                     let f = min(0.999, Double(added) / Double(remaining))
                     let pct = Int(f * 100)

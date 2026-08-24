@@ -144,9 +144,15 @@ const CSS = `
 .rx-mp-hero-note.is-amber{color:var(--mp-amber)}
 .rx-mp-hero-note.is-red{color:var(--mp-red)}
 
+/* The label is centred in the BUTTON, not in the button minus the spinner.
+   Laying the pair out as a centred flex group pushes the word right by half the
+   spinner plus the gap — which reads as a typo in the layout, and did. The
+   spinner is taken out of flow and pinned to the leading inset instead, so
+   "Stop" and "Stop · 47%" both sit on the button's true centre. */
 .rx-mp-cta{
-  -webkit-appearance:none; appearance:none; border:0; display:flex; align-items:center;
-  justify-content:center; gap:8px; width:100%; min-height:50px; margin:20px 0 0;
+  -webkit-appearance:none; appearance:none; border:0; position:relative;
+  display:flex; align-items:center;
+  justify-content:center; width:100%; min-height:50px; margin:20px 0 0;
   border-radius:var(--mp-r-button); background:var(--mp-tint); color:var(--mp-on-tint);
   font-size:calc(17px*var(--mp-dt)); font-weight:600;
   transition:transform var(--mp-dur-press) var(--mp-press), background-color 200ms linear;
@@ -155,7 +161,10 @@ const CSS = `
 /* a disabled control is never a faded tint — it is a neutral fill with a
    quiet glyph, the way Apple does it */
 .rx-mp-cta[disabled]{background:var(--mp-fill-3); color:var(--mp-label-3); transform:none}
-.rx-mp-cta-gauge{color:var(--mp-amber); display:block; height:22px; flex:0 0 auto}
+.rx-mp-cta-gauge{
+  color:var(--mp-on-tint); display:block; height:22px; flex:0 0 auto;
+  position:absolute; left:18px; top:50%; transform:translateY(-50%);
+}
 
 .rx-mp-secondary{
   -webkit-appearance:none; appearance:none; border:0; background:none; display:block;
