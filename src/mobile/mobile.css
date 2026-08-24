@@ -1604,3 +1604,158 @@
    artwork, so it does not take currentColor — that is the point: one logo,
    one set of colours, everywhere. */
 .is-native .rx-brand-static { display: block; flex: 0 0 auto; }
+
+/* ═══ first run ════════════════════════════════════════════════════════════
+   The one screen that is design rather than iOS. It continues the launch image
+   frame-for-frame, so the ground, both glows and the constellation here must
+   stay in step with scripts/make-ios-splash.py — change one, re-run the other.
+
+   EVERY ANIMATION RUNS ONCE AND HOLDS. No `infinite`, anywhere. The stars are a
+   pre-rendered PNG rather than a canvas for the same reason: this phone is
+   about to run a language model. */
+.is-native .rx-intro {
+  /* NOT `position: relative`. .rx-cover above is `fixed; inset: 0`, this rule
+     is later in the file at equal specificity, and relative won — the screen
+     stopped filling and collapsed to its content. Keep the fixed fill, and keep
+     the safe-area top or the mark clips under the notch. */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #070B13;
+  padding: var(--rx-safe-top) 28px calc(env(safe-area-inset-bottom) + 20px);
+}
+.is-native .rx-intro-sky { position: absolute; inset: 0; pointer-events: none; }
+.is-native .rx-intro-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0;
+  animation: rx-sky 1400ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) forwards;
+}
+/* the site's radial-gradient(120% 80% at 50% -10%) */
+.is-native .rx-intro-glow-a {
+  left: -10%; top: -34%; width: 120%; height: 80%;
+  background: radial-gradient(circle, oklch(0.40 0.14 262 / 0.55), transparent 62%);
+}
+/* and (80% 60% at 82% 8%), the violet one */
+.is-native .rx-intro-glow-b {
+  left: 42%; top: -12%; width: 80%; height: 60%;
+  background: radial-gradient(circle, oklch(0.50 0.12 280 / 0.38), transparent 60%);
+  animation-delay: 120ms;
+}
+.is-native .rx-intro-field {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center top;
+  opacity: 0;
+  animation: rx-stars 1800ms ease-out 200ms forwards;
+}
+
+.is-native .rx-intro-stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+}
+
+/* the mark rises into its own light */
+.is-native .rx-intro-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: rx-rise 900ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 260ms forwards;
+}
+.is-native .rx-intro-mark img { display: block; position: relative; }
+.is-native .rx-intro-halo {
+  position: absolute;
+  inset: -46%;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.70 0.18 262 / 0.55), transparent 62%);
+  filter: blur(7px);
+  transform: scale(0.6);
+  opacity: 0;
+  /* blooms first and stays — the site breathes this forever, we do not */
+  animation: rx-bloom 1100ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 160ms forwards;
+}
+
+/* the wordmark arrives slightly soft and sharpens, which is what reads as
+   expensive; a plain fade reads as a web page */
+.is-native .rx-intro-word {
+  display: block;
+  width: 208px;
+  height: auto;
+  opacity: 0;
+  animation: rx-sharpen 900ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 460ms forwards;
+}
+
+.is-native .rx-intro-line {
+  margin: 0;
+  max-width: 20em;
+  font: -apple-system-body;
+  line-height: 1.45;
+  color: oklch(0.74 0.022 262);
+  opacity: 0;
+  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 620ms forwards;
+}
+
+.is-native .rx-intro-actions {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 760ms forwards;
+}
+/* Not .rx-primary: this button is the one moment the app is allowed a gradient,
+   and it carries the brand's own blues rather than the flat system fill. */
+.is-native .rx-intro-cta {
+  min-height: 54px;
+  border: 0;
+  border-radius: 16px;
+  font: -apple-system-headline;
+  color: oklch(0.16 0.03 262);
+  background: linear-gradient(135deg, oklch(0.80 0.15 262), oklch(0.78 0.13 288));
+  box-shadow: 0 16px 40px oklch(0.62 0.16 262 / 0.40);
+  transition: transform 200ms var(--rx-ease, cubic-bezier(.22,1,.36,1));
+}
+.is-native .rx-intro-cta.is-pressed { transform: scale(0.97); }
+.is-native .rx-intro-alt {
+  min-height: 44px;
+  border: 0;
+  background: none;
+  font: -apple-system-body;
+  color: oklch(0.70 0.17 262);
+}
+.is-native .rx-intro-alt.is-pressed { opacity: 0.6; }
+
+@keyframes rx-sky   { to { opacity: 1; } }
+@keyframes rx-stars { to { opacity: 0.55; } }
+@keyframes rx-bloom { to { opacity: 1; transform: scale(1); } }
+@keyframes rx-rise  { from { transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes rx-sharpen {
+  from { filter: blur(6px); transform: scale(1.04); }
+  to   { opacity: 1; filter: blur(0); transform: none; }
+}
+
+/* Reduce Motion gets the same picture, arrived at plainly — never a broken
+   half-state, and never nothing at all. */
+@media (prefers-reduced-motion: reduce) {
+  .is-native .rx-intro-glow,
+  .is-native .rx-intro-field,
+  .is-native .rx-intro-mark,
+  .is-native .rx-intro-halo,
+  .is-native .rx-intro-word,
+  .is-native .rx-intro-line,
+  .is-native .rx-intro-actions {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
