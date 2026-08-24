@@ -23,7 +23,9 @@ const config: CapacitorConfig = {
     contentInset: 'never',
     // true black, not the Mac app's tinted #121417: on an OLED iPhone a tinted
     // near-black is exactly what makes a dark UI read as a web page
-    backgroundColor: '#000000',
+    // the site's ground, so the launch screen, the native window and the web
+    // layer are all the same colour and nothing flashes between them
+    backgroundColor: '#070B13',
     // only tailnet hosts — the app never needs the open web
     limitsNavigationsToAppBoundDomains: false
   },

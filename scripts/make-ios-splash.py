@@ -19,8 +19,10 @@ converts node_modules/@fontsource/montserrat to TTF with fontTools. Requires:
 """
 import struct, zlib, pathlib
 
-SRC = pathlib.Path('src/assets/logo-mark.png')
-FONT = pathlib.Path('node_modules/@fontsource/montserrat/files/montserrat-latin-800-normal.woff2')
+# THE BRAND, used as pixels. Not re-rendered, not re-tinted, not set in a font
+# I picked — these are the same two files the marketing site ships.
+MARK = pathlib.Path('src/assets/brand/radiant-mark.png')
+WORD = pathlib.Path('src/assets/brand/radiant-wordmark.png')
 OUT = pathlib.Path('apps/ios/ios/App/App/Assets.xcassets/Splash.imageset')
 SIDE = 2732
 # The mark reads at about 110pt on a phone. Bigger than a bar glyph, nowhere
@@ -34,6 +36,7 @@ BRAND_BG = (0x53, 0x77, 0xB3)   # the app icon's measured ground
 BRAND_INK = (0xFF, 0xFF, 0xFF)
 
 def load_rgba(p):
+    p = pathlib.Path(p)
     d = p.read_bytes(); pos = 8; idat = b''
     while pos < len(d):
         ln = struct.unpack('>I', d[pos:pos+4])[0]
@@ -87,6 +90,25 @@ def write_png(path, w, h, rgb):
            + chunk(b'IEND', b''))
     path.write_bytes(png)
 
+def oklch(L, C, H):
+    """OKLCH -> sRGB 0-255, the same transform src/theme.js uses."""
+    import math
+    h = math.radians(H)
+    a, b = math.cos(h) * C, math.sin(h) * C
+    l_ = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
+    m_ = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
+    s_ = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3
+    lin = (4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
+           -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
+           -0.0041960863 * l_ - 0.7034186147 * m_ + 1.7076147010 * s_)
+    out = []
+    for v in lin:
+        v = max(0.0, min(1.0, v))
+        v = 12.92 * v if v <= 0.0031308 else 1.055 * (v ** (1 / 2.4)) - 0.055
+        out.append(int(round(max(0.0, min(1.0, v)) * 255)))
+    return tuple(out)
+
+
 def wordmark_mask(cap_px):
     """RADIANT as an alpha mask at the brand's own tracking, via Pillow."""
     from PIL import Image, ImageDraw, ImageFont
@@ -117,50 +139,88 @@ def wordmark_mask(cap_px):
         x += w + track
     return img.crop(img.getbbox())
 
-def build(bg, ink, name):
-    w, h, px = load_rgba(SRC)
-    x0, y0, x1, y1 = ink_bbox(w, h, px)
-    iw, ih = x1 - x0 + 1, y1 - y0 + 1
-    target = int(SIDE * MARK_FRAC)
-    scale = target / max(iw, ih)
-    dw, dh = max(1, round(iw * scale)), max(1, round(ih * scale))
+def build(_a, _b, name):
+    """The website's hero, as a launch screen.
 
-    word = wordmark_mask(max(8, int(dw * WORD_FRAC)))
-    gap = int(dw * GAP_FRAC)
-    block_h = dh + gap + word.height
-    # optically centred: a lockup sitting on the true centre reads low, so the
-    # whole block is lifted by 4% of the canvas, the way Apple sets theirs
-    top = (SIDE - block_h) // 2 - int(SIDE * 0.04)
-    ox, oy = (SIDE - dw) // 2, top
+    Deep blue-black ground and the two radial glows exactly where index.html
+    puts them, a luminous halo behind the mark (the site's breathing
+    `.swirl::before`, held still), then the brand's own blue swirl and RADIANT
+    wordmark composited as-is. The atmosphere is the site's; the logo is the
+    logo.
+    """
+    import math
+    W = H = SIDE
+    BG = oklch(0.15, 0.018, 262)
+    GLOW_A = oklch(0.40, 0.14, 262)
+    GLOW_B = oklch(0.50, 0.12, 280)
+    HALO = oklch(0.70, 0.18, 262)
 
-    canvas = bytearray(bytes(bg) * (SIDE * SIDE))
-    for y in range(dh):
-        sy = y0 + min(ih - 1, int(y / scale))
-        for x in range(dw):
-            sx = x0 + min(iw - 1, int(x / scale))
-            a = px[((sy * w) + sx) * 4 + 3]
-            if not a: continue
-            o = (((oy + y) * SIDE) + (ox + x)) * 3
-            for k in range(3):
-                canvas[o + k] = (ink[k] * a + bg[k] * (255 - a)) // 255
+    canvas = bytearray(bytes(BG) * (W * H))
 
-    wx = (SIDE - word.width) // 2
-    wy = oy + dh + gap
-    wpx = word.load()
-    for y in range(word.height):
-        for x in range(word.width):
-            a = wpx[x, y]
-            if not a: continue
-            o = (((wy + y) * SIDE) + (wx + x)) * 3
-            for k in range(3):
-                canvas[o + k] = (ink[k] * a + bg[k] * (255 - a)) // 255
+    def wash(cx, cy, rx, ry, col, peak, falloff):
+        x0, x1 = max(0, int(cx - rx)), min(W, int(cx + rx) + 1)
+        y0, y1 = max(0, int(cy - ry)), min(H, int(cy + ry) + 1)
+        for y in range(y0, y1):
+            dy = (y - cy) / ry
+            row = y * W
+            for x in range(x0, x1):
+                dx = (x - cx) / rx
+                d = math.hypot(dx, dy)
+                if d >= 1.0:
+                    continue
+                a = peak * ((1.0 - d) ** falloff)
+                if a <= 0.002:
+                    continue
+                o = (row + x) * 3
+                for k in range(3):
+                    base = canvas[o + k]
+                    canvas[o + k] = min(255, int(base + (col[k] - base * col[k] / 255) * a))
+
+    wash(W * 0.50, -H * 0.10, W * 0.60, H * 0.80, GLOW_A, 0.55, 1.7)
+    wash(W * 0.82, H * 0.08, W * 0.40, H * 0.60, GLOW_B, 0.35, 1.7)
+
+    def place(path, target_w, cx, top):
+        """Composite an RGBA brand asset at its own colours."""
+        w, h, px = load_rgba(path)
+        x0, y0, x1, y1 = ink_bbox(w, h, px)
+        iw, ih = x1 - x0 + 1, y1 - y0 + 1
+        sc = target_w / iw
+        dw, dh = max(1, round(iw * sc)), max(1, round(ih * sc))
+        ox, oy = int(cx - dw / 2), top
+        for y in range(dh):
+            sy = y0 + min(ih - 1, int(y / sc))
+            for x in range(dw):
+                sx = x0 + min(iw - 1, int(x / sc))
+                so = ((sy * w) + sx) * 4
+                a = px[so + 3]
+                if not a:
+                    continue
+                o = (((oy + y) * SIDE) + (ox + x)) * 3
+                for k in range(3):
+                    canvas[o + k] = (px[so + k] * a + canvas[o + k] * (255 - a)) // 255
+        return dw, dh
+
+    mark_w = int(SIDE * MARK_FRAC)
+    word_w = int(mark_w * 1.42)          # the site sets the wordmark wider than the mark
+    gap = int(mark_w * 0.30)
+    # measure the wordmark's height before laying out, so the block centres true
+    ww, wh, wpx = load_rgba(WORD)
+    wx0, wy0, wx1, wy1 = ink_bbox(ww, wh, wpx)
+    word_h = round((wy1 - wy0 + 1) * (word_w / (wx1 - wx0 + 1)))
+    block = mark_w + gap + word_h
+    top = (SIDE - block) // 2 - int(SIDE * 0.03)
+
+    wash(W / 2, top + mark_w / 2, mark_w * 1.5, mark_w * 1.5, HALO, 0.62, 2.1)
+    _, dh = place(MARK, mark_w, W / 2, top)
+    place(WORD, word_w, W / 2, top + dh + gap)
 
     OUT.mkdir(parents=True, exist_ok=True)
     write_png(OUT / name, SIDE, SIDE, canvas)
-    print(f'  {name}  mark {dw}x{dh}, wordmark {word.width}x{word.height}, '
-          f'ink #{ink[0]:02X}{ink[1]:02X}{ink[2]:02X} on #{bg[0]:02X}{bg[1]:02X}{bg[2]:02X}')
+    print(f'  {name}  ground #{BG[0]:02X}{BG[1]:02X}{BG[2]:02X}, mark {mark_w}px, wordmark {word_w}px')
+
 
 if __name__ == '__main__':
-    print('launch screen (Radiant lockup):')
-    build(BRAND_BG, BRAND_INK, 'splash-light.png')
-    build(BRAND_BG, BRAND_INK, 'splash-dark.png')
+    # One image, not two: the app is always dark, so the launch screen is too.
+    print('launch screen (site hero + brand lockup):')
+    build(None, None, 'splash-light.png')
+    build(None, None, 'splash-dark.png')

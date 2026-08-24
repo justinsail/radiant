@@ -228,8 +228,16 @@
    [data-mode] would pin the phone to dark forever and it would never follow the
    system. The Mac app's twelve themes do not ship here — Light/Dark/System
    only. A theme picker on iOS announces "this is a web view". */
-@media (prefers-color-scheme: dark) {
-  .is-native {
+/* ⚠️ ALWAYS DARK, at Tony's direction (2026-08-24): "it should also always
+   start in dark mode." So this is NOT a media query any more — these values
+   land unconditionally and override the light ones above, which stay only as
+   the base layer the tokens are declared in. Following the system was the
+   previous, deliberate behaviour; the note above is kept for the reasoning, but
+   the decision has changed. Do not restore the media query. */
+.is-native, .is-native:root {
+  color-scheme: dark;
+}
+.is-native {
     --rx-tint: #79A6E9;            /* 8.44:1 on #000, 6.84:1 on #1C1C1E */
     /* Note the flip to a near-black label. White on the dark-mode tint measures
        ~2.4:1 and is the single fastest way to make an iOS button look amateur.
@@ -271,7 +279,7 @@
     --rx-bar-chip: rgba(120, 120, 128, 0.32);
     --rx-bar-chip-shadow: none;
   }
-}
+
 
 
 /* ═══ base ═════════════════════════════════════════════════════════════════ */
