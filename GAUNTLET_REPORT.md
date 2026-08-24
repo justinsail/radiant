@@ -1,6 +1,6 @@
 # Radiant for iPhone — App Store Submission Gauntlet
 
-**Pass 4** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
+**Pass 5** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
 
 ---
 
@@ -65,10 +65,14 @@ is actually published somewhere.
 
 **The top three things standing in the way:**
 
-1. **There is no published privacy policy.** Apple requires a URL in the listing
-   and a link in the app. `templetongroup.dev/privacy` returns HTTP 200 but is the
-   SPA fallback serving the homepage — byte-identical to `/`. I have drafted the
-   real policy at `docs/PRIVACY.md`; it needs publishing and the URL handing back.
+1. ~~**There is no published privacy policy.**~~ **DONE.** Live at
+   **`https://www.templetongroup.dev/showcase/radiant/privacy.html`**, and linked
+   from Settings → About in the app, which Apple also requires.
+   ⚠️ **The `.html` is load-bearing.** `templetongroup.dev` answers 200 for
+   unknown paths and serves the HOMEPAGE — the extensionless
+   `/showcase/radiant/privacy` returns 327 KB of homepage while the `.html`
+   returns the real 7 KB policy. Verified by content, not status code, because a
+   200 there means nothing. Put the `.html` URL in App Store Connect.
 2. **No App Store Connect record exists.** No app record, no screenshots, no
    description, no age rating. None of it can be done from here.
 3. **The app has never run its own model on a device under Release signing.**
@@ -235,7 +239,10 @@ provider under that provider's policy; and traffic to **the user's own Mac**.
 Model weights are downloaded from **Hugging Face**. None of that is collection by
 the developer, and the app has no code path that could send data to us.
 
-**BLOCKED 6.1 — privacy policy.** Apple requires a live URL in the listing and a
+**RESOLVED 6.1 — privacy policy.** Published and linked. See the top of this
+report for the URL and the trap in it.
+
+**Was: BLOCKED 6.1 — privacy policy.** Apple requires a live URL in the listing and a
 link reachable in the binary. `templetongroup.dev/privacy` returns 200 but is the
 SPA fallback: it is byte-identical to the homepage (327,013 bytes each). I have
 drafted the real policy at **`docs/PRIVACY.md`**, written against what the app

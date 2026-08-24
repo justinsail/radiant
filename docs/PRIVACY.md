@@ -54,4 +54,4 @@ If this policy changes, the date above changes with it.
 
 ## Contact
 
-privacy@templetontech.com
+privacy@templetongroup.com

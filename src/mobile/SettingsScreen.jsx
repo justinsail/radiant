@@ -214,6 +214,17 @@ export default function SettingsScreen ({
       <h2 className="rx-section-header">About</h2>
       <div className="rx-group">
         <Row label="Read me" onTap={onReadMe} />
+        {/* ⚠️ APPLE REQUIRES THE POLICY REACHABLE FROM THE BINARY, not only from
+            the App Store listing. Opened in Safari rather than a web view: an
+            in-app browser showing our own privacy policy is the kind of detail a
+            reviewer reads as evasive, and the system browser makes the domain
+            visible in the address bar.
+
+            ⚠️ THE .html IS LOAD-BEARING. templetongroup.dev answers 200 for
+            unknown paths and serves the HOMEPAGE — the extensionless
+            /showcase/radiant/privacy returns 327 KB of the wrong page. Verified
+            live: with .html it is the real 7 KB policy. */}
+        <Row label="Privacy policy" onTap={openPrivacy} />
         <Row label="Version" value={version || '—'} />
       </div>
       <div className="rx-about-mark">
@@ -222,6 +233,17 @@ export default function SettingsScreen ({
       </div>
     </>
   )
+}
+
+const PRIVACY_URL = 'https://www.templetongroup.dev/showcase/radiant/privacy.html'
+
+/** Open in the system browser, so the address bar shows whose policy it is. */
+function openPrivacy () {
+  try {
+    const browser = window.Capacitor?.Plugins?.Browser
+    if (browser?.open) { browser.open({ url: PRIVACY_URL }); return }
+  } catch { /* fall through */ }
+  window.open(PRIVACY_URL, '_blank', 'noopener')
 }
 
 function SegItem ({ label, on, onPick }) {

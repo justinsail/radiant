@@ -427,7 +427,10 @@ code, pre, .mono { font-family: var(--font-mono); }
 .bot-head-icon { display: inline-flex; }
 .bot-head-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
 .bot-head-count { font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); }
-.bot-new { border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); width: 20px; height: 20px; border-radius: 6px; font-size: 14px; line-height: 1; display: grid; place-items: center; }
+/* The glyph is an SVG now, so no font metric can push it off centre; the flex
+   centring below is exact because the child has real dimensions. */
+.bot-new { border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); width: 20px; height: 20px; border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; }
+.bot-new svg { display: block; }
 .bot-new:hover { border-color: var(--accent-dim); color: var(--accent); }
 .bot-group .session-item { margin-left: 8px; }
 

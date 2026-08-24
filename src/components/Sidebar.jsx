@@ -197,7 +197,16 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                     <span className='bot-head-name'>{a.name}</span>
                     <span className='bot-head-count'>{own.length}</span>
                   </button>
-                  <button className='bot-new' title={`New session with ${a.name}`} onClick={() => onNew(a.id)}>+</button>
+                  {/* ⚠️ DRAWN, NOT TYPED. A "+" character is not centred on its
+                      em box — it sits on the font's mathematical axis, above the
+                      middle — so `place-items: center` centres the LINE BOX and
+                      the ink still lands high. It looked off, because it was.
+                      Two strokes on an exact grid cannot drift with the font. */}
+                  <button className='bot-new' title={`New session with ${a.name}`} onClick={() => onNew(a.id)} aria-label={`New session with ${a.name}`}>
+                    <svg viewBox='0 0 12 12' width='11' height='11' aria-hidden='true'>
+                      <path d='M6 2.5v7M2.5 6h7' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' />
+                    </svg>
+                  </button>
                 </div>
                 {!isCollapsed && own.map(s => <SessionRow key={s.id} s={s} showAgent={false} />)}
               </div>

@@ -79,5 +79,17 @@ const blocksOnMemory = /disabled = downloading \|\| busyElsewhere \|\| blocked \
 is('the Read me and the code agree on whether a red model can be downloaded',
   readme.includes('cannot be downloaded'), blocksOnMemory)
 
+// ⚠️ THE PRIVACY URL MUST KEEP ITS .html, AND MUST EXIST AT ALL. Apple requires
+// it reachable from the binary, and templetongroup.dev answers 200 for unknown
+// paths while serving the HOMEPAGE — so dropping ".html" for tidiness would
+// leave a link that looks fine, returns 200, and shows a reviewer the wrong
+// page. Verified live once: /showcase/radiant/privacy is 327 KB of homepage,
+// /showcase/radiant/privacy.html is the real 7 KB policy.
+const settingsSrc = readFileSync('src/mobile/SettingsScreen.jsx', 'utf8')
+const purl = settingsSrc.match(/PRIVACY_URL = '([^']+)'/)?.[1]
+is('the app carries a privacy policy URL', !!purl, true)
+is('and it keeps the .html that makes it real', /\.html$/.test(purl || ''), true)
+is('and the app links to it', settingsSrc.includes('Privacy policy'), true)
+
 console.log(`${pass}/${pass + fail} passed  ·  Read me checked against the code`)
 process.exit(fail ? 1 : 0)
