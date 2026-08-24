@@ -124,8 +124,7 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     /// Bytes currently on disk for a model. Walking the directory is cheap next
     /// to a multi-gigabyte download, and unlike a progress callback it cannot
     /// fail to fire.
-    private func bytesOnDisk(for repo: String) -> Int64 {
-        guard let dir = cacheDir(for: repo) else { return 0 }
+    private func size(of dir: URL) -> Int64 {
         let fm = FileManager.default
         guard let en = fm.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey],
                                      options: [.skipsHiddenFiles]) else { return 0 }
@@ -134,6 +133,26 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             let sz = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
             total += Int64(sz)
         }
+        return total
+    }
+
+    /// Bytes landed for a model — INCLUDING the one still in flight.
+    ///
+    /// ⚠️ THE BIG FILE IS NOT IN THE CACHE DIRECTORY WHILE IT DOWNLOADS.
+    /// swift-huggingface fetches each blob with `URLSession.download(for:delegate:)`,
+    /// which writes to a temporary file and only moves it into `blobs/` on
+    /// completion (HubClient+Files.swift, "Download or resume into incomplete
+    /// blob until success"). So watching only the cache directory shows the few
+    /// small config files land — about 2% of a Llama — then nothing at all for
+    /// the entire 663 MB, then everything at once. Which is exactly what Tony
+    /// saw: "went to 2% stayed there whole time and then went to 100%".
+    ///
+    /// The app's own tmp/ is where that in-flight file lives, and it is
+    /// otherwise empty in this app, so its size IS the current transfer.
+    private func bytesOnDisk(for repo: String) -> Int64 {
+        var total: Int64 = 0
+        if let dir = cacheDir(for: repo) { total += size(of: dir) }
+        total += size(of: FileManager.default.temporaryDirectory)
         return total
     }
 

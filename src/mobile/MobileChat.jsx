@@ -779,7 +779,8 @@ const CSS = `
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   touch-action: manipulation;
 }
-@media (prefers-color-scheme: dark) { .rx-chat { --rx-mat: rgba(30,30,30,0.72); } }
+/* keyed off the app's mode, NOT the phone's — see data-rx-dark in theme.js */
+.is-native[data-rx-dark='true'] .rx-chat { --rx-mat: rgba(30,30,30,0.72); }
 /* :where() so the reset carries zero specificity and any single class below
    beats it — otherwise \`.rx-chat button\` quietly out-ranks \`.rx-chat-back\`
    and every tinted control comes out black. */

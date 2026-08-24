@@ -76,6 +76,13 @@ function syncNativeChrome () {
   const root = document.documentElement
   const mode = root.getAttribute('data-rx-mode')
   const dark = mode === 'dark' || (mode === 'system' && root.getAttribute('data-rx-system') === 'dark')
+  // ⚠️ THE flag every stylesheet keys off. src/mobile is three stylesheets —
+  // mobile.css plus the ones MobileChat and ModelPicker inject — and they used
+  // to decide dark independently from `prefers-color-scheme`. The moment mode
+  // became a choice rather than the system's, those two stopped agreeing with
+  // the rest of the app: on a light phone set to Dark, the chat kept a light
+  // nav bar and composer over a black transcript. One flag, written here.
+  root.setAttribute('data-rx-dark', dark ? 'true' : 'false')
   const bar = window.Capacitor?.Plugins?.StatusBar
   // Style.Dark means DARK CONTENT on a light bar, which is the opposite of what
   // the name suggests. Getting this backwards is the classic iOS mistake.

@@ -249,10 +249,10 @@
    to BEAT the system: someone who picks Dark on a light phone gets dark.
    Default is dark — Tony: "it should also always start in dark mode" — which
    theme.js applies before first paint. */
-.is-native:is([data-rx-mode='light'], [data-rx-mode='system'][data-rx-system='light']) {
+.is-native[data-rx-dark='false'] {
   color-scheme: light;
 }
-.is-native:is([data-rx-mode='dark'], [data-rx-mode='system'][data-rx-system='dark']) {
+.is-native[data-rx-dark='true'] {
   color-scheme: dark;
     /* only the LIGHTNESS differs by mode — brighter on black, deeper on white */
     --rx-tint: oklch(0.72 var(--rx-accent-c) var(--rx-accent-h));

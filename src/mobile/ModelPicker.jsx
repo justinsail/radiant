@@ -98,8 +98,8 @@ const CSS = `
   -webkit-tap-highlight-color:transparent; touch-action:manipulation;
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
-@media (prefers-color-scheme:dark){
-  .rx-mp{
+/* keyed off the app's mode, NOT the phone's — see data-rx-dark in theme.js */
+.is-native[data-rx-dark='true'] .rx-mp{
     --mp-bg:var(--rx-bg-grouped,#000000);
     --mp-cell:var(--rx-cell,#1C1C1E);
     --mp-sep:var(--rx-separator,rgba(84,84,88,0.65));
@@ -117,7 +117,7 @@ const CSS = `
     --mp-red:var(--rx-red-text,#FF453A);
     --mp-green:var(--rx-green,#30D158);
   }
-}
+
 
 /* the scroller bounces (a list that cannot rubber-band feels dead) but never
    shows a bar — a visible scrollbar is a webview tell */
