@@ -23,10 +23,25 @@ const SECTIONS = [
     ]
   },
   {
+    title: 'Home',
+    body: [
+      'Home is where the app opens: the logo, a greeting, and one button to start talking. Under it, Recent lists the conversations you have had, newest first — tap one to pick it up where you left off, or Delete to remove it.',
+      'If you would rather land straight back in the last thing you were saying, Settings → Open to will do that instead.'
+    ]
+  },
+  {
+    title: 'Your conversations',
+    body: [
+      'Every conversation is kept, named after the first thing you asked, and listed on Home. They stay on the phone — they are not synced anywhere and nobody else can read them.',
+      'Inside a chat, the ⋯ menu deletes the one you are in.'
+    ]
+  },
+  {
     title: 'Choosing a model',
     body: [
-      'Bigger models answer better and need more room and more battery. Qwen 3 1.7B is the one to start with on most iPhones; Qwen 3 4B is noticeably smarter but wants a Pro with headroom.',
-      'Tap any model to see it in detail, then Download. The logo turns beside its name while it works, and shows how far along it is.'
+      'There are forty-four to choose from, grouped by who made them — Google, Meta, Mistral, Microsoft, IBM, Alibaba, NVIDIA and more. Tap a name to open that shelf; tap it again to close it.',
+      'Every model is labeled for THIS iPhone. Green runs well. Amber runs, but close to the limit — expect it to be slow, and to reload when you switch apps. Red will not run at all, and cannot be downloaded, because your phone does not have the memory to load it.',
+      'That label is about memory, not storage, and they are different questions: a phone can easily have room for a file it cannot then run. Bigger models answer better and use more battery. Qwen 3 1.7B is a good place to start on any recent iPhone.'
     ]
   },
   {
@@ -39,7 +54,14 @@ const SECTIONS = [
   {
     title: 'Freeing up space',
     body: [
-      'Settings → Models lists everything on the phone and what it weighs. Tap a model to remove it, or remove all of them at once. Removing a model does not delete your conversation.'
+      'Settings → Models lists everything on the phone and what it weighs. Tap a model to remove it, or Remove all models to clear them at once. Removing a model does not delete your conversations.'
+    ]
+  },
+  {
+    title: 'Models in the cloud',
+    body: [
+      'Settings → Providers connects Radiant to Anthropic, OpenAI, OpenRouter, xAI, Nous, DeepSeek, Kimi, GLM, Groq or Mistral with your own API key. That is how to reach the models too large to run on a phone.',
+      'Your key is held in the iPhone Keychain and used by the app itself — it is never stored in the web layer, and never shown again after you enter it. These requests do go over the network, unlike a model running on the phone.'
     ]
   },
   {
@@ -52,7 +74,8 @@ const SECTIONS = [
     title: 'How it looks',
     body: [
       'Settings → Appearance chooses Dark, Medium, Light, or System — Medium is dark without the true black, and System follows your phone. Radiant opens dark unless you change it.',
-      'Settings → Color carries the same themes as the Mac app. The color runs through everything: buttons, the glow behind the logo, and the ring while a model downloads. The welcome screen stays dark whichever you pick, because it is built against black.'
+      'Settings → Color carries the same themes as the Mac app. The color runs through everything: buttons, the glow behind the logo, and the ring while a model downloads. The welcome screen stays dark whichever you pick, because it is built against black.',
+      'Settings → Text size sets the size of everything on top of whatever you have chosen in iOS Settings, so you can make Radiant larger without changing every other app.'
     ]
   }
 ]
