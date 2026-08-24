@@ -48,6 +48,7 @@ import * as GetModelSheetMod from './GetModelSheet.jsx'
 import * as FirstRunMod from './FirstRun.jsx'
 import SettingsScreen from './SettingsScreen.jsx'
 import ReadMeScreen from './ReadMeScreen.jsx'
+import ProvidersScreen from './ProvidersScreen.jsx'
 import { loadAppearance, applyAppearance } from './theme.js'
 import * as useLocalModelsMod from './useLocalModels.js'
 import * as hapticsMod from './haptics.js'
@@ -336,7 +337,8 @@ const SCREENS = {
   chat: { title: '', large: false, scroll: false, bg: 'plain', bare: true },
   connect: { title: 'Connect to a Mac', large: false, scroll: true, bg: 'grouped' },
   settings: { title: 'Settings', large: true, scroll: true, bg: 'grouped' },
-  readme: { title: 'Read me', large: false, scroll: true, bg: 'grouped' }
+  readme: { title: 'Read me', large: false, scroll: true, bg: 'grouped' },
+  providers: { title: 'Providers', large: false, scroll: true, bg: 'grouped' }
 }
 
 const BG = {
@@ -1040,6 +1042,8 @@ export default function MobileShell () {
         return <ConnectMac {...common} onConnected={pop} />
       case 'readme':
         return <ReadMeScreen {...common} />
+      case 'providers':
+        return <ProvidersScreen {...common} />
       case 'settings':
         return (
           <SettingsScreen
@@ -1048,6 +1052,7 @@ export default function MobileShell () {
             onAppearance={setAppearance}
             onConnectMac={connectMac}
             onReadMe={() => push('readme', {})}
+            onProviders={() => push('providers', {})}
             version={typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : null}
           />
         )

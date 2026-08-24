@@ -53,7 +53,7 @@ function Swatch ({ theme, selected, onPick }) {
 }
 
 export default function SettingsScreen ({
-  appearance, onAppearance, local = {}, models = [], onConnectMac, onReadMe, version
+  appearance, onAppearance, local = {}, models = [], onConnectMac, onReadMe, onProviders, version
 }) {
   const [busy, setBusy] = useState(false)
   const downloaded = models.filter(m => m?.downloaded)
@@ -123,6 +123,15 @@ export default function SettingsScreen ({
       {downloaded.length === 0 && (
         <p className="rx-section-footer">Nothing downloaded yet.</p>
       )}
+
+      <h2 className="rx-section-header">Providers</h2>
+      <div className="rx-group">
+        <Row label="API keys" onTap={onProviders} />
+      </div>
+      <p className="rx-section-footer">
+        Bring your own key for Anthropic, OpenAI, OpenRouter and others. Kept in
+        the iPhone&rsquo;s Keychain.
+      </p>
 
       <h2 className="rx-section-header">Your Mac</h2>
       <div className="rx-group">

@@ -1912,3 +1912,58 @@
   color: var(--rx-label-2);
 }
 
+/* ═══ providers ════════════════════════════════════════════════════════════ */
+.is-native .rx-provider-intro { margin-top: 4px; }
+.is-native .rx-provider-on {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font: -apple-system-subheadline;
+  color: var(--rx-tint);
+}
+.is-native .rx-provider-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 16px 14px;
+}
+.is-native .rx-field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--rx-fill-3, rgba(120,120,128,0.16));
+  color: var(--rx-label);
+  /* 17px minimum or iOS zooms the whole page when the field takes focus */
+  font: -apple-system-body;
+}
+.is-native .rx-provider-error {
+  margin: 0;
+  font: -apple-system-footnote;
+  color: var(--rx-destructive, #FF453A);
+}
+.is-native .rx-provider-buttons { display: flex; gap: 10px; }
+.is-native .rx-provider-save {
+  flex: 1 1 auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--rx-tint);
+  color: var(--rx-on-tint);
+  font: -apple-system-headline;
+}
+.is-native .rx-provider-save.is-pressed,
+.is-native .rx-provider-forget.is-pressed { opacity: 0.6; }
+.is-native .rx-provider-forget {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 10px;
+  color: var(--rx-destructive, #FF453A);
+  font: -apple-system-body;
+}
+

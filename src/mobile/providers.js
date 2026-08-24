@@ -1,0 +1,74 @@
+/**
+ * The providers a phone can actually reach, mirrored from the Mac's list in
+ * server/config.js so the two cannot drift.
+ *
+ * WHAT IS DELIBERATELY MISSING, and why — an app that lists something it cannot
+ * do is worse than one that lists less:
+ *  · Ollama and LM Studio are localhost servers. On a phone there is no
+ *    localhost worth talking to; reach them by connecting to your Mac.
+ *  · ChatGPT Plus and GitHub Copilot sign in with an OAuth flow that redirects
+ *    to a port on the machine running it. A phone cannot listen on one, so
+ *    those subscriptions are a Mac-connection feature, not a phone feature.
+ *  · Claude Pro/Max (paste) and Nous Portal (device code) COULD work on iOS and
+ *    are not built yet. They are listed as pending, not offered.
+ *
+ * Everything here is a plain API key over HTTPS, which a phone does fine.
+ */
+export const PROVIDERS = [
+  { id: 'anthropic', name: 'Anthropic', baseUrl: 'https://api.anthropic.com',
+    hint: 'Claude models. Key from console.anthropic.com.', prefix: 'sk-ant-' },
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1',
+    hint: 'GPT models. Key from platform.openai.com.', prefix: 'sk-' },
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',
+    hint: 'Hundreds of models behind one key. openrouter.ai/keys.', prefix: 'sk-or-' },
+  { id: 'xai', name: 'xAI (Grok)', baseUrl: 'https://api.x.ai/v1',
+    hint: 'Grok models. Key from console.x.ai.', prefix: 'xai-' },
+  { id: 'nousresearch', name: 'Nous Portal', baseUrl: 'https://inference-api.nousresearch.com/v1',
+    hint: 'Hermes models. Key from portal.nousresearch.com → API Keys.' },
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com',
+    hint: 'deepseek-chat and deepseek-reasoner. platform.deepseek.com.' },
+  { id: 'moonshot', name: 'Kimi (Moonshot)', baseUrl: 'https://api.moonshot.ai/v1',
+    hint: 'Kimi models. platform.moonshot.ai.' },
+  { id: 'zai', name: 'GLM (Z.ai)', baseUrl: 'https://api.z.ai/api/paas/v4',
+    hint: 'GLM-4.6 and 4.5. Works with the GLM Coding Plan.' },
+  { id: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1',
+    hint: 'Very fast open models. console.groq.com.', prefix: 'gsk_' },
+  { id: 'mistral', name: 'Mistral', baseUrl: 'https://api.mistral.ai/v1',
+    hint: 'Mistral and Codestral. console.mistral.ai.' }
+]
+
+const SS = () => (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.SecureStore : null)
+
+/** Which providers have a key. Names only — the keys never enter the web layer. */
+export async function connectedProviders () {
+  const ss = SS()
+  if (!ss?.keys) return []
+  try { return (await ss.keys())?.keys || [] } catch { return [] }
+}
+
+export async function saveKey (id, value) {
+  const ss = SS()
+  if (!ss?.set) throw new Error('Secure storage is unavailable on this device.')
+  await ss.set({ key: id, value: value.trim() })
+}
+
+export async function removeKey (id) {
+  const ss = SS()
+  if (!ss?.remove) return
+  await ss.remove({ key: id })
+}
+
+/**
+ * A shape check, not a validity check. It catches the overwhelmingly common
+ * mistake — pasting the wrong provider's key, or a fragment — without claiming
+ * the key works, which only the vendor can tell us.
+ */
+export function looksWrong (provider, value) {
+  const v = (value || '').trim()
+  if (v.length < 16) return 'That looks too short to be a key.'
+  if (/\s/.test(v)) return 'That has a space in it — check the paste.'
+  if (provider.prefix && !v.startsWith(provider.prefix)) {
+    return `${provider.name} keys start with ${provider.prefix}`
+  }
+  return null
+}
