@@ -284,9 +284,13 @@ def build(_a, _b, name):
     block = mark_w + gap + word_h
     top = (SIDE - block) // 2 - int(SIDE * 0.03)
 
-    # The halo hugs the swirl instead of filling it: inner edge just inside the
-    # ring of the mark, outer edge well past it.
-    ring(W / 2, top + mark_w / 2, mark_w * 0.34, mark_w * 1.55, HALO, 0.34)
+    # ⚠️ NO HALO BEHIND THE MARK. Tony: "remove the glow from the splash screen
+    # completely." Two rounds of tuning it — disc, then ring, then a softer ring
+    # — and the answer was that the logo does not want a light behind it at all.
+    # The three atmospheric washes above stay: those are the site's sky, and the
+    # blue "with glow here and there" he asked for. This was the one sitting on
+    # the lockup. `ring()` is kept because it is the only thing that draws a glow
+    # without filling the swirl's hollow centre, should one ever be wanted again.
     _, dh = place(MARK, mark_w, W / 2, top)
     place(WORD, word_w, W / 2, top + dh + gap)
 

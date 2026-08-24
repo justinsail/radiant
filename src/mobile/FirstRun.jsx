@@ -40,7 +40,10 @@ export default function FirstRun ({ onChooseModel, onConnectMac, onStartChat, ha
 
       <div className="rx-intro-stage">
         <span className="rx-intro-mark">
-          <span className="rx-intro-halo" aria-hidden="true" />
+          {/* No halo. Tony: "remove the glow from the splash screen
+              completely." The launch image has none either, and these two are
+              the same frame — a glow on one and not the other would show as a
+              flash at the handoff. */}
           {/* masked, so it follows the theme like every other mark */}
           <BrandMark size={132} className="rx-intro-mark-img" />
         </span>
