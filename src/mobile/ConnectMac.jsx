@@ -22,8 +22,12 @@ export default function ConnectMac ({ onConnected }) {
     setBusy(true)
     setError(null)
     try {
-      await testServer(address, token.trim())
-      setServer({ base: address, token: token.trim() })
+      // testServer returns the NORMALIZED address — what was actually reached,
+      // which is not always what was typed (a bare hostname gains https://).
+      // Storing the raw input instead would save an address that works only by
+      // accident.
+      const reached = await testServer(address, token.trim())
+      setServer({ base: reached, token: token.trim() })
       onConnected?.()
     } catch (e) {
       setError(e?.message || 'Could not reach that Mac.')

@@ -69,27 +69,112 @@ export async function connectHere (token) {
   setServer({ base: '', token })
   return true
 }
+/**
+ * Normalize what someone typed into an address we can actually fetch.
+ *
+ * ⚠️ A BARE HOSTNAME IS THE DANGEROUS CASE, not an obviously wrong one. Typed
+ * without a scheme, `mac.tailnet.ts.net` makes `fetch()` build a RELATIVE url —
+ * which on the phone resolves against `radiant://localhost/`, hits the app's own
+ * bundled server, and gets the SPA fallback: index.html, with status 200. The
+ * old check was `res.ok`, so that read as a successful connection to a Mac that
+ * was never contacted. Assume https rather than fail, since that is what the
+ * user meant, and make the http case an explicit refusal.
+ */
+function normalizeBase (raw) {
+  const v = String(raw || '').trim().replace(/\/+$/, '')
+  if (!v) throw new Error('Enter the address of the Mac running Radiant.')
+  if (/^http:\/\//i.test(v)) {
+    throw new Error('That address is http. Radiant needs https — Tailscale Serve puts a real certificate in front of it.')
+  }
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? v : 'https://' + v
+  if (!/^https:\/\//i.test(withScheme)) throw new Error('Use an https address.')
+  try { new URL(withScheme) } catch { throw new Error('That does not look like a web address.') }
+  return withScheme
+}
+
+/**
+ * Can we reach a Radiant on that Mac, and is it really Radiant?
+ *
+ * ⚠️ IT MUST TIME OUT. Tony, out of the house: "i entered info clicked connect
+ * and nothing happened." A bare fetch to a Mac that is asleep, or to a Tailscale
+ * name that does not resolve off the tailnet, does not fail fast — iOS will sit
+ * on it for a minute or more. The button said "Connecting…" and the app looked
+ * dead. Any network call the user is WAITING ON needs a deadline shorter than
+ * their patience.
+ *
+ * ⚠️ AND `res.ok` IS NOT PROOF. See normalizeBase: the app's own server answers
+ * 200 with HTML. The body has to parse as Radiant's config before this returns
+ * true.
+ */
+const TEST_TIMEOUT_MS = 12000
+
 export async function testServer (base, token) {
+  const url = normalizeBase(base)
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), TEST_TIMEOUT_MS)
   let res
   try {
-    res = await fetch(String(base).replace(/\/$/, '') + '/api/config', {
+    res = await fetch(url + '/api/config', {
       headers: token ? { 'x-radiant-token': token } : {},
-      credentials: 'same-origin'
+      credentials: 'same-origin',
+      signal: ctl.signal
     })
-  } catch {
+  } catch (e) {
+    if (e?.name === 'AbortError') {
+      throw new Error(`No answer from that Mac after ${TEST_TIMEOUT_MS / 1000} seconds. It is probably asleep, or you are not on the tailnet right now.`)
+    }
     throw new Error("Couldn't reach that server. Check the address is right, Radiant is running and shared on the host (v0.6.9+), and both devices are on Tailscale.")
+  } finally {
+    clearTimeout(timer)
   }
   if (res.status === 401) throw new Error('Reached the server, but the access token is wrong or missing.')
   if (!res.ok) throw new Error(`Server responded ${res.status}`)
-  return true
+  // Prove it is Radiant and not this app's own index.html.
+  let cfg
+  try { cfg = await res.json() } catch {
+    throw new Error('Something answered at that address, but it is not Radiant.')
+  }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
+    throw new Error('Something answered at that address, but it is not Radiant.')
+  }
+  return url
 }
 
+/**
+ * ⚠️ REST CALLS GET A DEADLINE. Same lesson as testServer: when the Mac at the
+ * other end goes to sleep mid-session, a bare fetch does not fail — iOS holds
+ * the connection for a minute or more and the UI just stops. Every screen that
+ * awaits this shows a spinner, so a hang here is indistinguishable from a bug.
+ *
+ * ⚠️ NOT APPLIED TO STREAMING. /api/chat and the download endpoints are
+ * deliberately separate fetch calls below: a token stream legitimately runs for
+ * minutes, and a total-duration timeout would cut off long answers. Those need
+ * a connection deadline rather than a total one — noted, not yet done.
+ *
+ * 30s is generous for any REST call this talks to, and far short of the silent
+ * minute-plus iOS would otherwise spend.
+ */
+const REST_TIMEOUT_MS = 30000
+
 async function json (method, path, body) {
-  const res = await fetch(apiUrl(path), {
-    method,
-    headers: authHeaders(body ? { 'content-type': 'application/json' } : {}),
-    body: body ? JSON.stringify(body) : undefined
-  })
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), REST_TIMEOUT_MS)
+  let res
+  try {
+    res = await fetch(apiUrl(path), {
+      method,
+      headers: authHeaders(body ? { 'content-type': 'application/json' } : {}),
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctl.signal
+    })
+  } catch (e) {
+    if (e?.name === 'AbortError') {
+      throw new Error('The Mac stopped answering. It may have gone to sleep, or you may have left the tailnet.')
+    }
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) {
     let msg = `${res.status}`
     try { msg = (await res.json()).error || msg } catch {}

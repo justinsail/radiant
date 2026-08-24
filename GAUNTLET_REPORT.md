@@ -1,6 +1,57 @@
 # Radiant for iPhone — App Store Submission Gauntlet
 
-**Pass 2 (final)** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
+**Pass 3** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
+
+---
+
+## ⚠️ Pass 2 was wrong, and here is why
+
+Tony connected to his Mac from outside the house, pressed Connect, and nothing
+happened. **The gauntlet had passed that code.** It should not have.
+
+**The mistake was mine, and it was a process mistake, not an unlucky miss.**
+Station 5 asks for two different kinds of check:
+
+- things that need a device — cold launch, memory, real flows;
+- things that are pure code reading — *"every network call handles offline mode,
+  timeouts, and server errors with a user-facing message, not a spinner forever
+  or a silent failure."*
+
+The iPhone was unreachable, so I marked the **whole station BLOCKED** and moved
+on. The network-error requirement needed no device at all. **A BLOCKED status
+swallowed a check that was never blocked**, and that is exactly where the bug was
+sitting.
+
+Two defects were in that code:
+
+1. **`testServer` had no timeout.** A Mac that is asleep, or a tailnet name that
+   does not resolve when you are away, does not fail fast — iOS holds the
+   connection for a minute or more. The button said "Connecting…" and the app
+   looked dead. That is precisely "nothing happened".
+2. **A bare hostname silently connected to nothing.** Typed without a scheme,
+   `mac.tailnet.ts.net` makes `fetch()` build a *relative* URL, which on the
+   phone resolves against the app's own bundled server and returns index.html
+   with **status 200**. The check was `res.ok`, so that read as success.
+
+And a third thing, which is the one that should sting: **the screen's own footer
+promised "a plain http address is blocked before it leaves the app" — and no
+such check existed anywhere.** I read that sentence during Station 8 and marked
+"no broken claims" as PASS without verifying it against the code. The Read me has
+a gate that catches exactly this class of lie. No other user-facing copy did.
+
+**What I changed in the process, not just the code:**
+
+- Station 5 is now split. A station is only BLOCKED for the checks that actually
+  need the blocked resource; everything else in it still runs.
+- `scripts/test-connect.mjs` — 10 assertions covering every failure mode above,
+  including that an unreachable Mac gives up in under 15 seconds. Wired into
+  `test-all.sh`.
+- I re-audited **every** network call the phone can make. Only 1 of 8 had a
+  deadline. `json()`, the generic REST helper behind most Mac calls, now has one
+  too. Streaming is deliberately excluded — a token stream legitimately runs for
+  minutes, and a total-duration timeout would truncate long answers. That one
+  needs a *connection* deadline rather than a total one, and is listed as
+  outstanding rather than quietly done.
 
 ---
 
@@ -35,7 +86,7 @@ is actually published somewhere.
 | 2 | Signing, capabilities, entitlements | **PASS** |
 | 3 | Info.plist and privacy | **PASS** (4 fixed in pass 1) |
 | 4 | Assets and app icon | **PASS** (1 finding) |
-| 5 | Runtime behaviour | **BLOCKED** (device offline) |
+| 5 | Runtime behaviour | **FAIL in pass 2 — fixed in pass 3** · device test still BLOCKED |
 | 6 | Accounts, login, data handling | **PASS** (1 fixed) · 1 **BLOCKED** |
 | 7 | Payments and monetisation | **PASS** (not applicable) |
 | 8 | Content and guideline compliance | **PASS** (1 risk noted) |
