@@ -56,6 +56,27 @@ Confirm with `spctl -a -vv -t install release/mac-arm64/Radiant.app` ("accepted,
 Notarized Developer ID"). Commit messages and release notes with apostrophes or
 backticks break shell heredocs — write them to a file and use `-F` / `--notes-file`.
 
+## Every release also updates the website
+
+The download page is part of shipping, not a follow-up:
+
+```bash
+cp release/Radiant-<v>-arm64.dmg /tmp/radiant.dmg
+gh release upload v<v> /tmp/radiant.dmg --clobber      # stable-named asset
+```
+
+Then in `~/Projects/templeton-group-dev-website`: set
+`showcase/radiant/version.json` to the new version and size, and update the
+`js-version` / `js-size` fallbacks in `showcase/radiant/index.html` so a failed
+fetch cannot show a stale number. Push to `main` (auto-deploys in ~10s) and
+verify the live URL.
+
+⚠️ The DMG is gitignored — 124 MB, past GitHub's file limit — so it never
+travels through git. The page links to
+`releases/latest/download/radiant.dmg`, which is why that stable-named asset
+has to be uploaded on every release. Skipping it is how the site once
+advertised 0.6.74 while 0.6.100 was current.
+
 ## Sharp edges
 
 - **Two icons, not one.** `build/icon.png` + `build/icon.icns` is the Mac Dock
