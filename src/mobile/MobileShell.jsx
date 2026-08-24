@@ -1042,7 +1042,16 @@ export default function MobileShell () {
 
   const renderScreen = (entry) => {
     const { setChrome } = bindings(entry.key)
-    const common = { nav, local, models, setChrome, ...entry.props }
+    // `isTop` is how a screen knows it has been RETURNED to. A pushed layer
+    // does not unmount the one beneath it, so a screen that loads a list on
+    // mount will still be showing that list minutes later — which is why a chat
+    // started and left did not appear on Home. Anything that reads storage
+    // needs to re-read when this flips back to true.
+    const common = {
+      nav, local, models, setChrome,
+      isTop: entry.key === topKey && !popping,
+      ...entry.props
+    }
     switch (entry.route) {
       case 'chat':
         return (
@@ -1079,6 +1088,7 @@ export default function MobileShell () {
             onConnectMac={connectMac}
             onReadMe={() => push('readme', {})}
             onProviders={() => push('providers', {})}
+            onGetModels={() => push('models', {})}
             version={typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : null}
           />
         )

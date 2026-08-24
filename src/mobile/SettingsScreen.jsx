@@ -73,7 +73,8 @@ function Swatch ({ theme, selected, onPick }) {
 }
 
 export default function SettingsScreen ({
-  appearance, onAppearance, local = {}, models = [], onConnectMac, onReadMe, onProviders, version
+  appearance, onAppearance, local = {}, models = [], onConnectMac, onReadMe, onProviders,
+  onGetModels, version
 }) {
   const [busy, setBusy] = useState(false)
   const downloaded = models.filter(m => m?.downloaded)
@@ -170,6 +171,9 @@ export default function SettingsScreen ({
       <h2 className="rx-section-header">Models</h2>
       <div className="rx-group">
         <Row label="On this iPhone" value={`${downloaded.length} · ${fmt(used)}`} />
+        {/* the way OUT of this screen to the one that adds a model — Settings
+            listed what you had and offered no route to getting more */}
+        <Row label="Download a model" onTap={onGetModels} />
         {/* Each model can be removed on its own — but the row does NOT delete
             on tap. It used to, looking exactly like the inert row above it,
             with no confirmation and no undo. The delete is its own labelled,

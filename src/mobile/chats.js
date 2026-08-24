@@ -22,8 +22,25 @@ const read = () => {
   } catch { return [] }
 }
 
+/**
+ * Every write announces itself.
+ *
+ * ⚠️ DO NOT make a screen's freshness depend on navigation. Home sits mounted
+ * underneath the chat that is pushed over it, so it never remounts on the way
+ * back and a list read at mount is what stays on screen — which is exactly how
+ * a chat you had just started failed to appear. Tying the refresh to "the pop
+ * animation finished" would make correctness depend on a transition. The store
+ * tells its readers instead, the moment the data actually changes.
+ */
 const write = (rows) => {
   try { localStorage.setItem(KEY, JSON.stringify(rows.slice(0, MAX))) } catch { /* private mode */ }
+  try { window.dispatchEvent(new CustomEvent('rx:chats-changed')) } catch { /* SSR */ }
+}
+
+/** Subscribe to conversation changes. Returns an unsubscribe. */
+export function onChatsChanged (fn) {
+  window.addEventListener('rx:chats-changed', fn)
+  return () => window.removeEventListener('rx:chats-changed', fn)
 }
 
 /** Newest first. Metadata only — enough to draw a list without parsing every turn. */

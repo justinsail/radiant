@@ -13,7 +13,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import usePress from './usePress.js'
 import { BrandMark } from './BrandSpinner.jsx'
-import { listChats, deleteChat, whenLabel } from './chats.js'
+import { listChats, deleteChat, whenLabel, onChatsChanged } from './chats.js'
 
 /** Time of day, because a greeting that never changes stops being one. */
 function greeting () {
@@ -48,20 +48,24 @@ function ChatRow ({ chat, onOpen, onRemove }) {
 }
 
 export default function HomeScreen ({
-  activeModel, models = [], onStartChat, onOpenChat, onChooseModel, onConnectMac
+  activeModel, models = [], isTop, onStartChat, onOpenChat, onChooseModel, onConnectMac
 }) {
   const [chats, setChats] = useState(() => listChats())
   const refresh = useCallback(() => setChats(listChats()), [])
 
-  // coming back from a conversation should show it at the top, updated
+  // The store tells us the moment a conversation is written, so this does not
+  // depend on a pop animation finishing or on this screen remounting — neither
+  // of which happens when you come back from a chat.
+  useEffect(() => onChatsChanged(refresh), [refresh])
+
+  // and belt-and-braces: re-read whenever this screen is on top again
+  useEffect(() => { if (isTop) refresh() }, [isTop, refresh])
+
+  // and when the whole app comes back from the background
   useEffect(() => {
     const onVis = () => { if (!document.hidden) refresh() }
     document.addEventListener('visibilitychange', onVis)
-    window.addEventListener('focus', refresh)
-    return () => {
-      document.removeEventListener('visibilitychange', onVis)
-      window.removeEventListener('focus', refresh)
-    }
+    return () => document.removeEventListener('visibilitychange', onVis)
   }, [refresh])
 
   const remove = useCallback((chat) => {
