@@ -8,6 +8,7 @@ run "download math"  bash scripts/test-download-math.sh
 run "fit verdicts"   node scripts/test-fit.mjs
 run "model catalog"  node scripts/test-catalog.mjs
 run "read me"        node scripts/test-readme.mjs
+run "plugin bridge"  node scripts/test-bridge.mjs
 printf '\n'
 if [ "$fail" -ne 0 ]; then echo "SOME GATES FAILED"; exit 1; fi
 echo "ALL GATES GREEN"

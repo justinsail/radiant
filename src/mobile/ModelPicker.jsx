@@ -3,6 +3,7 @@ import * as GaugeModule from './Gauge.jsx'
 import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
 import { fitOf, FIT_LABEL, FITS_NO, ramNeededGB } from './fit.js'
 import MakerSection from './MakerSection.jsx'
+import DeviceSpecs from './DeviceSpecs.jsx'
 import { byMaker } from './makers.js'
 
 // Picking a model is the first thing a new user does, so this screen has one
@@ -696,6 +697,11 @@ export default function ModelPicker ({
               onCommit={() => commit(hero)}
             />
           )}
+
+          {/* What this phone is, and therefore why the verdicts below read as
+              they do. Above the list because it is the frame for everything in
+              it, not a detail underneath. */}
+          <DeviceSpecs freeBytes={freeBytes} />
 
           {groups.map(({ maker, models: rows }) => {
             const open = openMakers.has(maker)

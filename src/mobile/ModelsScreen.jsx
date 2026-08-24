@@ -52,6 +52,7 @@ import StorageLine from './StorageLine.jsx'
 import usePress from './usePress.js'
 import { FIT_LABEL, FITS_NO, ramNeededGB } from './fit.js'
 import MakerSection from './MakerSection.jsx'
+import DeviceSpecs from './DeviceSpecs.jsx'
 import { byMaker } from './makers.js'
 import { GB } from './useLocalModels.js'
 
@@ -330,6 +331,8 @@ export default function ModelsScreen ({
             have now." Forty-four rows in one column is unreadable; fourteen
             headers is a contents page. Same idiom as the Mac's Settings →
             Models, where each repo sits behind a triangle. */}
+        <DeviceSpecs freeBytes={disk?.free} />
+
         {byMaker(models).map(({ maker, models: rows }) => {
           const open = openMakers.has(maker)
           const runnable = ramAvailable ? rows.filter(m => fitOfModel(m) !== FITS_NO).length : null

@@ -1778,13 +1778,34 @@
   animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 700ms forwards;
 }
 /* the smallest thing on the screen, and the last to arrive */
+/* The site's footer, at the foot. radiant-site/index.html `.footer-fine`:
+   the line, the Templeton Technologies mark, centered, 16px apart. It lands
+   last in the entrance — after the buttons — because it is the credit, not the
+   offer. Like everything on this screen it runs once and holds. */
+.is-native .rx-intro-footer {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  opacity: 0;
+  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 960ms forwards;
+}
 .is-native .rx-intro-byline {
-  margin: 6px 0 0;
+  margin: 0;
   font: -apple-system-caption1;
   letter-spacing: 0.01em;
   color: oklch(0.60 0.02 var(--rx-accent-h));
-  opacity: 0;
-  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 860ms forwards;
+}
+/* 42px on the site; smaller here, because a phone's footer sits directly under
+   two buttons rather than at the end of a long page. Height-driven with auto
+   width so the lockup never distorts. */
+.is-native .rx-intro-tt {
+  height: 30px;
+  width: auto;
+  opacity: 0.9;
 }
 
 .is-native .rx-intro-actions {
@@ -1851,6 +1872,7 @@
   .is-native .rx-intro-halo,
   .is-native .rx-intro-word,
   .is-native .rx-intro-line,
+  .is-native .rx-intro-footer,
   .is-native .rx-intro-actions {
     animation-duration: 1ms;
     animation-delay: 0ms;
@@ -2219,3 +2241,27 @@
 .is-native .rx-fit.is-well{color:var(--rx-green)}
 .is-native .rx-fit.is-tight{color:var(--rx-amber)}
 .is-native .rx-fit.is-no{color:var(--rx-red-text)}
+
+/* ---- the device panel above the model list ----------------------------- */
+/* The Mac's `.spec-card`, on a phone. Three parts: what it is, what it has,
+   and what that means for the list underneath. */
+.is-native .rx-specs{
+  margin:4px 0 0; padding:14px 16px;
+  background:var(--rx-cell); border-radius:12px;
+}
+.is-native .rx-specs-name{font:-apple-system-headline}
+.is-native .rx-specs-line{
+  margin-top:3px; font:-apple-system-subheadline; color:var(--rx-label-2);
+  font-variant-numeric:tabular-nums;
+}
+/* Separated by a hairline because it is a different KIND of statement: the
+   line above is what the phone has, this is what Radiant may use. */
+.is-native .rx-specs-note{
+  margin-top:10px; padding-top:10px;
+  border-top:1px solid var(--rx-separator);
+  font:-apple-system-footnote; line-height:1.38; color:var(--rx-label-2);
+}
+.is-native .rx-specs-note b{color:var(--rx-label); font-weight:600}
+/* The three words appear here as a legend, so they must not carry the row
+   margin they have beside a model name. */
+.is-native .rx-specs-note .rx-fit{margin-left:0}

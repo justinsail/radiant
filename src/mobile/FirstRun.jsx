@@ -17,6 +17,7 @@ import React from 'react'
 import usePress from './usePress.js'
 import { BrandMark } from './BrandSpinner.jsx'
 import wordUrl from '../assets/brand/radiant-wordmark.png'
+import ttUrl from '../assets/brand/templeton-tech-mark.png'
 
 export default function FirstRun ({ onChooseModel, onConnectMac, onStartChat, hasModel }) {
   // Start Chat leads, but only when there is something to chat WITH. With an
@@ -70,9 +71,6 @@ export default function FirstRun ({ onChooseModel, onConnectMac, onStartChat, ha
           Download one and talk to it anywhere. It keeps working with no signal,
           and nothing you type leaves this device.
         </p>
-        <p className="rx-intro-byline">
-          Radiant is a Templeton&nbsp;Technologies product.
-        </p>
       </div>
 
       <div className="rx-intro-actions">
@@ -95,6 +93,33 @@ export default function FirstRun ({ onChooseModel, onConnectMac, onStartChat, ha
         >
           Connect to a Mac instead
         </button>
+      </div>
+
+      {/* The site's footer, on the app's first screen.
+          radiant-site/index.html `.footer-fine`: the line, then the Templeton
+          Technologies mark under it, centered. Tony asked for this screen to
+          carry what the web splash carries.
+
+          ⚠️ THE MARK KEEPS ITS OWN COLORS. Every other brand element here is
+          masked so it follows the user's accent — that is right for Radiant's
+          own swirl, and wrong for this: it is a different company's logo, and
+          recoloring it green-to-whatever is exactly the thing you do not do to
+          someone's mark. It is an <img>, composited as drawn.
+
+          It works on this ground because it is the SAME ground: the site sets
+          oklch(0.15 0.018 262) behind it and so does this screen, so the mark
+          is being used in the condition it was approved in. */}
+      <div className="rx-intro-footer">
+        <p className="rx-intro-byline">
+          Radiant is a Templeton&nbsp;Technologies product.
+        </p>
+        <img
+          className="rx-intro-tt"
+          src={ttUrl}
+          alt="Templeton Technologies"
+          width="844"
+          height="180"
+        />
       </div>
     </div>
   )

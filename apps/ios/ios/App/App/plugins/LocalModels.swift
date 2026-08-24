@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import os   // os_proc_available_memory()
+import UIKit
 
 import MLXLLM
 import MLXLMCommon
@@ -46,7 +47,8 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "remove", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "generate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "diskInfo", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "diskInfo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "deviceInfo", returnType: CAPPluginReturnPromise)
     ]
 
     /// A short, curated list rather than every model on Hugging Face.
@@ -636,6 +638,57 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     ///
     /// volumeAvailableCapacityForImportantUsage is the figure Settings shows,
     /// which is the whole point: a number the user can go and check.
+    /// What this iPhone is, for the panel above the model list.
+    ///
+    /// ⚠️ iOS DOES NOT TELL YOU THE PHONE'S NAME. `UIDevice.current.model` says
+    /// "iPhone" and nothing more; the only identity available is the kernel's
+    /// machine string ("iPhone18,2"), which is right but unreadable. The map
+    /// below is the only way to say "iPhone 17 Pro Max", and it therefore GOES
+    /// STALE — a phone released after this build falls through to plain
+    /// "iPhone", which is honest and readable. It must never guess: showing the
+    /// wrong phone name is worse than showing a generic one, so unknown
+    /// identifiers are not pattern-matched into a family.
+    ///
+    /// Everything else here is measured, not mapped.
+    @objc func deviceInfo(_ call: CAPPluginCall) {
+        var sys = utsname()
+        uname(&sys)
+        let machine = withUnsafePointer(to: &sys.machine) {
+            $0.withMemoryRebound(to: CChar.self, capacity: 1) { String(validatingUTF8: $0) ?? "" }
+        }
+        let p = ProcessInfo.processInfo
+        call.resolve([
+            "name": Self.marketingNames[machine] ?? "iPhone",
+            "identifier": machine,
+            "cores": p.activeProcessorCount,
+            "osVersion": UIDevice.current.systemVersion,
+            "ramTotal": Double(p.physicalMemory),
+            "ramAvailable": Double(os_proc_available_memory())
+        ])
+    }
+
+    /// Machine identifier -> the name on the box. Incomplete on purpose: only
+    /// phones that can plausibly run a model are listed, and anything missing
+    /// falls back to "iPhone" rather than being guessed at.
+    private static let marketingNames: [String: String] = [
+        "iPhone13,1": "iPhone 12 mini", "iPhone13,2": "iPhone 12",
+        "iPhone13,3": "iPhone 12 Pro", "iPhone13,4": "iPhone 12 Pro Max",
+        "iPhone14,4": "iPhone 13 mini", "iPhone14,5": "iPhone 13",
+        "iPhone14,2": "iPhone 13 Pro", "iPhone14,3": "iPhone 13 Pro Max",
+        "iPhone14,6": "iPhone SE (3rd generation)",
+        "iPhone14,7": "iPhone 14", "iPhone14,8": "iPhone 14 Plus",
+        "iPhone15,2": "iPhone 14 Pro", "iPhone15,3": "iPhone 14 Pro Max",
+        "iPhone15,4": "iPhone 15", "iPhone15,5": "iPhone 15 Plus",
+        "iPhone16,1": "iPhone 15 Pro", "iPhone16,2": "iPhone 15 Pro Max",
+        "iPhone17,3": "iPhone 16", "iPhone17,4": "iPhone 16 Plus",
+        "iPhone17,1": "iPhone 16 Pro", "iPhone17,2": "iPhone 16 Pro Max",
+        "iPhone17,5": "iPhone 16e",
+        "iPhone18,3": "iPhone 17", "iPhone18,4": "iPhone 17 Plus",
+        "iPhone18,1": "iPhone 17 Pro", "iPhone18,2": "iPhone 17 Pro Max",
+        "iPhone18,5": "iPhone Air",
+        "arm64": "Simulator", "x86_64": "Simulator"
+    ]
+
     /// Disk AND memory, because "will this model run" is two different questions.
     ///
     /// ⚠️ `physicalMemory` IS THE WRONG NUMBER TO PLAN AGAINST, and it is the
