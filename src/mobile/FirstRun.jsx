@@ -17,6 +17,7 @@ import React from 'react'
 import usePress from './usePress.js'
 import { BrandMark } from './BrandSpinner.jsx'
 import wordUrl from '../assets/brand/radiant-wordmark.png'
+import fieldUrl from '../assets/brand/node-field.png'
 
 export default function FirstRun ({ onChooseModel, onConnectMac }) {
   const choose = usePress(() => onChooseModel?.(), { label: 'Choose a model' })
@@ -24,12 +25,16 @@ export default function FirstRun ({ onChooseModel, onConnectMac }) {
 
   return (
     <div className="rx-cover rx-intro">
-      {/* Ground, in layers. Three glows, aria-hidden: this is
+      {/* Ground, in layers. Three glows and the node field, aria-hidden: this is
           atmosphere, and a screen reader announcing it would be noise. */}
       <div className="rx-intro-sky" aria-hidden="true">
         <span className="rx-intro-glow rx-intro-glow-a" />
         <span className="rx-intro-glow rx-intro-glow-b" />
         <span className="rx-intro-glow rx-intro-glow-c" />
+        {/* the connected-node field from templetongroup.dev's hero, rendered
+            once into a PNG rather than run on a canvas — same file the launch
+            image uses, which is what keeps the handoff exact */}
+        <span className="rx-intro-net" style={{ backgroundImage: `url(${fieldUrl})` }} />
       </div>
 
       <div className="rx-intro-stage">

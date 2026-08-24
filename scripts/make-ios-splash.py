@@ -139,6 +139,87 @@ def wordmark_mask(cap_px):
         x += w + track
     return img.crop(img.getbbox())
 
+# ── the node field, from templetongroup.dev's hero ──────────────────────────
+# Parameters read straight out of that site's canvas code (index.html, #net):
+#   count      area / 15000, clamped to 46–104
+#   node r     0.8 … 2.2 css px, with a soft glow
+#   LINK       132 css px — the distance two nodes will draw a line across
+#   links      one in five drawn lighter: (i*13 + j*7) % 5 == 0
+#
+# COLOUR IS THE ONE DEPARTURE, and it is deliberate: the site's nodes are
+# terracotta on graphite, which on Radiant's blue ground would read as a
+# different brand's artwork pasted in. These are Radiant's accent. Everything
+# about the STRUCTURE — density, radii, link distance, the lighter fifth — is
+# the site's.
+#
+# Rendered ONCE to a PNG at phone proportions, not animated: the site runs a
+# rAF loop forever and this phone is about to run a language model. The same
+# file backs the launch image and the first-run screen, which is what keeps the
+# handoff between them exact.
+FIELD = pathlib.Path('src/assets/brand/node-field.png')
+FIELD_W, FIELD_H = 1206, 2622      # iPhone 17 Pro in device pixels
+SCALE = 3                          # css px → device px
+
+
+def build_field(seed=7):
+    from PIL import Image, ImageDraw, ImageFilter
+    import random, math
+    rng = random.Random(seed)
+
+    w, h = FIELD_W, FIELD_H
+    css_area = (w / SCALE) * (h / SCALE)
+    count = max(46, min(104, round(css_area / 15000)))
+    link = 132 * SCALE
+
+    nodes = [{
+        'x': rng.uniform(0, w), 'y': rng.uniform(0, h),
+        'r': (rng.random() * 1.4 + 0.8) * SCALE,
+        'g': rng.random() * 0.5 + 0.5,
+    } for _ in range(count)]
+
+    img = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    ink = oklch(0.70, 0.17, 262)          # Radiant accent
+    pale = oklch(0.965, 0.008, 262)       # the site's lighter fifth
+
+    # links first, so nodes sit on top of their own threads
+    for i, a in enumerate(nodes):
+        for j in range(i + 1, count):
+            b = nodes[j]
+            dist = math.hypot(a['x'] - b['x'], a['y'] - b['y'])
+            if dist >= link:
+                continue
+            al = 1 - dist / link
+            lighter = (i * 13 + j * 7) % 5 == 0
+            col = pale if lighter else ink
+            alpha = int(al * (0.14 if lighter else 0.30) * 255)
+            if alpha <= 1:
+                continue
+            d.line([(a['x'], a['y']), (b['x'], b['y'])], fill=col + (alpha,), width=SCALE)
+
+    # the glow, on its own layer so blurring it cannot soften the nodes
+    glow = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for n in nodes:
+        rr = n['r'] + 8 * n['g'] * SCALE * 0.5
+        gd.ellipse([n['x']-rr, n['y']-rr, n['x']+rr, n['y']+rr],
+                   fill=ink + (int(70 * n['g']),))
+    glow = glow.filter(ImageFilter.GaussianBlur(6 * SCALE * 0.5))
+    img = Image.alpha_composite(glow, img)
+
+    d = ImageDraw.Draw(img)
+    for n in nodes:
+        a = int((0.55 + 0.35 * n['g']) * 255)
+        d.ellipse([n['x']-n['r'], n['y']-n['r'], n['x']+n['r'], n['y']+n['r']],
+                  fill=ink + (a,))
+
+    FIELD.parent.mkdir(parents=True, exist_ok=True)
+    img.save(FIELD)
+    print(f'  {FIELD.name}  {w}x{h}, {count} nodes, link {link}px')
+    return img
+
+
 def build(_a, _b, name):
     """The website's hero, as a launch screen.
 
@@ -180,6 +261,26 @@ def build(_a, _b, name):
     wash(W * 0.82, H * 0.08, W * 0.40, H * 0.60, GLOW_B, 0.34, 1.7)
     # the low quiet one, matching .rx-intro-glow-c
     wash(W * 0.32, H * 1.05, W * 0.78, H * 0.46, oklch(0.52, 0.13, 262), 0.26, 1.7)
+
+    # the node field, scaled to cover the square canvas the way the launch
+    # screen's aspectFill will crop it on the phone
+    fld = build_field()
+    fw, fh = fld.size
+    cover = max(SIDE / fw, SIDE / fh)
+    fld = fld.resize((max(1, int(fw * cover)), max(1, int(fh * cover))))
+    fw, fh = fld.size
+    offx, offy = (fw - SIDE) // 2, (fh - SIDE) // 2
+    fpx = fld.load()
+    for y in range(SIDE):
+        row = y * SIDE
+        for x in range(SIDE):
+            r_, g_, b_, a_ = fpx[x + offx, y + offy]
+            if not a_:
+                continue
+            o = (row + x) * 3
+            canvas[o] = (r_ * a_ + canvas[o] * (255 - a_)) // 255
+            canvas[o + 1] = (g_ * a_ + canvas[o + 1] * (255 - a_)) // 255
+            canvas[o + 2] = (b_ * a_ + canvas[o + 2] * (255 - a_)) // 255
 
     def place(path, target_w, cx, top):
         """Composite an RGBA brand asset at its own colours."""

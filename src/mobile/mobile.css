@@ -1710,6 +1710,19 @@
   background: radial-gradient(circle, oklch(0.52 0.13 var(--rx-accent-h) / 0.26), transparent 62%);
   animation-delay: 240ms;
 }
+/* templetongroup.dev's node field, as a still. It fades in behind the lockup
+   and then holds — the site animates it forever, this phone is about to run a
+   language model. */
+.is-native .rx-intro-net {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  animation: rx-net 1600ms ease-out 180ms forwards;
+}
+@keyframes rx-net { to { opacity: 1; } }
+
 .is-native .rx-intro-stage {
   position: relative;
   flex: 1 1 auto;
@@ -1832,6 +1845,7 @@
    half-state, and never nothing at all. */
 @media (prefers-reduced-motion: reduce) {
   .is-native .rx-intro-glow,
+  .is-native .rx-intro-net,
   .is-native .rx-intro-mark,
   .is-native .rx-intro-halo,
   .is-native .rx-intro-word,
