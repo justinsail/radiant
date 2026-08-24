@@ -11,9 +11,12 @@ import { getServer, setServer, testServer, servedByRadiant } from '../api.js'
 export default function ConnectGate ({ error }) {
   const cur = getServer()
   const here = servedByRadiant()
-  const [base, setBase] = useState(cur.base || '')
+  // In the iPhone app the UI is bundled, so there is no origin to borrow — the
+  // address field is the only way in. A build can prefill it (VITE_RADIANT_SERVER)
+  // so the app opens knowing which Mac to talk to and only asks for the token.
+  const [base, setBase] = useState(cur.base || import.meta.env.VITE_RADIANT_SERVER || '')
   const [token, setToken] = useState(cur.token || '')
-  const [manual, setManual] = useState(!here)
+  const [manual, setManual] = useState(!here)   // native shell => always manual
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
 
