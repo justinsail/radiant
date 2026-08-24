@@ -27,7 +27,13 @@ function UsageChip () {
     return `in ${Math.round(h / 24)}d`
   }
   const subTitle = s => {
-    if (!s.windows?.length) return `${s.label}: signed in (usage not reported)`
+    if (!s.windows?.length) {
+      // Some vendors publish usage and some do not — say which, so an absent
+      // gauge does not read as a bug.
+      return s.reportsUsage === false
+        ? `${s.label}: signed in — this provider does not publish usage, so there is no number to show`
+        : `${s.label}: signed in (usage not reported right now)`
+    }
     return `${s.label}:\n` + s.windows.map(w => `  ${w.name}: ${w.usedPct != null ? Math.max(0, 100 - w.usedPct) + '% left' : 'active'}${w.resetAt ? ` · resets ${fmtReset(w.resetAt)}` : ''}`).join('\n')
   }
   return (
@@ -42,7 +48,7 @@ function UsageChip () {
           <span key={s.provider} className='usage-line sub' title={subTitle(s)}>
             <span className={'usage-dot' + (left != null && left <= 10 ? ' warn' : ' ok')} /> {s.label}
             <span className='usage-sub'>
-              {left != null ? <span className='num-pop' key={left}>{left}% left</span> : 'plan'}{reset ? <span className='usage-reset'> · ↻ {reset}</span> : ''}
+              {left != null ? <span className='num-pop' key={left}>{left}% left</span> : 'signed in'}{reset ? <span className='usage-reset'> · ↻ {reset}</span> : ''}
             </span>
           </span>
         )

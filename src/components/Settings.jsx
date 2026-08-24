@@ -1399,6 +1399,7 @@ const GUIDE = [
     items: [
       ['One server, all your devices', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share on my network) and connect your other Macs and phone to it — they share the same agents, models, and sessions.'],
       ['On your phone', 'On the host Mac hit Settings → Devices → “Copy phone link”, open it once in Safari on the phone, then Add to Home Screen — it installs like an app, with a mobile-tuned layout. The link carries the access token, so you never type an address or a token, and the token is dropped from the URL immediately so it doesn’t linger in history.'],
+      ['Behind a proxy, the token still applies', 'Radiant skips the access token for the app talking to its own server on this Mac. If you put a reverse proxy in front — Tailscale Serve, nginx — those requests come from the proxy, so they must present the token like any other device. Nothing reaches your files or shell without it.'],
       ['Signed in for good', 'Once a device is signed in it stays signed in — the token is held in a secure cookie rather than page storage, which iOS can clear out from under a Home Screen app. If you do land on the connect screen, it only asks for the token: the address is wherever you opened it from.']
     ]
   },

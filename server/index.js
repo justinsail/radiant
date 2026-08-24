@@ -56,7 +56,25 @@ const share0 = config.settings.share || {}
 const SHARE_ENABLED = process.env.RADIANT_SHARE === '1' || Boolean(share0.enabled)
 const SHARE_TOKEN = process.env.RADIANT_TOKEN || share0.token || null
 const BIND_HOST = SHARE_ENABLED ? '0.0.0.0' : '127.0.0.1'
-const isLoopback = ra => !ra || ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1'
+// ⚠️ A LOOPBACK SOCKET IS NOT PROOF THE CLIENT IS LOCAL.
+//
+// Loopback skips the access token, which is right for the app talking to its
+// own embedded server. But put ANY reverse proxy in front — Tailscale Serve,
+// nginx, Caddy — and the proxy connects from 127.0.0.1, so every remote
+// request looks local and the token check is skipped entirely. Verified
+// 2026-08-23: through `tailscale serve`, /api/config returned 200 with no
+// token, from another machine. Radiant runs shell commands, so that is a
+// full compromise of the host, and with `tailscale funnel` it would be open
+// to the internet.
+//
+// Any forwarding header means the request was relayed and the peer address
+// belongs to the proxy, not the client. Those requests must present a token.
+const PROXY_HEADERS = ['x-forwarded-for', 'x-real-ip', 'forwarded', 'tailscale-user-login']
+function isLocalRequest (req) {
+  for (const h of PROXY_HEADERS) if (req.headers?.[h]) return false
+  const ra = req.socket?.remoteAddress
+  return !ra || ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1'
+}
 // The cookie is what keeps a phone signed in. localStorage on an iOS Home
 // Screen app is separate from Safari's and can be evicted, which is why the
 // token screen kept coming back; an httpOnly cookie survives both and is not
@@ -83,7 +101,7 @@ function presentedToken (req) {
     cookieToken(req) || null
 }
 function tokenOk (req) {
-  if (isLoopback(req.socket?.remoteAddress)) return true
+  if (isLocalRequest(req)) return true
   if (!SHARE_TOKEN) return false
   return presentedToken(req) === SHARE_TOKEN
 }
@@ -136,7 +154,7 @@ app.use('/api', (req, res, next) => {
   if (!tokenOk(req)) return res.status(401).json({ error: 'This Radiant server requires an access token.' })
   // Presented a good token by header? Leave a cookie so this device stays signed
   // in even if the page's stored copy is cleared.
-  if (SHARE_TOKEN && !isLoopback(req.socket?.remoteAddress) && cookieToken(req) !== SHARE_TOKEN) setTokenCookie(res)
+  if (SHARE_TOKEN && !isLocalRequest(req) && cookieToken(req) !== SHARE_TOKEN) setTokenCookie(res)
   next()
 })
 
@@ -1548,7 +1566,7 @@ wss.on('connection', (ws, req) => {
   const url = new URL(req.url, 'http://localhost')
   // terminal socket is gated too — browsers can't set headers on a WS, so remote
   // clients pass the token as a query param
-  if (!isLoopback(req.socket?.remoteAddress)) {
+  if (!isLocalRequest(req)) {
     const tok = url.searchParams.get('token')
     if (!SHARE_TOKEN || tok !== SHARE_TOKEN) { ws.close(1008, 'unauthorized'); return }
   }
