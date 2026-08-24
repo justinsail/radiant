@@ -47,11 +47,23 @@
  */
 import React from 'react'
 import Gauge from './Gauge.jsx'
+import BrandSpinner from './BrandSpinner.jsx'
 import StorageLine from './StorageLine.jsx'
 import usePress from './usePress.js'
 import { GB } from './useLocalModels.js'
 
 const fmtGB = (gb) => `${Number(gb || 0).toFixed(1)} GB`
+// What to print while a download runs. A percent when the total is known; the
+// megabytes when it is not — never "0%" for ten minutes, which is what a
+// fraction-only relay produced.
+export const progressText = (p) => {
+  if (!p) return null
+  if (typeof p.pct === 'number') return `${Math.round(p.pct * 100)}%`
+  if (p.done > 0) return p.done >= 1e9
+    ? `${(p.done / 1e9).toFixed(1)} GB`
+    : `${Math.round(p.done / 1e6)} MB`
+  return null
+}
 
 // The one model the sheet also pre-highlights. Falls back to the smallest entry
 // so a catalog change can never leave the empty hero with nothing to open.
@@ -130,7 +142,8 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
 /* ── one catalog row ──────────────────────────────────────────────────────── */
 
 function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAccessory }) {
-  const pct = typeof progress === 'number' ? Math.round(progress * 100) : null
+  const shown = progressText(progress)
+  const pct = progress && typeof progress.pct === 'number' ? Math.round(progress.pct * 100) : null
   const row = usePress(() => onTap?.(model), {
     label: `${model.name}, ${fmtGB(model.sizeGB)}` + (
       model.downloaded ? ', on this iPhone'
@@ -146,7 +159,7 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
     label: model.downloaded
       ? `Chat with ${model.name}`
       : downloading
-        ? `Stop downloading ${model.name}${pct === null ? '' : `, ${pct} percent done`}`
+        ? `Stop downloading ${model.name}${shown === null ? '' : `, ${shown} done`}`
         : `Download ${model.name}`
   })
 
@@ -162,7 +175,7 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
       // separate ✕ elsewhere in the row would break the single-glyph trailing
       // column every other row keeps.
       ? <span className="rx-stoppable">
-          <Gauge size={26} state="working" progress={typeof progress === 'number' ? progress : null} />
+          <BrandSpinner size={26} progress={progress && typeof progress.pct === 'number' ? progress.pct : null} />
           <span className="rx-stop-square" aria-hidden="true" />
         </span>
       : <span className={state === 'failed' ? 'rx-destructive' : undefined}><ArrowDownCircle /></span>
@@ -187,9 +200,7 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
                 // replaces a blurb nobody is reading at that moment: a
                 // determinate arc still does not answer "how much longer".
                 ? <span className="rx-tabular" aria-hidden="true">
-                    {typeof progress === 'number'
-                      ? `Downloading… ${Math.round(progress * 100)}%`
-                      : 'Downloading…'}
+                    {shown ? `Downloading… ${shown}` : 'Downloading…'}
                   </span>
                 : model.blurb}
         </div>

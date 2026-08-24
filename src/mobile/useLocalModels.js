@@ -117,9 +117,13 @@ export function useLocalModels () {
       // The native side throttles to whole percents. A stale event can still
       // land just after downloadDone; harmless, because the row reads as
       // downloaded by then and only a downloading row consults this.
-      downloadProgress: ({ id, progress: f }) => {
-        if (typeof f !== 'number' || !isFinite(f)) return
-        setProgress(p => ({ ...p, [id]: Math.min(Math.max(f, 0), 1) }))
+      // -1 means the total size is unknowable, so there is no honest percent
+      // to show; the byte counts are still real and the UI prints those.
+      downloadProgress: ({ id, progress: f, completedBytes, totalBytes }) => {
+        const pct = typeof f === 'number' && isFinite(f) && f >= 0
+          ? Math.min(Math.max(f, 0), 1)
+          : null
+        setProgress(p => ({ ...p, [id]: { pct, done: Number(completedBytes) || 0, total: Number(totalBytes) || 0 } }))
       },
       downloadDone: ({ id }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })

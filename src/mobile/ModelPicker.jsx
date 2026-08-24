@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as GaugeModule from './Gauge.jsx'
+import BrandSpinner from './BrandSpinner.jsx'
 
 // Picking a model is the first thing a new user does, so this screen has one
 // job: make the obvious choice obvious. A recommended model gets the hero —
@@ -429,10 +430,12 @@ export default function ModelPicker ({
       // This sheet stays open over the download it started, so it — not the
       // list behind it — is where the percentage and the stop control have to
       // live. It carried neither until 2026-08-24.
-      downloadProgress: ({ id, progress }) => {
-        if (typeof progress !== 'number' || !isFinite(progress)) return
+      downloadProgress: ({ id, progress, completedBytes, totalBytes }) => {
+        const pct = typeof progress === 'number' && isFinite(progress) && progress >= 0
+          ? Math.min(Math.max(progress, 0), 1)
+          : null
         setJobs(j => (j[id]?.state === 'downloading'
-          ? { ...j, [id]: { ...j[id], progress: Math.min(Math.max(progress, 0), 1) } }
+          ? { ...j, [id]: { ...j[id], progress: pct, done: Number(completedBytes) || 0, total: Number(totalBytes) || 0 } }
           : j))
       },
       // Stopping is a choice, not a failure: clear it and say nothing.
@@ -646,7 +649,13 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, on
   const downloading = job?.state === 'downloading'
   const failed = job?.state === 'failed'
   const blocked = shortfall > 0 && !model.downloaded && !downloading
-  const pct = typeof job?.progress === 'number' ? Math.round(job.progress * 100) : null
+  const shown = job?.state === 'downloading'
+    ? (typeof job.progress === 'number'
+        ? `${Math.round(job.progress * 100)}%`
+        : job.done > 0
+          ? (job.done >= 1e9 ? `${(job.done / 1e9).toFixed(1)} GB` : `${Math.round(job.done / 1e6)} MB`)
+          : null)
+    : null
   // Mid-download this button is NOT disabled — it is the way out. Disabling it
   // was how 2.3 GB became uncancellable from the screen that started it.
   const disabled = busyElsewhere || blocked
@@ -665,7 +674,7 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, on
   const showGauge = downloading || failed || done
 
   let label
-  if (downloading) label = pct === null ? 'Stop' : `Stop · ${pct}%`
+  if (downloading) label = shown === null ? 'Stop' : `Stop · ${shown}`
   else if (blocked) label = 'Not enough room'
   else if (model.downloaded) label = 'Start chatting'
   else if (failed) label = 'Try again'
@@ -694,7 +703,9 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, on
           className={`rx-mp-hero-gauge${done ? ' rx-mp-pop' : ''}`}
           style={{ color: gaugeColor(gaugeState) }}
         >
-          <Gauge state={gaugeState} size={120} progress={downloading ? (job?.progress ?? null) : null} />
+          {downloading
+            ? <BrandSpinner size={120} progress={typeof job?.progress === 'number' ? job.progress : null} />
+            : <Gauge state={gaugeState} size={120} />}
         </span>
       )}
       <div className="rx-mp-hero-name">{model.name}</div>

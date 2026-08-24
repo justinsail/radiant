@@ -943,11 +943,9 @@
   width: 9px;
   height: 9px;
   border-radius: 1px;
-  /* --rx-amber-glyph, matching the arc exactly. Not --rx-amber, which is the
-     darker text-contrast amber: two ambers inside one 26pt object reads as a
-     mistake. The square only ever renders mid-download, so it needs no state
-     selector to know it should be amber. */
-  background: var(--rx-amber-glyph);
+  /* Brand blue, matching the ring on the spinning mark. This was amber back
+     when the indicator was Gauge's amber iris; the indicator is the logo now. */
+  background: var(--rx-tint);
 }
 /* ⚠️ THERE IS NO .rx-row-size, AND ADDING ONE BACK COSTS THE BLURB ITS WIDTH.
    The download weight has been in front of the blurb (every row wrapped, the
@@ -1581,4 +1579,23 @@
   width: 182px;
   height: auto;
   margin-top: 4px;
+}
+
+/* The download indicator is the brand mark turning, not Gauge's amber iris.
+   The ring around it is brand blue — amber is reserved for the phone spending
+   something, and a download is the one place the logo earns the motion. */
+.is-native .rx-brand-spin {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rx-tint);
+}
+.is-native .rx-brand-spin img {
+  display: block;
+  animation: rx-spin 2.4s linear infinite;
+}
+.is-native .rx-brand-spin svg { position: absolute; inset: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .is-native .rx-brand-spin img { animation: none; }
 }

@@ -1,6 +1,6 @@
 ---
 name: star-system
-description: Ask the user to rate the code/output just produced on a 1-5 star scale, then ask rating-appropriate follow-up questions, log the rating, and iterate until the work reaches 4+ stars. Use when the user says "run the star system", "rate this", or invokes /star-system after a deliverable is complete.
+description: Ask the user to rate the code/output just produced on a 1-5 star scale, then ask rating-appropriate follow-up questions, log the rating, and iterate until the work reaches 4+ stars. Use when the user says "run the star system", "rate this", or invokes /star-system after a deliverable is complete — AND automatically after every deployment, without being asked.
 ---
 
 # Star System — Code Rating & Feedback Loop
@@ -116,9 +116,13 @@ For ratings 1-4:
 
 4. If a memory system or agent notes file is available (e.g. AGENTS.md, .cursorrules, CLAUDE.md, or your harness's persistent memory), also add a one-line pointer there so future sessions measure new work in this area against this exemplar.
 
-## Step 7: Re-rating loop
+## Step 7: Re-rating loop — and after every deployment
 
 After executing the action plan (Step 5), return to Step 1 and ask the user to re-rate the revised output.
+
+**Ask again after every deployment, unprompted.** Any time fixed work reaches the user — shipped, released, installed on their device, pushed to the environment they will look at — that is a deployment, and it ends with the Step 1 question. Do not wait to be asked, do not batch several deployments into one rating, and do not decide on the user's behalf that a change was too small to be worth grading. The user should never have to remember to ask for the star system; the loop is what makes the rating a habit instead of an event.
+
+Two things this is not. It is not a rating on work the user cannot see yet — if a change is committed but not deployed, finish deploying first. And it is not a prompt after every message: a turn that only investigates, answers a question, or reports findings has deployed nothing and ends normally.
 
 - Repeat the full cycle — rate, question, log (incrementing the round number), plan, fix — until the user gives **4 or 5 stars**, or explicitly says to stop.
 - On each round, only ask about what's still wrong; never re-ask settled questions.
@@ -128,6 +132,7 @@ After executing the action plan (Step 5), return to Step 1 and ask the user to r
 ## Rules
 
 - Never skip Step 1 or assume a rating from context.
+- Every deployment ends with the Step 1 question, unprompted (Step 7).
 - Never argue with or negotiate the rating. The rating is the user's verdict; your job is to extract actionable specifics.
 - Scale strictly: 1 star = most questions, 4 stars = fewest, 5 stars = zero.
 - Don't ask questions the user already answered — if they gave the rating alongside detailed feedback, only ask about the gaps.

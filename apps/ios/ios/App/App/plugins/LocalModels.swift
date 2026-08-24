@@ -133,21 +133,40 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             // becomes the relay: the handler yields fractions from whatever
             // thread the download is on, and the pump below — which does have
             // self — turns them into plugin events.
-            let (fractions, feed) = AsyncStream<Double>.makeStream(
+            // Carry BYTES as well as the fraction. `Progress.fractionCompleted`
+            // sits at 0 for the whole transfer whenever the total size is not
+            // known up front, which is exactly what happens pulling a repo of
+            // shards — so a relay that only forwarded the fraction emitted
+            // nothing at all, and the phone showed a bare "Downloading…" for
+            // 2.3 GB. Bytes are always real, so the UI always has something
+            // true to print.
+            let (ticks, feed) = AsyncStream<(Double, Int64, Int64)>.makeStream(
                 bufferingPolicy: .bufferingNewest(1)
             )
-            // A multi-gigabyte download reports progress constantly. The UI is a
-            // 29pt arc, so anything finer than a whole percent is thousands of
-            // bridge crossings that cannot be seen.
+            // A multi-gigabyte download reports constantly. Throttle to a whole
+            // percent, or — when there is no percent to be had — to each new
+            // megabyte, so the number on screen still moves.
             let pump = Task { [weak self] in
-                var last = -1
-                for await f in fractions {
-                    let pct = Int(f * 100)
-                    guard pct != last else { continue }
-                    last = pct
-                    self?.notifyListeners(
-                        "downloadProgress", data: ["id": id, "progress": f]
-                    )
+                var lastPct = -1
+                var lastMB: Int64 = -1
+                for await (f, done, total) in ticks {
+                    let pct = total > 0 ? Int(f * 100) : -1
+                    let mb = done / 1_000_000
+                    if pct >= 0 {
+                        guard pct != lastPct else { continue }
+                        lastPct = pct
+                    } else {
+                        guard mb != lastMB else { continue }
+                        lastMB = mb
+                    }
+                    self?.notifyListeners("downloadProgress", data: [
+                        "id": id,
+                        // null-ish when unknowable: the UI must not print "0%"
+                        // for ten minutes and call that progress
+                        "progress": total > 0 ? f : -1,
+                        "completedBytes": done,
+                        "totalBytes": total
+                    ])
                 }
             }
             do {
@@ -155,7 +174,11 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
                 _ = try await #huggingFaceLoadModelContainer(
                     configuration: entry.config
                 ) { progress in
-                    feed.yield(progress.fractionCompleted)
+                    feed.yield((
+                        progress.fractionCompleted,
+                        progress.completedUnitCount,
+                        progress.totalUnitCount
+                    ))
                 }
                 feed.finish()
                 await pump.value
