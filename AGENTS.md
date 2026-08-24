@@ -128,6 +128,19 @@ landed by checking the dylib, not the stub:
 strings -a "$APP/App.debug.dylib" | grep -c downloadProgress
 ```
 
+**MLX cannot run in the iOS Simulator — the app aborts.** Anything that touches
+the model engine (download, generate) dies in `mlx::core::metal::Device::Device()`
+with SIGABRT the moment it initialises Metal; the simulator has no GPU MLX will
+accept. The app then vanishes and the simulator falls back to whatever was
+behind it, which looks like a UI bug and is not one. Read the real reason in
+`~/Library/Logs/DiagnosticReports/App-*.ips`.
+
+So the simulator is good for **layout, navigation, first run and accessibility
+only**. Any claim about downloading or generating has to be made on a physical
+iPhone — build with `-destination 'id=<udid>'`, `DEVELOPMENT_TEAM=5VY66S6G3M`,
+`-allowProvisioningUpdates`, then `xcrun devicectl device install app`. Do not
+write "verified in the Simulator" about a model actually running.
+
 **Previewing the phone UI without a device.** The native gate means a browser
 shows the desktop app. Serve `dist/` with a script that defines
 `window.Capacitor` — `isNativePlatform`, `getPlatform`, `nativePromise`,
