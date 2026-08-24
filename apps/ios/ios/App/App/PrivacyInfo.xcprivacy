@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Radiant's privacy manifest.
+
+	  ⚠️ WITHOUT THIS FILE THE UPLOAD IS REJECTED, not the review — App Store
+	  Connect refuses the binary before a human ever sees it, and the email only
+	  says which required-reason API was undeclared. Every entry below was found
+	  by grepping the Swift sources, not assumed.
+
+	  ⚠️ IF YOU ADD A REQUIRED-REASON API, ADD IT HERE IN THE SAME CHANGE. The
+	  categories Apple polices are: file timestamps, system boot time, disk
+	  space, active keyboards, and UserDefaults.
+	-->
+
+	<!-- Radiant does not track. There is no analytics SDK, no advertising
+	     identifier, and no third-party network call the user did not configure
+	     themselves by entering their own API key. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<!--
+	  Nothing is collected. The model runs on the device; conversations are
+	  written to this app's own storage and leave the phone only if the user
+	  connects a provider with their own key or their own Mac, in which case the
+	  data goes to THEIR service, not to us. Apple does not count that as
+	  collection by the developer, and we operate no server that receives it.
+	-->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!--
+		  UserDefaults — LocalModels.swift records which models finished
+		  downloading, and theme/appearance choices persist through the web
+		  layer. CA92.1 is the correct reason: the data never leaves the app
+		  and is not used for identification.
+		-->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<!--
+		  Disk space — LocalModels.swift reads
+		  volumeAvailableCapacityForImportantUsage so the app can refuse to
+		  start a multi-gigabyte model download that would not fit, and can
+		  tell the user how much more room they need. E174.1 is exactly this
+		  case: displaying space to the user and deciding whether to write.
+		-->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>E174.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

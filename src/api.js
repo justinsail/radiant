@@ -1,13 +1,50 @@
 // Which Radiant server to talk to. Empty base = this app's own bundled server
 // (same origin). A remote base + token points at a shared server on another Mac.
-let SERVER = (() => { try { return JSON.parse(localStorage.getItem('radiant.server')) || {} } catch { return {} } })()
+//
+// ⚠️ THE TOKEN IS A CREDENTIAL AND ON iOS IT LIVES IN THE KEYCHAIN. It grants
+// access to every model, agent and session on someone's Mac, which makes it at
+// least as sensitive as the provider API keys that already go to SecureStore —
+// and it was sitting in localStorage while they did. On the Mac app localStorage
+// is the app's own Electron store and stays fine; only the phone, where the web
+// layer is a shipped WKWebView, moves it.
+const KEY = 'radiant.server'
+const SS = () => (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.SecureStore : null)
+
+// The address is not secret and stays in localStorage, so the app knows which
+// Mac to talk to before the async Keychain read comes back.
+let SERVER = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {} } catch { return {} } })()
+
+// On the phone the token is stripped from that copy and fetched from the
+// Keychain once at startup. Until it lands, requests go out unauthenticated and
+// get a 401 — which is the correct failure, not a leak.
+if (SS()) {
+  if (SERVER.token) {
+    // migrate a token written by an older build, then remove the plaintext one
+    SS().set({ key: KEY, value: SERVER.token }).catch(() => {})
+    const { token, ...rest } = SERVER
+    localStorage.setItem(KEY, JSON.stringify(rest))
+  }
+  SS().get({ key: KEY })
+    .then(r => { if (r?.value) SERVER = { ...SERVER, token: r.value } })
+    .catch(() => {})
+}
+
 export function getServer () { return { ...SERVER } }
 export function setServer (s) {
   // A token with no base is valid: the page is served by the shared server
   // itself, so the address is this origin and only the token is needed.
   if (!s || (!s.base && !s.token)) SERVER = {}
   else SERVER = { base: s.base ? String(s.base).replace(/\/$/, '') : '', token: s.token || '' }
-  localStorage.setItem('radiant.server', JSON.stringify(SERVER))
+  const ss = SS()
+  if (ss) {
+    // Keychain holds the token; localStorage holds only the address.
+    if (SERVER.token) ss.set({ key: KEY, value: SERVER.token }).catch(() => {})
+    else ss.remove({ key: KEY }).catch(() => {})
+    const { token, ...rest } = SERVER
+    localStorage.setItem(KEY, JSON.stringify(rest))
+  } else {
+    localStorage.setItem(KEY, JSON.stringify(SERVER))
+  }
 }
 export function apiUrl (path) { return (SERVER.base || '') + path }
 export function authHeaders (extra = {}) { return SERVER.token ? { ...extra, 'x-radiant-token': SERVER.token } : { ...extra } }

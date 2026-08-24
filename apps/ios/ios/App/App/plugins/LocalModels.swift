@@ -294,11 +294,16 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     /// which is 28% of the device, and is the whole reason a 3 GB model reports
     /// "won't run" on a 12 GB phone.
     override public func load() {
+        // ⚠️ DEBUG ONLY. It prints no user data, but a Release build should not
+        // narrate itself in the device console — and device installs are Debug
+        // config, so the diagnostic survives exactly where it is used.
+        #if DEBUG
         let p = ProcessInfo.processInfo
         NSLog("RADIANT-MEM physical=%.2fGB headroom-now=%.2fGB app-limit=%.2fGB",
               Double(p.physicalMemory) / 1e9,
               Double(os_proc_available_memory()) / 1e9,
               Double(rxMemoryLimit()) / 1e9)
+        #endif
     }
 
     private var loaded: (id: String, container: ModelContainer)?
