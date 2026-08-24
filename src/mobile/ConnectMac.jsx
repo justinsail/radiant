@@ -82,10 +82,21 @@ export default function ConnectMac ({ onConnected }) {
             />
           </div>
         </div>
+        {/* ⚠️ EXPLAIN TAILSCALE, DO NOT JUST NAME IT. The old text named
+            "Tailscale Serve" and "a real certificate" at someone who has opened
+            a chat app — and then promised an http check that did not exist. This
+            says what the two cases are and what Tailscale is for, in the order
+            someone meets them. */}
         <div className="rx-section-footer">
-          The Mac must be reachable over https — Tailscale Serve puts a real
-          certificate in front of Radiant. A plain http address is blocked before
-          it leaves the app.
+          Both on the same Wi-Fi? Use the address your Mac shows — nothing else
+          to install.
+          {'\n\n'}
+          Away from home? That needs Tailscale. iPhone will only reach your Mac
+          over an encrypted connection, and Tailscale creates one — a free
+          private link between your own devices, so your Mac is reachable from
+          anywhere without being exposed to the internet. Install it on both,
+          sign in with the same account, and Radiant sets up the rest. Your Mac
+          then shows an address beginning https.
         </div>
       </div>
 

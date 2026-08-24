@@ -1388,9 +1388,25 @@ function DevicesPane () {
                   <button className='small-btn' onClick={() => copy(share.token)}>Copy</button>
                 </div>
               </div>
-              <div className='hint' style={{ marginTop: 8 }}>
-                {best.where}
-                {!share.phone?.ready && ' Install Tailscale on both devices to use it away from home.'}
+              <div className='hint' style={{ marginTop: 8 }}>{best.where}</div>
+
+              {/* ⚠️ SAY WHAT TAILSCALE IS AND WHY IT IS NEEDED. Tony: "explain
+                  tailscale is required to create the secure connection. it needs
+                  to be explained on mac and ios apps." Naming a product the user
+                  has never heard of, with no reason attached, is how the old
+                  panel lost people — and iPhones genuinely will not connect over
+                  the internet without an encrypted address, which is the thing
+                  Tailscale provides. */}
+              <div className='hint' style={{ marginTop: 10, lineHeight: 1.5 }}>
+                <b>Using it away from home needs Tailscale.</b> iPhone will only talk
+                to your Mac over an encrypted connection, and Tailscale is what
+                creates one — a free private link between your own devices, so your
+                Mac is reachable from anywhere without being exposed to the internet.
+                {share.phone?.ready
+                  ? ' It is set up here, and Radiant configured the rest for you.'
+                  : ' Install it on this Mac and your iPhone and sign in to both with the same account; Radiant does the rest.'}
+                {' '}
+                <a href='https://tailscale.com/download' target='_blank' rel='noreferrer'>tailscale.com/download</a>
               </div>
             </div>
           )

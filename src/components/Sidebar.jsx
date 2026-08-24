@@ -38,7 +38,19 @@ function UsageChip () {
   }
   return (
     <div className='usage-chip' title={credits ? `${credits.label}: $${credits.remaining} left of $${credits.total} ($${credits.used} used)` : ''}>
-      {credits && <span className='usage-line'><span className='usage-dot' /> <span className='num-pop' key={credits.remaining}>${credits.remaining}</span> <span className='usage-sub'>OpenRouter</span></span>}
+      {/* ⚠️ SAME SHAPE AS EVERY OTHER ROW: dot, name, then the number in
+          .usage-sub. This one was inverted — "$69.2 OPENROUTER" against
+          "Claude 64% LEFT" — so one line in the stack read backwards and the
+          eye had to re-parse it. Tony: "why are all the services first then
+          usage after except for openrouter? thats ui inconsistency." */}
+      {credits && (
+        <span className='usage-line' >
+          <span className='usage-dot' /> OpenRouter
+          <span className='usage-sub'>
+            <span className='num-pop' key={credits.remaining}>${credits.remaining}</span> left
+          </span>
+        </span>
+      )}
       {subs.map(s => {
         const primary = s.windows?.[0]
         const pct = primary?.usedPct

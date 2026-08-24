@@ -830,6 +830,8 @@
 /* the first header on a screen has the large title above it already */
 .is-native .rx-section-header:first-child { margin-top: var(--rx-sp-8, 8px); }
 .is-native .rx-section-footer {
+  /* the connect screen's footer is two paragraphs separated by a blank line */
+  white-space: pre-line;
   font: -apple-system-caption1;
   line-height: 1.333;
   color: var(--rx-label-2);
