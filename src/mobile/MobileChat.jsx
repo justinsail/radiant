@@ -570,7 +570,11 @@ export default function MobileChat ({
       <style>{CSS}</style>
       <div className='rx-chat' ref={rootRef}>
         <header ref={navRef} className={'rx-chat-nav' + (scrolled ? ' is-scrolled' : '')}>
-          <button className={'rx-chat-back' + (back.pressed ? ' is-pressed' : '')} {...back.handlers}>
+          <button
+            className={'rx-chat-back' + (back.pressed ? ' is-pressed' : '')}
+            aria-label='Back to Models'
+            {...back.handlers}
+          >
             <Chevron />
             <span>Models</span>
           </button>
@@ -639,7 +643,15 @@ export default function MobileChat ({
                 className='rx-chat-body rx-chat-live'
                 ref={node => {
                   liveNode.current = node
-                  if (node && !node.firstChild) node.appendChild(document.createTextNode(''))
+                  // Seeded from the buffer, not empty. This <p> only mounts once
+                  // the first token has ALREADY been counted — the token handler
+                  // is what flips the marker that renders it — so an empty text
+                  // node silently drops the opening word of every reply until
+                  // the finished turn replaces it. Seeding also self-heals if
+                  // this node is ever remounted mid-stream.
+                  if (node && !node.firstChild) {
+                    node.appendChild(document.createTextNode(bufRef.current))
+                  }
                 }}
               />
             </AssistantTurn>
@@ -731,8 +743,17 @@ const CSS = `
    beats it — otherwise \`.rx-chat button\` quietly out-ranks \`.rx-chat-back\`
    and every tinted control comes out black. */
 :where(.rx-chat) :where(button) { font-family: inherit; color: inherit; background: none; border: 0; margin: 0; padding: 0; }
-/* focus is invisible on a touch device */
-.rx-chat button:focus-visible, .rx-chat textarea:focus-visible { outline: none; }
+/* Invisible to a finger, visible to a keyboard. This selector out-specifies the
+   global .is-native :focus-visible ring, so suppressing it here quietly undid
+   that ring for every control on this screen — including the composer, where
+   losing the caret's focus outline is worst. :focus-visible never matches a
+   tap, so there is nothing to hide from a finger. */
+.rx-chat button:focus-visible,
+.rx-chat textarea:focus-visible {
+  outline: 3px solid var(--rx-tint);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
 /* The \`font: -apple-system-body\` shorthands below are how Dynamic Type gets in
    for free, but they are WebKit-only: anywhere else the whole declaration is
    dropped at parse time and the control falls back to its UA font — a textarea
@@ -755,12 +776,12 @@ const CSS = `
 .rx-chat-back {
   display: flex; align-items: center; gap: 2px; justify-self: start;
   min-height: 44px; padding-right: 10px; color: var(--rx-tint);
-  font: -apple-system-body; min-width: 0;
+  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; min-width: 0;
 }
 .rx-chat-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rx-chat-back.is-pressed { opacity: 0.35; }
 .rx-chat-title { text-align: center; min-width: 0; }
-.rx-chat-title-1 { font: -apple-system-headline; color: var(--rx-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-chat-title-1 { font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 600; color: var(--rx-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rx-chat-title-2 {
   font-size: calc(11px * var(--rx-dt, 1)); line-height: 13px;
   color: var(--rx-label-2); margin-top: 1px;
@@ -789,7 +810,7 @@ const CSS = `
 .rx-chat-turn.is-same { margin-top: 4px; }
 .rx-chat-turn-user { align-self: flex-end; max-width: 78%; }
 .rx-chat-bubble {
-  font: -apple-system-body;
+  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400;
   background: var(--rx-tint); color: var(--rx-on-tint);
   border-radius: var(--rx-r-bubble, 20px); padding: 10px 14px;
   white-space: pre-wrap; overflow-wrap: anywhere;
@@ -798,14 +819,14 @@ const CSS = `
 .rx-chat-turn-model { align-self: stretch; max-width: 34em; }
 .rx-chat-byline { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--rx-label-2); }
 .rx-chat-marker { display: block; width: 22px; height: 22px; flex: none; }
-.rx-chat-byname { font: -apple-system-footnote; font-weight: 600; color: var(--rx-label-2); }
+.rx-chat-byname { font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; font-weight: 600; color: var(--rx-label-2); }
 .rx-chat-body {
-  font: -apple-system-body; line-height: 1.53; /* 400 words needs air a bubble does not give */
+  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; line-height: 1.53; /* 400 words needs air a bubble does not give */
   color: var(--rx-label); margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
 }
 .rx-chat-body:last-child { margin-bottom: 0; }
-.rx-chat-error { font: -apple-system-footnote; color: var(--rx-red-text); margin: 4px 0 0; }
+.rx-chat-error { font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-red-text); margin: 4px 0 0; }
 
 /* the only motion in the transcript, and it is amber because the phone is
    burning current */
@@ -829,7 +850,7 @@ const CSS = `
 .rx-chat-code::-webkit-scrollbar { display: none; }
 .rx-chat-copy {
   position: absolute; top: 4px; right: 4px; z-index: 1;
-  font: -apple-system-footnote; color: var(--rx-tint);
+  font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-tint);
   padding: 8px 10px; min-height: 32px;
 }
 .rx-chat-copy.is-pressed { opacity: 0.35; }
@@ -854,7 +875,7 @@ const CSS = `
 .rx-chat-jump {
   position: absolute; z-index: 2; left: 50%;
   bottom: calc(var(--rx-chat-composerh, 64px) + var(--rx-kb) + 10px);
-  font: -apple-system-footnote; color: var(--rx-tint);
+  font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-tint);
   background: var(--rx-mat);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
@@ -885,7 +906,7 @@ const CSS = `
 }
 .rx-chat-field {
   flex: 1; min-width: 0; resize: none; border: 0; appearance: none;
-  font: -apple-system-body; /* 17px floor — anything smaller zooms on focus */
+  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; /* 17px floor — anything smaller zooms on focus */
   color: var(--rx-label); background: var(--rx-fill-2);
   border-radius: var(--rx-r-field, 18px);
   padding: 7px 12px; min-height: 36px; max-height: 45dvh;
@@ -929,7 +950,7 @@ const CSS = `
 .rx-chat-menurow {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   width: 100%; min-height: 44px; padding: 11px 16px; text-align: left;
-  font: -apple-system-body; color: var(--rx-label);
+  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; color: var(--rx-label);
 }
 .rx-chat-menurow.is-destructive { color: var(--rx-red-text); }
 .rx-chat-menurow.is-pressed { background: var(--rx-fill-1); }

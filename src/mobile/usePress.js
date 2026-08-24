@@ -10,13 +10,22 @@
  *
  * Commit is on pointer-up inside the bounds — the way UIKit does it. A tap that
  * fires on touch-down feels twitchy and cannot be taken back.
+ *
+ * Pointer events alone reach only a finger. Every control here is a <div>, so
+ * without the role and the key handler below, VoiceOver announces the Models
+ * screen as flat text and Switch Control cannot reach a single download button
+ * — in an app whose whole purpose is downloading a model. The handlers carry
+ * their own semantics so no call site can forget them; pass `label` wherever
+ * the control is an icon with no readable text of its own.
  */
 import { useMemo, useRef, useState } from 'react'
 import * as haptics from './haptics.js'
 
 const SLOP = 10 // pt: past this the finger has become a scroll, not a tap
 
-export default function usePress (onPress, { haptic = 'LIGHT', disabled = false } = {}) {
+export default function usePress (onPress, {
+  haptic = 'LIGHT', disabled = false, label, role = 'button', expanded
+} = {}) {
   const [pressed, setPressed] = useState(false)
   const origin = useRef(null)
 
@@ -43,8 +52,29 @@ export default function usePress (onPress, { haptic = 'LIGHT', disabled = false 
       onPress?.(e)
     },
     onPointerCancel () { origin.current = null; setPressed(false) },
-    onLostPointerCapture () { origin.current = null; setPressed(false) }
-  }), [onPress, haptic, disabled])
+    onLostPointerCapture () { origin.current = null; setPressed(false) },
+    // Space and Enter are what a real <button> answers to, and what iOS
+    // Full Keyboard Access and Switch Control send. Space also scrolls the
+    // page by default, so it has to be swallowed.
+    onKeyDown (e) {
+      if (disabled) return
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return
+      e.preventDefault()
+      setPressed(true)
+    },
+    onKeyUp (e) {
+      if (disabled) return
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return
+      e.preventDefault()
+      setPressed(false)
+      onPress?.(e)
+    },
+    role,
+    tabIndex: disabled ? -1 : 0,
+    'aria-label': label,
+    'aria-disabled': disabled || undefined,
+    'aria-expanded': expanded
+  }), [onPress, haptic, disabled, label, role, expanded])
 
   return { pressed, handlers, className: pressed ? ' is-pressed' : '' }
 }

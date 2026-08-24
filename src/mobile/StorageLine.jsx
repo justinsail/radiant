@@ -13,8 +13,8 @@ import { GB } from './useLocalModels.js'
 
 const fmt = (bytes) => {
   const gb = bytes / GB
-  if (gb >= 100) return `${Math.round(gb)} GB`
-  if (gb >= 10) return `${gb.toFixed(0)} GB`
+  if (gb <= 0) return '0 GB'
+  if (gb >= 10) return `${Math.round(gb)} GB`
   return `${gb.toFixed(1)} GB`
 }
 
@@ -34,10 +34,11 @@ export default function StorageLine ({ downloaded = [], disk, usedBytes = 0, byt
           />
         ))}
       </div>
+      {/* One sentence, in both states. With nothing downloaded the empty track
+          and "0 GB of 128 GB" still make the argument — the model is a thing
+          that weighs something, and right now it weighs nothing. */}
       <div className="rx-storage-label">
-        {usedBytes > 0
-          ? `${fmt(usedBytes)} of ${fmt(disk.total)} used by models.`
-          : `No models stored. ${fmt(disk.free ?? disk.total)} free.`}
+        {`${fmt(usedBytes)} of ${fmt(disk.total)} used by models.`}
       </div>
     </div>
   )

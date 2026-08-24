@@ -127,7 +127,7 @@ const CSS = `
   font-family:var(--mp-font); font-size:calc(34px*var(--mp-dt)); line-height:1.21;
   font-weight:700; letter-spacing:-0.4px; margin:8px 0 0; color:var(--mp-label);
 }
-.rx-mp-lede{font-size:calc(15px*var(--mp-dt)); font-weight:400; font:-apple-system-subheadline; color:var(--mp-label-2); margin:6px 0 0; line-height:1.33}
+.rx-mp-lede{font-size:calc(15px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); margin:6px 0 0; line-height:1.33}
 
 /* ---- hero: the recommended model, no card and no plate. The gauge on the
    grouped background IS the hero; a bordered box would make it a settings
@@ -135,8 +135,8 @@ const CSS = `
 .rx-mp-hero{display:flex; flex-direction:column; align-items:center; text-align:center; padding:24px 0 4px}
 .rx-mp-hero-gauge{display:block; height:96px; color:var(--mp-tint)}
 .rx-mp-hero-name{font-family:var(--mp-font); font-size:calc(22px*var(--mp-dt)); line-height:1.27; font-weight:600; margin:16px 0 0}
-.rx-mp-hero-blurb{font-size:calc(15px*var(--mp-dt)); font-weight:400; font:-apple-system-subheadline; color:var(--mp-label-2); margin:4px 0 0; line-height:1.33; max-width:26em}
-.rx-mp-hero-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; font:-apple-system-footnote; margin:10px 0 0; line-height:1.38}
+.rx-mp-hero-blurb{font-size:calc(15px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); margin:4px 0 0; line-height:1.33; max-width:26em}
+.rx-mp-hero-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); margin:10px 0 0; line-height:1.38}
 .rx-mp-hero-note.is-amber{color:var(--mp-amber)}
 .rx-mp-hero-note.is-red{color:var(--mp-red)}
 
@@ -144,7 +144,7 @@ const CSS = `
   -webkit-appearance:none; appearance:none; border:0; display:flex; align-items:center;
   justify-content:center; gap:8px; width:100%; min-height:50px; margin:20px 0 0;
   border-radius:var(--mp-r-button); background:var(--mp-tint); color:var(--mp-on-tint);
-  font-size:calc(17px*var(--mp-dt)); font:-apple-system-headline; font-weight:600;
+  font-size:calc(17px*var(--mp-dt)); font-family:var(--mp-font); font-weight:600;
   transition:transform var(--mp-dur-press) var(--mp-press), background-color 200ms linear;
 }
 .rx-mp-cta.is-pressed{background:var(--mp-tint-pressed); transform:scale(.96); transition:transform var(--mp-dur-down) var(--mp-down), background-color 0s}
@@ -156,12 +156,12 @@ const CSS = `
 .rx-mp-secondary{
   -webkit-appearance:none; appearance:none; border:0; background:none; display:block;
   width:100%; min-height:44px; margin:4px 0 0;
-  font-size:calc(17px*var(--mp-dt)); font-weight:400; font:-apple-system-body;
+  font-size:calc(17px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font);
   color:var(--mp-tint); transition:opacity var(--mp-dur-press) var(--mp-press);
 }
 .rx-mp-secondary.is-pressed{opacity:.4; transition:opacity var(--mp-dur-down) var(--mp-down)}
 
-.rx-mp-sechead{font-size:calc(13px*var(--mp-dt)); font-weight:400; font:-apple-system-footnote; color:var(--mp-label-2); margin:20px 0 6px; padding:0 4px}
+.rx-mp-sechead{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); margin:20px 0 6px; padding:0 4px}
 .rx-mp-secfoot{font-family:var(--mp-font); font-size:calc(12px*var(--mp-dt)); line-height:1.33; color:var(--mp-label-2); margin:6px 0 0; padding:0 4px}
 
 .rx-mp-group{list-style:none; margin:0; padding:0; background:var(--mp-cell); border-radius:var(--mp-r-cell); overflow:hidden}
@@ -176,28 +176,34 @@ const CSS = `
 .rx-mp-row.is-pressed{background:var(--mp-fill-1); transition:none}
 .rx-mp-row.is-blocked{opacity:1}
 .rx-mp-row.is-blocked .rx-mp-row-name{color:var(--mp-label-3)}
-/* separators are inset to the text column: 16 margin + 29 glyph + 12 gutter.
-   Full-bleed rules between grouped cells read as not-Apple instantly. */
+/* Separators are inset to THIS row's text column — 16 margin, plus the 29pt
+   glyph and its 12pt gutter only when the row actually has one — and they stop
+   16pt short of the trailing edge, as Apple's do. Full-bleed rules between
+   grouped cells read as not-Apple instantly. */
 .rx-mp-row + .rx-mp-row::before{
-  content:''; position:absolute; top:0; left:57px; right:0; height:0.5px; background:var(--mp-sep);
+  content:''; position:absolute; top:0; left:var(--mp-sep-inset,16px); right:16px;
+  height:0.5px; background:var(--mp-sep);
 }
 .rx-mp-row-lead{flex:0 0 29px; height:29px; display:block}
 .rx-mp-row-lead > *{display:block; height:29px; color:inherit}
 .rx-mp-row-text{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px}
-.rx-mp-row-name{font-size:calc(17px*var(--mp-dt)); font-weight:600; font:-apple-system-headline; color:var(--mp-label)}
+.rx-mp-row-name{font-size:calc(17px*var(--mp-dt)); font-weight:600; font-family:var(--mp-font); color:var(--mp-label)}
+/* ⚠️ WRAPS to two lines. It used to be white-space:nowrap, which clipped
+   every blurb mid-word and left a column of identical ellipses. Nothing in an
+   Apple stock app truncates 100% of its secondary text. */
 .rx-mp-row-sub{
-  font-size:calc(15px*var(--mp-dt)); font-weight:400; font:-apple-system-subheadline;
+  font-size:calc(15px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font);
   color:var(--mp-label-2); line-height:1.33;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
 }
-.rx-mp-row-sub.is-amber{color:var(--mp-amber); white-space:normal}
-.rx-mp-row-sub.is-red{color:var(--mp-red); white-space:normal}
-/* at accessibility sizes a truncated model name is useless, so the row stops
-   clipping and grows instead */
-.rx-mp.is-ax .rx-mp-row-sub{white-space:normal}
+.rx-mp-row-sub .rx-mp-size{color:var(--mp-label-2); font-variant-numeric:tabular-nums; font-feature-settings:'tnum'}
+.rx-mp-row-sub.is-amber{color:var(--mp-amber)}
+.rx-mp-row-sub.is-red{color:var(--mp-red)}
+/* at accessibility sizes the row grows a third line rather than clamping harder */
+.rx-mp.is-ax .rx-mp-row-sub{-webkit-line-clamp:3}
 .rx-mp.is-ax .rx-mp-row{align-items:flex-start}
 .rx-mp.is-ax .rx-mp-row-lead{margin-top:2px}
-.rx-mp-row-acc{flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:2px; min-width:44px}
+.rx-mp-row-acc{flex:0 0 auto; display:flex; align-items:center; justify-content:center; min-width:44px}
 /* 44pt of hit area from padding around a 28pt glyph. Getting it from
    width:44px instead swells the glyph and unbalances the row. */
 .rx-mp-row-glyph{display:flex; align-items:center; justify-content:center; width:28px; height:28px; padding:8px; box-sizing:content-box; color:var(--mp-tint)}
@@ -205,13 +211,9 @@ const CSS = `
 .rx-mp-row-glyph.is-green{color:var(--mp-green)}
 .rx-mp-row-glyph.is-amber{color:var(--mp-amber)}
 .rx-mp-row-glyph > *{display:block; height:28px}
-.rx-mp-row-size{
-  font-size:calc(13px*var(--mp-dt)); font-weight:400; font:-apple-system-footnote;
-  color:var(--mp-label-3); font-variant-numeric:tabular-nums; font-feature-settings:'tnum';
-}
-.rx-mp-row-retry{font-size:calc(13px*var(--mp-dt)); font-weight:400; font:-apple-system-footnote; color:var(--mp-tint); padding:4px 0}
+.rx-mp-row-retry{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-tint); padding:4px 0}
 
-.rx-mp-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; font:-apple-system-footnote; color:var(--mp-label-2); text-align:center; padding:32px 8px; line-height:1.38}
+.rx-mp-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); text-align:center; padding:32px 8px; line-height:1.38}
 
 /* the completion beat: one 500ms pop, then the row settles back to tint.
    Green is a confirmation here, never a state. */
@@ -545,7 +547,7 @@ export default function ModelPicker ({ onChoose, onConnectMac, heading = 'Choose
 
           {list.length > 0 && (
             <p className="rx-mp-secfoot">
-              Models run entirely on this iPhone. Nothing you type leaves the device.
+              Models run on this iPhone. Nothing you type leaves it.
             </p>
           )}
 
@@ -564,7 +566,7 @@ export default function ModelPicker ({ onChoose, onConnectMac, heading = 'Choose
 // faded tint, so an undownloaded model reads as empty rather than as broken.
 const gaugeColor = state => (
   state === 'working' ? 'var(--mp-amber)'
-    : state === 'resident' ? 'var(--mp-tint)'
+    : state === 'resident' || state === 'mark' ? 'var(--mp-tint)'
       : 'var(--mp-label-3)'
 )
 
@@ -574,9 +576,13 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
   const blocked = shortfall > 0 && !model.downloaded && !downloading
   const disabled = downloading || busyElsewhere || blocked
 
+  // 'mark', not 'absent': Gauge paints its own color from data-state, and
+  // data-state="absent" is --rx-label-3 — a 96pt grey donut in the highest-
+  // value slot on the sheet. 'mark' is the same geometry in tint with no core
+  // dot: the icon, held still. It still turns amber the moment a download runs.
   const gaugeState = downloading ? 'working'
     : failed ? 'failed'
-      : model.downloaded ? 'resident' : 'absent'
+      : model.downloaded ? 'resident' : 'mark'
 
   let label
   if (downloading) label = 'Downloading…'
@@ -592,6 +598,12 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
       {/* currentColor is set here as well as inside Gauge, so the mark is right
           whether Gauge paints its own stroke or inherits. Amber only ever means
           the phone is spending something. */}
+      {/* Tint, not grey, when the model is simply not here yet. At 96pt a
+          --mp-label-3 iris is a large grey donut in the highest-value slot on
+          the sheet; here the gauge is the subject of the screen, so it is drawn
+          as the mark. It still goes amber while downloading and it still gets
+          its core dot only once the weights are resident — the state is carried
+          by the dot and the motion, which is where it belongs. */}
       <span
         className={`rx-mp-hero-gauge${done ? ' rx-mp-pop' : ''}`}
         style={{ color: gaugeColor(gaugeState) }}
@@ -661,22 +673,33 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
     accessory = <span className={`rx-mp-row-glyph${blocked ? ' is-quiet' : ''}`}><ArrowDownCircle /></span>
   }
 
+  // ⚠️ NO LEADING GAUGE ON A ROW THAT IS MERELY UNDOWNLOADED. At 29pt the
+  // iris's three strokes go sub-pixel and collapse into a pale grey blob; five
+  // of them down the left edge read as broken image placeholders, and they said
+  // nothing, because every row was in the same state. It appears only when it
+  // has something to report.
+  const lead = model.downloaded || downloading || failed
+  const showSize = !failed && !downloading && !blocked
+
   return (
     <li
       className={`rx-mp-row${pressed ? ' is-pressed' : ''}${blocked ? ' is-blocked' : ''}`}
+      style={{ '--mp-sep-inset': lead ? '57px' : '16px' }}
       {...handlers}
     >
-      <span className="rx-mp-row-lead" style={{ color: gaugeColor(gaugeState) }}>
-        <Gauge state={gaugeState} size={29} />
-      </span>
+      {lead && (
+        <span className="rx-mp-row-lead" style={{ color: gaugeColor(gaugeState) }}>
+          <Gauge state={gaugeState} size={29} />
+        </span>
+      )}
       <span className="rx-mp-row-text">
         <span className="rx-mp-row-name">{model.name}</span>
-        <span className={`rx-mp-row-sub${subClass}`}>{sub}</span>
+        <span className={`rx-mp-row-sub${subClass}`}>
+          {showSize && <><span className="rx-mp-size">{model.sizeGB.toFixed(1)} GB</span>{' · '}</>}
+          {sub}
+        </span>
       </span>
-      <span className="rx-mp-row-acc">
-        {accessory}
-        {!failed && <span className="rx-mp-row-size">{model.sizeGB.toFixed(1)} GB</span>}
-      </span>
+      <span className="rx-mp-row-acc">{accessory}</span>
     </li>
   )
 }

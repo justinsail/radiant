@@ -10,7 +10,11 @@
  * the mark rather than as three rings.
  *
  * States (one prop):
- *   absent      not downloaded — static, rest coverage, no core dot
+ *   absent      not downloaded — static, rest coverage, grey, no core dot
+ *   mark        the launch/first-run identity draw — rest coverage, tint, no
+ *               core dot. It claims nothing about state because there is no
+ *               state yet; it is the icon, held still. Used ONLY on the first-
+ *               run cover, so the first frame of the app is never a grey ring.
  *   resident    downloaded and idle — static, tint, core dot
  *   working     indeterminate — narrow arcs, differential rotation (mobile.css)
  *   generating  rest coverage, whole group turning, dot breathing, amber

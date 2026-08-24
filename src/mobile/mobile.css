@@ -91,7 +91,10 @@
   --rx-dt: 1;
 
   /* radii — continuous-corner FEEL from generous values, not squircle math */
-  --rx-r-cell: 10px;               /* the grouped card group's outer corners */
+  /* Measured against Settings on the same simulator: Apple's inset-grouped
+     card corner is ~17pt, not the 10pt the spec inherited from an older iOS.
+     At 10px the cards read boxy and dated in a side-by-side. */
+  --rx-r-cell: 16px;               /* the grouped card group's outer corners */
   --rx-r-bubble: 20px;
   --rx-r-button: 14px;
   --rx-r-field: 18px;
@@ -318,10 +321,19 @@
 }
 .is-native ::selection { background: color-mix(in srgb, var(--rx-tint) 26%, transparent); }
 
-/* No focus ring. styles.css has one; it is not loaded, and it is not coming
-   back. Focus is invisible on a touch device. */
-.is-native :focus,
-.is-native :focus-visible { outline: none; }
+/* No focus ring for a finger — styles.css has one, it is not loaded, and it is
+   not coming back. But a phone is not only a touch device: Full Keyboard
+   Access, Switch Control and a paired keyboard all drive focus, and they are
+   exactly what :focus-visible matches and a tap never does. Without this the
+   controls are reachable and invisible, which is worse than unreachable. */
+.is-native :focus { outline: none; }
+.is-native :focus-visible {
+  outline: 3px solid var(--rx-tint);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+/* A full-bleed row would clip its ring against the group's edge */
+.is-native .rx-row:focus-visible { outline-offset: -3px; border-radius: 0; }
 
 /* Scrollbars are never drawn. styles.css styles them to be VISIBLE, which is
    correct on a Mac and disqualifying on a phone. Stated explicitly so nobody
@@ -354,9 +366,22 @@
    not print their own name in their chrome, and deleting the wordmark is what
    buys the gauge its meaning. */
 
+/* ⚠️ EVERY ROLE BELOW SETS ITS SIZE EXPLICITLY, and that is a deliberate
+   reversal. The spec's mechanism 1 was `font: -apple-system-headline` and
+   friends, on the theory that WebKit resolves them to the real Dynamic Type
+   metrics for free. Measured in this app's WKWebView against Settings on the
+   same simulator, it does not: a `-apple-system-headline` row name came out
+   ~9% short of Apple's 17pt, which side by side reads as a smaller, weaker
+   list. So the sizes are typed out and scaled by --rx-dt, which IS measured
+   from a live `-apple-system-body` probe (MobileShell/Phone) and which the
+   large title already proved accurate — it matched Apple exactly. Dynamic Type
+   still works; it now goes through one number we can verify instead of six
+   shorthands we cannot.
+   Do not "simplify" these back to the shorthand without re-measuring. */
+
 /* the one place letter-spacing is set in this entire file */
 .is-native .rx-large-title {
-  font: -apple-system-body;
+  font-family: var(--rx-font);
   font-size: calc(34px * var(--rx-dt));
   line-height: 1.206;              /* 41/34 */
   font-weight: 700;
@@ -366,50 +391,71 @@
   text-wrap: balance;
 }
 .is-native .rx-title-2 {
-  font: -apple-system-body;
+  font-family: var(--rx-font);
   font-size: calc(22px * var(--rx-dt));
   line-height: 1.273;              /* 28/22 */
   font-weight: 600;
 }
 .is-native .rx-title-3 {
-  font: -apple-system-body;
+  font-family: var(--rx-font);
   font-size: calc(20px * var(--rx-dt));
   line-height: 1.25;               /* 25/20 */
   font-weight: 600;
 }
 .is-native .rx-headline {
-  font: -apple-system-headline;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;              /* 22/17 */
+  font-weight: 600;
   color: var(--rx-label);
 }
 .is-native .rx-body {
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;              /* 22/17 */
+  font-weight: 400;
   color: var(--rx-label);
 }
 /* 400 words of generated prose needs air a bubble does not */
 .is-native .rx-body-assistant {
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  font-weight: 400;
   line-height: 1.53;
   color: var(--rx-label);
 }
 .is-native .rx-callout {
-  font: -apple-system-body;
+  font-family: var(--rx-font);
   font-size: calc(16px * var(--rx-dt));
   line-height: 1.3125;             /* 21/16 */
+  font-weight: 400;
 }
 .is-native .rx-subhead {
-  font: -apple-system-subheadline;
+  font-family: var(--rx-font);
+  font-size: calc(15px * var(--rx-dt));
+  line-height: 1.333;              /* 20/15 */
+  font-weight: 400;
   color: var(--rx-label-2);
 }
 .is-native .rx-footnote {
-  font: -apple-system-footnote;
+  font-family: var(--rx-font);
+  font-size: calc(13px * var(--rx-dt));
+  line-height: 1.385;              /* 18/13 */
+  font-weight: 400;
   color: var(--rx-label-2);
 }
 .is-native .rx-caption-1 {
-  font: -apple-system-caption1;
+  font-family: var(--rx-font);
+  font-size: calc(12px * var(--rx-dt));
+  line-height: 1.333;              /* 16/12 */
+  font-weight: 400;
   color: var(--rx-label-2);
 }
 .is-native .rx-caption-2 {
-  font: -apple-system-caption2;
+  font-family: var(--rx-font);
+  font-size: calc(11px * var(--rx-dt));
+  line-height: 1.182;              /* 13/11 */
+  font-weight: 400;
   color: var(--rx-label-2);
 }
 .is-native .rx-code {
@@ -579,7 +625,10 @@
   transform: translate3d(0, calc((1 - var(--rx-collapse, 0)) * 4px), 0);
 }
 .is-native .rx-nav-title-main {
-  font: -apple-system-headline;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;
+  font-weight: 600;
   color: var(--rx-label);
   white-space: nowrap;
   overflow: hidden;
@@ -588,7 +637,10 @@
 /* the two-line Chat title: model name over "On device". The privacy promise
    lives permanently in the chrome, in the quietest possible place. */
 .is-native .rx-nav-title-sub {
-  font: -apple-system-caption2;
+  font-family: var(--rx-font);
+  font-size: calc(11px * var(--rx-dt));
+  line-height: 1.182;
+  font-weight: 400;
   color: var(--rx-label-2);
   white-space: nowrap;
   overflow: hidden;
@@ -608,7 +660,10 @@
   margin: 0 calc(-1 * var(--rx-sp-8));   /* optical: pull back to the 16pt margin */
   padding: 0 var(--rx-sp-8);
   color: var(--rx-tint);
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;
+  font-weight: 400;
 }
 .is-native .rx-bar-button[data-align='leading'] { justify-content: flex-start; }
 .is-native .rx-bar-button[data-align='trailing'] { justify-content: flex-end; }
@@ -636,24 +691,44 @@
 .is-native .rx-title-block {
   padding: var(--rx-sp-8) var(--rx-sp-16) 0;
 }
-/* hero block sits 24pt below the title */
-.is-native .rx-hero { margin-top: var(--rx-sp-24); }
+/* ⚠️ THE ROOT SCREEN HAS EXACTLY TWO VERTICAL INTERVALS: 24 from the title to
+   the first block, 32 between blocks. It used to have four unrelated gaps
+   (48 / 26 / 17 / 31) and nothing grouped. Settings uses two on this screen. */
+.is-native .rx-hero {
+  margin-top: var(--rx-sp-24);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--rx-sp-12);            /* inside one unit, not between blocks */
+  padding: 0 var(--rx-sp-16);
+  min-height: var(--rx-sp-44);
+}
+.is-native .rx-hero-label { display: flex; flex-direction: column; gap: var(--rx-sp-2); }
 
 
 /* ═══ inset grouped list ═══════════════════════════════════════════════════ */
 
-.is-native .rx-section { margin-top: var(--rx-sp-20); }
+.is-native .rx-section { margin-top: var(--rx-sp-32); }
 
+/* Sentence case, not uppercase: SHOUTING GROUPED HEADERS are the iOS 7–13
+   idiom and current Apple sets them at footnote in sentence case. */
 .is-native .rx-section-header {
-  font: -apple-system-footnote;
+  font-family: var(--rx-font);
+  font-size: calc(13px * var(--rx-dt));
+  line-height: 1.385;
+  font-weight: 400;
   color: var(--rx-label-2);
-  text-transform: uppercase;
   padding: 0 var(--rx-sp-16) var(--rx-sp-6);
 }
 .is-native .rx-section-footer {
-  font: -apple-system-caption1;
+  font-family: var(--rx-font);
+  font-size: calc(12px * var(--rx-dt));
+  line-height: 1.333;
+  font-weight: 400;
   color: var(--rx-label-2);
   padding: var(--rx-sp-6) var(--rx-sp-16) 0;
+  /* keeps "device." off a line of its own */
+  text-wrap: pretty;
 }
 
 .is-native .rx-group {
@@ -663,6 +738,38 @@
   border-radius: var(--rx-r-cell);
   overflow: hidden;
 }
+
+/* The App Store's GET idiom: a low-ink capsule, tint label on a neutral fill.
+   It exists so the root screen's first frame is actionable when nothing is
+   downloaded yet — the screen used to open on a 96pt grey donut reading "No
+   model yet", which is the weakest possible first frame. 28pt visual inside a
+   44pt hit area, from padding, never from `width: 44px`. */
+.is-native .rx-get-hit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--rx-sp-44);
+  min-height: var(--rx-sp-44);
+  padding: var(--rx-sp-8);
+  margin: calc(-1 * var(--rx-sp-8)) calc(-1 * var(--rx-sp-8)) calc(-1 * var(--rx-sp-8)) 0;
+}
+.is-native .rx-get {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 28px;
+  padding: 0 var(--rx-sp-16);
+  border-radius: var(--rx-r-capsule);
+  background: var(--rx-fill-2);
+  color: var(--rx-tint);
+  font-family: var(--rx-font);
+  font-size: calc(15px * var(--rx-dt));
+  line-height: 1;
+  font-weight: 600;
+}
+.is-native .rx-get-hit.is-pressed .rx-get { background: var(--rx-fill-1); }
 
 .is-native .rx-row {
   position: relative;
@@ -689,7 +796,9 @@
   position: absolute;
   top: 0;
   left: var(--rx-sep-inset, var(--rx-sp-16));
-  right: 0;
+  /* stops 16pt short of the card's trailing edge, as Apple's does. Running it
+     to `right: 0` is a small thing that reads as not-Apple immediately. */
+  right: var(--rx-sp-16);
   height: 0.5px;
   background: var(--rx-separator);
 }
@@ -701,26 +810,28 @@
   flex-direction: column;
   gap: var(--rx-sp-2);
 }
-/* one line at default sizes; reflows to two at AX rather than truncating the
-   model name, which is the thing the row exists to communicate */
+/* ⚠️ WRAPS. It used to be `white-space: nowrap`, which truncated all five
+   catalog blurbs mid-word and produced a stacked column of five ellipses at
+   almost the same x. Nothing in an Apple stock app truncates 100% of its
+   secondary text — Settings wraps the Apple Account subtitle to two lines
+   rather than clip it. The two-line clamp is unconditional now, not an AX-only
+   fallback, and the row is already 60pt so it costs nothing. */
 .is-native .rx-row-blurb {
-  font: -apple-system-subheadline;
+  font-family: var(--rx-font);
+  font-size: calc(15px * var(--rx-dt));
+  line-height: 1.333;
+  font-weight: 400;
   color: var(--rx-label-2);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* At AX sizes the row reflows to two lines rather than truncating — the model
-   name is the thing the row exists to communicate, and an ellipsed name at AX3
-   is the failure this whole Dynamic Type effort exists to avoid. Phone.jsx sets
-   data-ax on the root when the measured --rx-dt clears 1.2; a CSS-only test is
-   not possible because custom properties cannot be used in a media query. */
-.is-native[data-ax='true'] .rx-row-blurb {
-  white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+/* At AX sizes the row grows instead of clamping harder: the blurb gets a third
+   line and the row stops pretending it can hold two. Phone.jsx sets data-ax on
+   the root when the measured --rx-dt clears 1.2; a CSS-only test is impossible
+   because custom properties cannot be used in a media query. */
+.is-native[data-ax='true'] .rx-row-blurb { -webkit-line-clamp: 3; }
 .is-native[data-ax='true'] .rx-row { min-height: 60px; }
 
 /* a row the device cannot honor: not enough free disk. Dimmed, with an amber
@@ -749,10 +860,14 @@
   min-height: var(--rx-sp-44);
   color: var(--rx-tint);
 }
-.is-native .rx-accessory-size {
-  font: -apple-system-footnote;
-  color: var(--rx-label-3);
+/* The size used to live under the accessory in --rx-label-3 — 2.4:1 on white,
+   failing AA, reading as disabled, and eating ~90pt of the width the blurb
+   needed. It now leads the blurb ("0.7 GB · Fastest…"), which is the App Store
+   idiom, and the trailing column is one clean 44pt hit area. */
+.is-native .rx-row-size {
+  color: var(--rx-label-2);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }
 
 /* trailing swipe action. Full-swipe is enabled but raises a confirm sheet
@@ -765,7 +880,10 @@
   padding: 0 var(--rx-sp-20);
   background: var(--rx-red-fill);
   color: #FFFFFF;
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;
+  font-weight: 400;
 }
 
 
@@ -803,7 +921,10 @@
   border-radius: var(--rx-r-button);
   background: var(--rx-tint);
   color: var(--rx-on-tint);
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;
+  font-weight: 400;
   font-weight: 600;
 }
 .is-native .rx-primary.is-pressed { background: var(--rx-tint-pressed); }
@@ -821,7 +942,10 @@
   min-height: var(--rx-sp-44);
   padding: 0 var(--rx-sp-12);
   color: var(--rx-tint);
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;
+  font-weight: 400;
 }
 .is-native .rx-plain-button[data-destructive='true'] { color: var(--rx-red-text); }
 
@@ -867,7 +991,10 @@
   padding: var(--rx-sp-10) 14px;
   border-radius: var(--rx-r-bubble);
   background: var(--rx-tint);
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;
+  font-weight: 400;
   color: var(--rx-on-tint);
 }
 /* consecutive turns from the same speaker sit tighter than a speaker change */
@@ -889,7 +1016,10 @@
   align-items: center;
   gap: var(--rx-sp-6);
   margin-bottom: var(--rx-sp-6);
-  font: -apple-system-footnote;
+  font-family: var(--rx-font);
+  font-size: calc(13px * var(--rx-dt));
+  line-height: 1.385;
+  font-weight: 400;
   font-weight: 600;
   color: var(--rx-label-2);
 }
@@ -939,7 +1069,10 @@
   right: var(--rx-sp-4);
   min-height: 32px;
   padding: 0 var(--rx-sp-8);
-  font: -apple-system-footnote;
+  font-family: var(--rx-font);
+  font-size: calc(13px * var(--rx-dt));
+  line-height: 1.385;
+  font-weight: 400;
   color: var(--rx-tint);
 }
 
@@ -960,7 +1093,10 @@
   -webkit-backdrop-filter: var(--rx-mat-regular-blur);
   backdrop-filter: var(--rx-mat-regular-blur);
   color: var(--rx-tint);
-  font: -apple-system-footnote;
+  font-family: var(--rx-font);
+  font-size: calc(13px * var(--rx-dt));
+  line-height: 1.385;
+  font-weight: 400;
   transform: translate3d(-50%, 0, 0);
   transition: transform var(--rx-dur-pop) var(--rx-pop),
               opacity var(--rx-dur-pop) var(--rx-pop);
@@ -1009,7 +1145,10 @@
   color: var(--rx-label);
   /* 17px MINIMUM and never reduced. Below 16px iOS zooms the page on focus and
      the illusion is over in one tap. */
-  font: -apple-system-body;
+  font-family: var(--rx-font);
+  font-size: calc(17px * var(--rx-dt));
+  line-height: 1.294;
+  font-weight: 400;
   line-height: 1.294;
   resize: none;
   overflow-y: auto;
@@ -1092,11 +1231,21 @@
 }
 .is-native .rx-sheet[data-dragging='true'] { transition: none; }
 
+/* The grabber is 36×5, as Apple draws it, but the DRAG TARGET is the full
+   width of a 22pt strip. A 5pt-tall drag zone is unhittable with a thumb, and
+   a sheet you cannot pull down is a sheet people think is stuck. */
 .is-native .rx-grabber {
   flex: 0 0 auto;
+  width: 100%;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.is-native .rx-grabber::before {
+  content: '';
   width: 36px;
   height: 5px;
-  margin: var(--rx-sp-6) auto 0;
   border-radius: 2.5px;
   background: var(--rx-fill-1);
 }
@@ -1117,7 +1266,10 @@
 }
 .is-native .rx-stat + .rx-stat { border-left: 0.5px solid var(--rx-separator); }
 .is-native .rx-stat-key {
-  font: -apple-system-caption2;
+  font-family: var(--rx-font);
+  font-size: calc(11px * var(--rx-dt));
+  line-height: 1.182;
+  font-weight: 400;
   color: var(--rx-label-3);
   text-transform: uppercase;
 }
@@ -1179,12 +1331,18 @@
 .is-native .rx-storage-seg:nth-child(3) { opacity: 0.52; }
 .is-native .rx-storage-seg:nth-child(4) { opacity: 0.38; }
 .is-native .rx-storage-seg:nth-child(n + 5) { opacity: 0.28; }
+/* ⚠️ SF, NOT SF MONO. The spec asked for mono here; on the device "0 GB of
+   128 GB used by models." in SF Mono reads as terminal output pasted into an
+   iOS app, and Settings sets every storage figure in SF. Tabular numerals give
+   the same no-jitter guarantee, which was the actual requirement. */
 .is-native .rx-storage-label {
   margin-top: var(--rx-sp-6);
-  font-family: var(--rx-mono);
-  font-size: calc(11px * var(--rx-dt));
-  line-height: 1.18;
+  font-family: var(--rx-font);
+  font-size: calc(12px * var(--rx-dt));
+  line-height: 1.33;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
   color: var(--rx-label-2);
 }
 

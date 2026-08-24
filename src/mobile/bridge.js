@@ -23,7 +23,7 @@
  * (LocalModels, Device.getInfo) the error is passed through instead.
  */
 
-const LOUD = { LocalModels: ['list', 'downloaded', 'download', 'remove', 'generate', 'stop'] }
+const LOUD = { LocalModels: ['list', 'downloaded', 'download', 'remove', 'generate', 'stop', 'diskInfo'] }
 const QUIET = {
   Haptics: ['impact', 'notification', 'vibrate', 'selectionStart', 'selectionChanged', 'selectionEnd'],
   StatusBar: ['setStyle', 'setBackgroundColor', 'show', 'hide', 'setOverlaysWebView'],

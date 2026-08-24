@@ -62,7 +62,7 @@ const pick = (mod, ...names) => {
 
 const Missing = (name) => function MissingScreen () {
   return (
-    <div style={{ padding: 16, color: 'var(--rx-label-2, rgba(60,60,67,0.6))', font: '-apple-system-body' }}>
+    <div style={{ padding: 16, color: 'var(--rx-label-2, rgba(60,60,67,0.6))', fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400 }}>
       {name} has not landed yet.
     </div>
   )
@@ -275,14 +275,6 @@ const Chevron = ({ size = 17 }) => (
   </svg>
 )
 
-const Gear = ({ size = 21 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.8" />
-    <path d="M12 2.6v2.2M12 19.2v2.2M21.4 12h-2.2M5 12H2.6M18.6 5.4 17 7M7 17l-1.6 1.6M18.6 18.6 17 17M7 7 5.4 5.4"
-      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-  </svg>
-)
-
 const EllipsisCircle = ({ size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <circle cx="12" cy="12" r="10.1" stroke="currentColor" strokeWidth="1.7" />
@@ -379,7 +371,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
               minWidth: 44, padding: '0 8px',
               appearance: 'none', border: 0, background: 'none',
               color: 'var(--rx-tint, #3F69A7)',
-              font: '-apple-system-body',
+              fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400,
               touchAction: 'manipulation'
             }}
           >
@@ -403,7 +395,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
           }}
         >
           <span style={{
-            font: '-apple-system-headline',
+            fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 600,
             color: 'var(--rx-label, #000)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%'
           }}>{title}</span>
@@ -610,7 +602,7 @@ function MenuRow ({ item, first, onClose }) {
         appearance: 'none', border: 0, background: 'transparent', textAlign: 'left',
         borderTop: first ? 'none' : '0.5px solid var(--rx-separator, rgba(60,60,67,0.29))',
         color: item.destructive ? 'var(--rx-red-text, #D70015)' : 'var(--rx-label, #000)',
-        font: '-apple-system-body', touchAction: 'manipulation'
+        fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400, touchAction: 'manipulation'
       }}
     >{item.label}</button>
   )
@@ -939,7 +931,6 @@ export default function MobileShell () {
     push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, depth: stack.length
   }), [push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, stack.length])
 
-  const gearPress = usePress(connectMac)
   const menuPress = usePress(() => setMenuOpen(true))
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -994,12 +985,11 @@ export default function MobileShell () {
 
   const trailingFor = (entry) => {
     if (entry.key !== topKey) return null
-    if (entry.route === 'models') {
-      return (
-        <button type="button" className="rx-shell-barbtn" {...gearPress}
-          aria-label="Settings" style={barButtonStyle}><Gear /></button>
-      )
-    }
+    // ⚠️ NO TRAILING BUTTON ON MODELS, and that is the fix, not an omission.
+    // It used to be a "gear" drawn as a circle with eight radial strokes, which
+    // at 21pt reads as a sun with uneven rays — the only tinted glyph above the
+    // fold, doing nothing the "Connect to a Mac" row two sections down does not
+    // already do. A decorative control in the chrome is a webview tell.
     if (entry.route === 'chat') {
       return (
         <button type="button" className="rx-shell-barbtn" {...menuPress}

@@ -22,7 +22,10 @@ export default function FirstRun ({ onChooseModel, onConnectMac }) {
         alignItems: 'center', justifyContent: 'center', gap: 20,
         textAlign: 'center'
       }}>
-        <Gauge size={128} state="absent" />
+        {/* `mark`, not `absent`: the first frame of the app must not be a
+            128pt grey donut. This is the launch screen's tinted iris, held
+            still — it is the icon, not a status readout. */}
+        <Gauge size={128} state="mark" />
         <h1 className="rx-large-title" style={{ margin: 0 }}>Radiant</h1>
         <p className="rx-body rx-l2" style={{ margin: 0, maxWidth: '30em' }}>
           Pick a model to download. It runs on this iPhone — no account, and no

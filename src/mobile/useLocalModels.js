@@ -9,6 +9,8 @@
  * What the plugin actually gives us, and what this hook therefore refuses to
  * invent:
  *   list()      → { models: [{ id, name, blurb, sizeGB, downloaded }] }
+ *   events      downloadStarted / downloadProgress { id, progress: 0..1 }
+ *               / downloadDone / downloadFailed
  *   download()  is INDETERMINATE — downloadStarted / downloadDone /
  *               downloadFailed and nothing in between (TG-221). There is no
  *               percentage here because there is no percentage to have, and a
@@ -35,6 +37,7 @@ export function useLocalModels () {
   const [jobs, setJobs] = useState({})        // id -> 'downloading' | 'failed'
   const [failures, setFailures] = useState({}) // id -> message
   const [justDone, setJustDone] = useState(null)
+  const [progress, setProgress] = useState({})  // id -> 0..1 while downloading
   const [disk, setDisk] = useState(null)      // { total, free } or null
 
   const alive = useRef(true)
@@ -55,15 +58,37 @@ export function useLocalModels () {
     }
   }, [])
 
+  /**
+   * ⚠️ LocalModels.diskInfo() FIRST, Device second.
+   *
+   * @capacitor/device is not installed natively here and cannot be: adding it
+   * means `npx cap sync ios`, and sync rewrites CapApp-SPM/Package.swift, where
+   * the MLX dependencies are hand-added. So the storage line silently never
+   * rendered — half the product argument, missing from the root screen. The
+   * Swift plugin now answers the two numbers itself; the Device path stays as a
+   * fallback in case that plugin build is ever older than this JS.
+   */
   const refreshDisk = useCallback(async () => {
-    const dev = DEVICE()
-    if (!dev?.getInfo) { setDisk(null); return }
+    const read = async () => {
+      const lm = LM()
+      if (lm?.diskInfo) {
+        const d = await lm.diskInfo()
+        if (typeof d?.total === 'number' && d.total > 0) {
+          return { total: d.total, free: typeof d.free === 'number' ? d.free : null }
+        }
+      }
+      const dev = DEVICE()
+      if (dev?.getInfo) {
+        const info = await dev.getInfo()
+        const total = typeof info?.realDiskTotal === 'number' ? info.realDiskTotal : null
+        const free = typeof info?.realDiskFree === 'number' ? info.realDiskFree : null
+        if (total) return { total, free }
+      }
+      return null
+    }
     try {
-      const info = await dev.getInfo()
-      if (!alive.current) return
-      const total = typeof info?.realDiskTotal === 'number' ? info.realDiskTotal : null
-      const free = typeof info?.realDiskFree === 'number' ? info.realDiskFree : null
-      setDisk(total ? { total, free } : null)
+      const d = await read()
+      if (alive.current) setDisk(d)
     } catch { if (alive.current) setDisk(null) }
   }, [])
 
@@ -89,8 +114,16 @@ export function useLocalModels () {
         setJobs(j => ({ ...j, [id]: 'downloading' }))
         setFailures(f => { if (!(id in f)) return f; const n = { ...f }; delete n[id]; return n })
       },
+      // The native side throttles to whole percents. A stale event can still
+      // land just after downloadDone; harmless, because the row reads as
+      // downloaded by then and only a downloading row consults this.
+      downloadProgress: ({ id, progress: f }) => {
+        if (typeof f !== 'number' || !isFinite(f)) return
+        setProgress(p => ({ ...p, [id]: Math.min(Math.max(f, 0), 1) }))
+      },
       downloadDone: ({ id }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })
+        setProgress(p => { if (!(id in p)) return p; const n = { ...p }; delete n[id]; return n })
         setModels(ms => ms.map(m => (m.id === id ? { ...m, downloaded: true } : m)))
         setJustDone(id)
         haptics.notification('SUCCESS')
@@ -99,6 +132,7 @@ export function useLocalModels () {
       },
       downloadFailed: ({ id, message }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })
+        setProgress(p => { if (!(id in p)) return p; const n = { ...p }; delete n[id]; return n })
         setFailures(f => ({ ...f, [id]: message || 'The download did not finish.' }))
         haptics.notification('ERROR')
       }
@@ -177,6 +211,7 @@ export function useLocalModels () {
     jobs,
     failures,
     justDone,
+    progress,
     downloadingId,
     disk,
     usedBytes,
