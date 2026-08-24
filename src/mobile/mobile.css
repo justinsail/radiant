@@ -2166,3 +2166,48 @@
   font: -apple-system-caption2;
   color: var(--rx-label-2);
 }
+
+/* ---- maker shelves on the models screen -------------------------------- */
+/* The picker injects its own rx-mp-* copy of these; the two must stay in step.
+   Shared behavior lives in MakerSection.jsx — only appearance is here. */
+.is-native .rx-makerhead{
+  display:flex; align-items:center; gap:10px; width:100%;
+  margin:8px 0 0; padding:12px 16px;
+  background:var(--rx-cell); border:0; border-radius:12px;
+  font:inherit; color:var(--rx-label); text-align:left;
+  -webkit-tap-highlight-color:transparent;
+}
+.is-native .rx-makerhead.is-pressed{background:var(--rx-fill-3)}
+/* Square the bottom when open so header and list read as one card. */
+.is-native .rx-makerhead.is-open{border-bottom-left-radius:0; border-bottom-right-radius:0}
+.is-native .rx-makerhead.is-open + div > .rx-group{
+  margin-top:0; border-top-left-radius:0; border-top-right-radius:0;
+}
+.is-native .rx-maker-chev{
+  display:flex; flex:none; color:var(--rx-label-3);
+  transition:transform .18s ease, color .18s ease;
+}
+.is-native .rx-makerhead.is-open .rx-maker-chev{transform:rotate(90deg); color:var(--rx-tint)}
+.is-native .rx-maker-name{
+  font:-apple-system-body; font-weight:600; flex:1 1 auto; min-width:0;
+}
+.is-native .rx-maker-meta{
+  font:-apple-system-footnote; color:var(--rx-label-2);
+  flex:none; font-variant-numeric:tabular-nums;
+}
+.is-native .rx-maker-none{color:var(--rx-label-3)}
+@media (prefers-reduced-motion:reduce){
+  .is-native .rx-maker-chev{transition:none}
+}
+
+/* The verdict, beside the model name. A weighted word, not a filled pill:
+   forty-four pills down a scroll is a color chart and the ones that matter
+   stop standing out. "Runs well" is the expected case, so it is the quietest
+   of the three — it needs to not be a warning, not to be celebrated. */
+.is-native .rx-fit{
+  margin-left:8px; font-size:0.82em; font-weight:600;
+  letter-spacing:0.01em; white-space:nowrap;
+}
+.is-native .rx-fit.is-well{color:var(--rx-label-3); font-weight:400}
+.is-native .rx-fit.is-tight{color:var(--rx-amber)}
+.is-native .rx-fit.is-no{color:var(--rx-label-3); font-weight:400}

@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as GaugeModule from './Gauge.jsx'
 import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
+import { fitOf, FIT_LABEL, FITS_NO, ramNeededGB } from './fit.js'
+import MakerSection from './MakerSection.jsx'
+import { byMaker } from './makers.js'
 
 // Picking a model is the first thing a new user does, so this screen has one
 // job: make the obvious choice obvious. A recommended model gets the hero —
@@ -46,19 +49,6 @@ const hapt = {
 // recent iPhone"). If the native catalog ever drops it we fall through to the
 // first entry rather than rendering a picker with no hero.
 const RECOMMENDED_ID = 'qwen3-1.7b'
-
-// The catalogue is seventeen models, and one undifferentiated list of them is
-// the wall of names this screen exists to avoid. So it is banded by download
-// size — which is the one thing that genuinely decides whether a given iPhone
-// can run a given model, and therefore the only heading here that tells the
-// reader something true rather than tidying the page. Bands are computed from
-// sizeGB, not hard-coded per model, so adding a model to the Swift catalogue
-// files it correctly without touching this screen.
-const BANDS = [
-  { title: 'Runs on any iPhone', holds: gb => gb <= 1.0 },
-  { title: 'Most recent iPhones', holds: gb => gb > 1.0 && gb <= 2.0 },
-  { title: 'Needs a Pro, and room', holds: gb => gb > 2.0 }
-]
 
 // Decimal GB, matching how Apple reports storage in Settings. Using 2^30 here
 // would make every size on screen disagree with the number the user can check.
@@ -187,6 +177,54 @@ const CSS = `
 .rx-mp-secondary.is-pressed{opacity:.4; transition:opacity var(--mp-dur-down) var(--mp-down)}
 
 .rx-mp-sechead{font-size:calc(13px*var(--mp-dt)); font-weight:400; color:var(--mp-label-2); margin:20px 0 6px; padding:0 4px}
+/* ---- a maker's shelf: header, and the fit verdict on each row ---------- */
+/* The header is a cell in its own right, not a caption: it is tappable, so it
+   has to read as a control. Same radius and ground as the rows it opens. */
+.rx-mp-makerhead{
+  display:flex; align-items:center; gap:10px; width:100%;
+  margin:8px 0 0; padding:12px 16px;
+  background:var(--mp-cell); border:0; border-radius:var(--mp-r-cell);
+  font:inherit; color:var(--mp-label); text-align:left;
+  -webkit-tap-highlight-color:transparent; cursor:pointer;
+}
+.rx-mp-makerhead.is-pressed{background:var(--mp-fill-3)}
+/* Square off the bottom when open so the header and its list read as one
+   card rather than two stacked ones. */
+.rx-mp-makerhead.is-open{border-bottom-left-radius:0; border-bottom-right-radius:0}
+.rx-mp-makerhead.is-open + div .rx-mp-group{
+  margin-top:0; border-top-left-radius:0; border-top-right-radius:0;
+}
+.rx-mp-maker-chev{
+  display:flex; color:var(--mp-label-3); flex:none;
+  transition:transform .18s ease, color .18s ease;
+}
+.rx-mp-makerhead.is-open .rx-mp-maker-chev{transform:rotate(90deg); color:var(--mp-tint)}
+.rx-mp-maker-name{font-size:calc(17px*var(--mp-dt)); font-weight:600; flex:1 1 auto; min-width:0}
+.rx-mp-maker-meta{
+  font-size:calc(13px*var(--mp-dt)); color:var(--mp-label-2);
+  flex:none; font-variant-numeric:tabular-nums;
+}
+.rx-mp-maker-none{color:var(--mp-label-3)}
+
+/* The verdict. A weighted word rather than a filled pill: forty-four filled
+   pills down a scroll is a colour chart, and the ones that matter stop
+   standing out. Green is never used — "runs well" is the expected case and
+   does not need celebrating; it just needs to not be a warning. */
+.rx-mp-fit{
+  margin-left:8px; font-size:calc(12px*var(--mp-dt)); font-weight:600;
+  letter-spacing:0.01em; white-space:nowrap;
+}
+.rx-mp-fit.is-well{color:var(--mp-label-3); font-weight:400}
+.rx-mp-fit.is-tight{color:var(--mp-amber)}
+.rx-mp-fit.is-no{color:var(--mp-label-3); font-weight:400}
+/* A row that cannot run is dimmed as a whole, so the eye skips it on the way
+   down rather than reading the name and then discovering the verdict. */
+.rx-mp-row.is-toobig .rx-mp-row-name{color:var(--mp-label-2)}
+.rx-mp-row.is-toobig .rx-mp-row-acc{opacity:0.35}
+@media (prefers-reduced-motion:reduce){
+  .rx-mp-maker-chev{transition:none}
+}
+
 .rx-mp-secfoot{font-size:calc(12px*var(--mp-dt)); line-height:1.33; color:var(--mp-label-2); margin:6px 0 0; padding:0 4px}
 
 .rx-mp-group{list-style:none; margin:0; padding:0; background:var(--mp-cell); border-radius:var(--mp-r-cell); overflow:hidden}
@@ -379,6 +417,11 @@ export default function ModelPicker ({
   const [jobs, setJobs] = useState({})         // id -> { state:'downloading'|'failed', message }
   const [justDone, setJustDone] = useState(null)
   const [freeBytes, setFreeBytes] = useState(null) // null = Device unavailable, so no shortfall claims
+  // Bytes this app may still allocate. null until the phone answers — a fit
+  // badge drawn before then would be a guess wearing a measurement's clothes.
+  const [memBytes, setMemBytes] = useState(null)
+  // Which maker sections are open. Closed is the default; see byMaker.
+  const [openMakers, setOpenMakers] = useState(() => new Set())
 
   const rootRef = useRef(null)
   const scrollRef = useRef(null)
@@ -438,7 +481,20 @@ export default function ModelPicker ({
     } catch { setFreeBytes(null) }
   }, [])
 
+  // Memory is a separate question from disk, and a separate call. Disk decides
+  // whether the download can land; memory decides whether the model can then be
+  // loaded — a phone can easily have room for a file it cannot run.
+  const refreshMemory = useCallback(async () => {
+    const lm = LM()
+    if (!lm?.diskInfo) return
+    try {
+      const d = await lm.diskInfo()
+      setMemBytes(typeof d?.ramAvailable === 'number' && d.ramAvailable > 0 ? d.ramAvailable : null)
+    } catch { setMemBytes(null) }
+  }, [])
+
   useEffect(() => { refreshDisk() }, [refreshDisk])
+  useEffect(() => { refreshMemory() }, [refreshMemory])
 
   /* -- plugin events ------------------------------------------------------ */
   useEffect(() => {
@@ -575,6 +631,19 @@ export default function ModelPicker ({
     list.find(m => m.id === RECOMMENDED_ID) || list[0] || null
   const rest = hero ? list.filter(m => m.id !== hero.id) : list
 
+  const fitFor = useCallback(model => fitOf(model.sizeGB, memBytes), [memBytes])
+
+  const toggleMaker = useCallback(name => {
+    hapt.light()
+    setOpenMakers(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name); else next.add(name)
+      return next
+    })
+  }, [])
+
+  const groups = useMemo(() => byMaker(rest), [rest])
+
   const shortfallFor = useCallback(model => {
     if (freeBytes == null) return 0
     const need = model.sizeGB * GB
@@ -622,33 +691,48 @@ export default function ModelPicker ({
             />
           )}
 
-          {BANDS.map(band => {
-            const rows = rest.filter(m => band.holds(m.sizeGB))
-            if (!rows.length) return null
+          {groups.map(({ maker, models: rows }) => {
+            const open = openMakers.has(maker)
+            // What the header can promise without being opened: how many of
+            // this maker's models this particular iPhone can actually run.
+            const runnable = memBytes ? rows.filter(m => fitFor(m) !== FITS_NO).length : null
             return (
-              <React.Fragment key={band.title}>
-                <h2 className="rx-mp-sechead">{band.title}</h2>
-                <ul className="rx-mp-group">
-                  {rows.map(m => (
-                    <Row
-                      key={m.id}
-                      model={m}
-                      Gauge={Gauge}
-                      job={jobs[m.id]}
-                      done={justDone === m.id}
-                      busyElsewhere={!!downloadingId && downloadingId !== m.id}
-                      shortfall={shortfallFor(m)}
-                      onCommit={() => commit(m)}
-                    />
-                  ))}
-                </ul>
-              </React.Fragment>
+              <MakerSection
+                key={maker}
+                maker={maker}
+                count={rows.length}
+                runnable={runnable}
+                open={open}
+                onToggle={() => toggleMaker(maker)}
+                prefix="rx-mp"
+              >
+                {open && (
+                  <ul className="rx-mp-group">
+                    {rows.map(m => (
+                      <Row
+                        key={m.id}
+                        model={m}
+                        Gauge={Gauge}
+                        job={jobs[m.id]}
+                        done={justDone === m.id}
+                        busyElsewhere={!!downloadingId && downloadingId !== m.id}
+                        shortfall={shortfallFor(m)}
+                        fit={fitFor(m)}
+                        onCommit={() => commit(m)}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </MakerSection>
             )
           })}
 
           {list.length > 0 && (
             <p className="rx-mp-secfoot">
               Models run on this iPhone. Nothing you type leaves it.
+              {memBytes
+                ? ' Each one is labeled against the memory this iPhone can give a single app.'
+                : ''}
             </p>
           )}
 
@@ -764,11 +848,18 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, on
   )
 }
 
-function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
+function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, fit, onCommit }) {
   const downloading = job?.state === 'downloading'
   const failed = job?.state === 'failed'
   const blocked = shortfall > 0 && !model.downloaded && !downloading
-  const disabled = downloading || busyElsewhere || blocked
+  // ⚠️ WON'T RUN IS A HARD STOP, not a warning. The Mac disables Download on a
+  // model too big for its RAM; on iOS the consequence is worse, because the
+  // phone does not refuse the load — it kills Radiant partway through it, which
+  // reads to the user as the app crashing rather than as a limit. So a model
+  // that cannot run cannot be started, however much disk is free. An already
+  // downloaded one stays tappable so it can still be removed.
+  const tooBig = fit === FITS_NO && !model.downloaded
+  const disabled = downloading || busyElsewhere || blocked || tooBig
 
   const [pressed, handlers] = usePress(
     onCommit, disabled,
@@ -776,7 +867,8 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
       model.downloaded ? ', on this iPhone'
         : downloading ? ', downloading'
           : failed ? ', that download did not finish'
-            : blocked ? ', not enough room' : ''
+            : blocked ? ', not enough room'
+              : fit ? `, ${FIT_LABEL[fit].toLowerCase()} on this iPhone` : ''
     )
   )
 
@@ -789,6 +881,7 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
   if (failed) { sub = job.message; subClass = ' is-red' }
   else if (downloading) { sub = 'Downloading…'; subClass = ' is-amber' }
   else if (blocked) { sub = `Needs ${fmtGB(shortfall)} more room`; subClass = ' is-amber' }
+  else if (tooBig) { sub = `Needs about ${ramNeededGB(model.sizeGB).toFixed(1)} GB of memory` }
 
   // The iCloud-download idiom needs no label: an arrow in a circle becomes a
   // spinning iris becomes a tick, and everyone already knows that story.
@@ -811,11 +904,11 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
   // nothing, because every row was in the same state. It appears only when it
   // has something to report.
   const lead = model.downloaded || downloading || failed
-  const showSize = !failed && !downloading && !blocked
+  const showSize = !failed && !downloading && !blocked && !tooBig
 
   return (
     <li
-      className={`rx-mp-row${pressed ? ' is-pressed' : ''}${blocked ? ' is-blocked' : ''}`}
+      className={`rx-mp-row${pressed ? ' is-pressed' : ''}${blocked ? ' is-blocked' : ''}${tooBig ? ' is-toobig' : ''}`}
       style={{ '--mp-sep-inset': lead ? '57px' : '16px' }}
       {...handlers}
     >
@@ -825,7 +918,16 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
         </span>
       )}
       <span className="rx-mp-row-text">
-        <span className="rx-mp-row-name">{model.name}</span>
+        <span className="rx-mp-row-name">
+          {model.name}
+          {/* The verdict rides with the NAME, not down in the subtitle, because
+              it is the thing that decides whether the row is worth reading at
+              all. aria-hidden: the pressable's own label already says it, and
+              hearing it twice per row across forty-four rows is noise. */}
+          {fit && !model.downloaded && !downloading && !failed && (
+            <span className={`rx-mp-fit is-${fit}`} aria-hidden="true">{FIT_LABEL[fit]}</span>
+          )}
+        </span>
         <span className={`rx-mp-row-sub${subClass}`}>
           {showSize && <><span className="rx-mp-size">{model.sizeGB.toFixed(1)} GB</span>{' · '}</>}
           {sub}

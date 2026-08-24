@@ -45,11 +45,14 @@
  *    draws no track — an empty 4pt rail reads as a stuck download — and states
  *    the free space instead.
  */
-import React from 'react'
+import React, { useState } from 'react'
 import Gauge from './Gauge.jsx'
 import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
 import StorageLine from './StorageLine.jsx'
 import usePress from './usePress.js'
+import { FIT_LABEL, FITS_NO, ramNeededGB } from './fit.js'
+import MakerSection from './MakerSection.jsx'
+import { byMaker } from './makers.js'
 import { GB } from './useLocalModels.js'
 
 const fmtGB = (gb) => `${Number(gb || 0).toFixed(1)} GB`
@@ -141,14 +144,21 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
 
 /* ── one catalog row ──────────────────────────────────────────────────────── */
 
-function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAccessory }) {
+function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, onAccessory }) {
+  // ⚠️ A MODEL THAT CANNOT RUN MUST NOT BE STARTABLE. iOS does not refuse an
+  // oversized load — it kills the app partway through, which reads as Radiant
+  // crashing rather than as a limit. Same rule as the Mac, where Download is
+  // disabled on anything past the machine's RAM. Already-downloaded models stay
+  // tappable so they can still be removed.
+  const tooBig = fit === FITS_NO && !model.downloaded
   const shown = progressText(progress)
   const pct = progress && typeof progress.pct === 'number' ? Math.round(progress.pct * 100) : null
   const row = usePress(() => onTap?.(model), {
     label: `${model.name}, ${fmtGB(model.sizeGB)}` + (
       model.downloaded ? ', on this iPhone'
         : state === 'downloading' ? `, downloading${pct === null ? '' : `, ${pct} percent`}`
-          : unavailable ? ', not enough room' : ''
+          : unavailable ? ', not enough room'
+            : fit ? `, ${FIT_LABEL[fit].toLowerCase()} on this iPhone` : ''
     )
   })
   const downloading = state === 'downloading'
@@ -184,7 +194,7 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
     <div
       className={'rx-row rx-row-2line' + row.className}
       {...row.handlers}
-      data-unavailable={unavailable ? 'true' : undefined}
+      data-unavailable={unavailable || tooBig ? 'true' : undefined}
       style={{ '--rx-sep-inset': downloading ? '57px' : '16px' }}
     >
       {/* While it downloads, the logo turns beside the name — Tony: "i want the
@@ -196,13 +206,23 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
         </span>
       )}
       <div className="rx-row-text">
-        <div className="rx-headline">{model.name}</div>
+        <div className="rx-headline">
+          {model.name}
+          {/* The verdict sits with the name, because it decides whether the row
+              is worth reading. aria-hidden: the row's own label already says
+              it, and hearing it twice on every row is noise. */}
+          {fit && !model.downloaded && state !== 'downloading' && state !== 'failed' && (
+            <span className={`rx-fit is-${fit}`} aria-hidden="true">{FIT_LABEL[fit]}</span>
+          )}
+        </div>
         <div className="rx-row-blurb">
           {state === 'failed'
             ? 'That download did not finish. Tap to try again.'
             : unavailable
               ? <span className="rx-warm">Needs {fmtGB(shortBy / GB)} more room</span>
-              : downloading
+              : tooBig
+                ? `Needs about ${ramNeededGB(model.sizeGB).toFixed(1)} GB of memory`
+                : downloading
                 // Not the size — see the .rx-accessory note in mobile.css, that
                 // string is always present and always costs the blurb its
                 // width. This one exists only while the download runs, and it
@@ -272,6 +292,14 @@ export default function ModelsScreen ({
   const connect = usePress(() => onConnectMac?.(), { label: 'Connect to a Mac' })
 
   const canFit = (m) => (typeof fits === 'function' ? fits(m) : true)
+  const fitOfModel = (m) => (typeof local.fitOf === 'function' ? local.fitOf(m) : null)
+  const ramAvailable = local.ramAvailable || null
+  const [openMakers, setOpenMakers] = useState(() => new Set())
+  const toggleMaker = (name) => setOpenMakers(prev => {
+    const next = new Set(prev)
+    if (next.has(name)) next.delete(name); else next.add(name)
+    return next
+  })
   const shortBy = (m) => (typeof shortfall === 'function' ? shortfall(m) : 0)
 
   const stateOf = (m) => (
@@ -296,30 +324,56 @@ export default function ModelsScreen ({
       />
 
       <div className="rx-section">
-        <div className="rx-section-header">Available</div>
-      <Announcer models={models} jobs={jobs} progress={progress} failures={failures} />
-        <div className="rx-group">
-          {models.map(m => {
-            const blocked = !m.downloaded && !canFit(m)
-            return (
-              <ModelRow
-                key={m.id}
-                model={m}
-                state={stateOf(m)}
-                progress={progress[m.id]}
-                unavailable={blocked}
-                shortBy={shortBy(m)}
-                onTap={() => (blocked ? null : onGetModel?.(m.id))}
-                onAccessory={() => {
-                  if (blocked) return
-                  if (m.downloaded) onOpenChat?.(m.id)
-                  else if (stateOf(m) === 'downloading') cancel?.(m.id)
-                  else download?.(m.id)
-                }}
-              />
-            )
-          })}
-          {models.length === 0 && (
+        <Announcer models={models} jobs={jobs} progress={progress} failures={failures} />
+        {/* One shelf per maker, all closed. Tony: "group the models by provider
+            with widgets to close the section. not a long messy list like you
+            have now." Forty-four rows in one column is unreadable; fourteen
+            headers is a contents page. Same idiom as the Mac's Settings →
+            Models, where each repo sits behind a triangle. */}
+        {byMaker(models).map(({ maker, models: rows }) => {
+          const open = openMakers.has(maker)
+          const runnable = ramAvailable ? rows.filter(m => fitOfModel(m) !== FITS_NO).length : null
+          return (
+            <MakerSection
+              key={maker}
+              maker={maker}
+              count={rows.length}
+              runnable={runnable}
+              open={open}
+              onToggle={() => toggleMaker(maker)}
+            >
+              {open && (
+                <div className="rx-group">
+                  {rows.map(m => {
+                    const blocked = !m.downloaded && !canFit(m)
+                    const fit = fitOfModel(m)
+                    const stopped = blocked || (fit === FITS_NO && !m.downloaded)
+                    return (
+                      <ModelRow
+                        key={m.id}
+                        model={m}
+                        state={stateOf(m)}
+                        progress={progress[m.id]}
+                        unavailable={blocked}
+                        shortBy={shortBy(m)}
+                        fit={fit}
+                        onTap={() => (stopped ? null : onGetModel?.(m.id))}
+                        onAccessory={() => {
+                          if (stopped) return
+                          if (m.downloaded) onOpenChat?.(m.id)
+                          else if (stateOf(m) === 'downloading') cancel?.(m.id)
+                          else download?.(m.id)
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </MakerSection>
+          )
+        })}
+        {models.length === 0 && (
+          <div className="rx-group">
             <div className="rx-row">
               <div className="rx-row-text">
                 <div className="rx-row-blurb">
@@ -327,8 +381,8 @@ export default function ModelsScreen ({
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
         {/* the privacy claim, in the quietest text on the screen. A banner would
             cheapen it, and this one happens to be literally true. */}
         <div className="rx-section-footer">

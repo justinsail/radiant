@@ -21,6 +21,7 @@
  * than guessing.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fitOf } from './fit.js'
 import * as haptics from './haptics.js'
 
 const LM = () => (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.LocalModels : null)
@@ -74,7 +75,14 @@ export function useLocalModels () {
       if (lm?.diskInfo) {
         const d = await lm.diskInfo()
         if (typeof d?.total === 'number' && d.total > 0) {
-          return { total: d.total, free: typeof d.free === 'number' ? d.free : null }
+          return {
+            total: d.total,
+            free: typeof d.free === 'number' ? d.free : null,
+            // Bytes this app may still allocate. Disk says whether the download
+            // can land; this says whether the model can then be loaded, and a
+            // phone can easily have room for a file it cannot run.
+            ram: typeof d.ramAvailable === 'number' && d.ramAvailable > 0 ? d.ramAvailable : null
+          }
         }
       }
       const dev = DEVICE()
@@ -230,6 +238,13 @@ export function useLocalModels () {
     return Math.max(0, bytesOf(m) - disk.free)
   }, [disk, bytesOf])
 
+  /**
+   * Runs well / runs tight / won't run on THIS iPhone, or null before the phone
+   * has said how much memory it can spare. Thresholds live in fit.js and are
+   * shared with the Mac app's, so the two never disagree about a model.
+   */
+  const fitOfModel = useCallback((m) => fitOf(m?.sizeGB, disk?.ram || 0), [disk])
+
   return {
     models,
     downloaded,
@@ -245,6 +260,8 @@ export function useLocalModels () {
     bytesOf,
     fits,
     shortfall,
+    fitOf: fitOfModel,
+    ramAvailable: disk?.ram || null,
     download,
     cancel,
     remove,

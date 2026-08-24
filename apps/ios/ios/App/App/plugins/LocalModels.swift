@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import os   // os_proc_available_memory()
 
 import MLXLLM
 import MLXLMCommon
@@ -54,92 +55,201 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     /// the download, measured, so nobody starts a 4 GB pull on cellular by
     /// accident.
     private struct Entry {
-        let id: String, name: String, blurb: String, gb: Double
+        let id: String, name: String, maker: String, blurb: String, gb: Double
         let config: ModelConfiguration
     }
     /// ⚠️ SIZES ARE MEASURED, NOT ESTIMATED. Each is the summed blob size from
     /// huggingface.co/api/models/<id>?blobs=true, because the download progress
     /// bar divides by this number — a guessed size shows a wrong percentage.
-    /// Re-measure when the catalogue changes.
     ///
-    /// ⚠️ AND SO ARE THE STOP TOKENS. `stop:` here is the token the model's CHAT
+    /// ⚠️ AND SO ARE THE STOP TOKENS. `stop:` is the token the model's CHAT
     /// TEMPLATE ends a turn with, which is frequently NOT the `eos_token` in its
-    /// tokenizer config — every Gemma declares `<eos>` and then ends turns with
-    /// `<end_of_turn>` (Gemma 3) or `<turn|>` (Gemma 4); Phi declares
-    /// `<|endoftext|>` and ends with `<|end|>`. Get it wrong and the model never
-    /// stops: it answers, then keeps going, writing the user's next turn for
-    /// them. Each one below was read from that repo's own chat template, not
-    /// assumed from the family.
+    /// tokenizer config: every Gemma declares `<eos>` and then ends turns with
+    /// `<end_of_turn>` (Gemma 3) or `<turn|>` (Gemma 4). Get it wrong and the
+    /// model never stops — it answers, then writes the user's next turn for
+    /// them. Each was read from that repo's own chat template.
     ///
-    /// ⚠️ THE REGISTRY IS NOT THE MENU. `LLMRegistry` is MLX's sample list, and
-    /// picking only from it is what made this catalogue six models: it has no
-    /// entry for the Gemma 4 QAT mobile builds, for Ministral, for Granite 4.1,
-    /// or for LFM2.5. What actually gates a model is `LLMTypeRegistry` — the 62
-    /// ARCHITECTURES MLX implements — so any HuggingFace repo whose config.json
-    /// names one of those loads through `ModelConfiguration(id:)`, registry
-    /// entry or not. That is why most rows below are repo ids.
+    /// Both are generated, not typed: scripts/catalog-verify.py probes every
+    /// repo and regenerates this array. Re-run it when the catalogue changes
+    /// rather than editing sizes by hand.
+    ///
+    /// ⚠️ LLMRegistry IS NOT THE MENU. It is MLX's SAMPLE list; what actually
+    /// gates a model is `LLMTypeRegistry`, the 62 ARCHITECTURES MLX implements.
+    /// Any repo whose config.json names one of those loads through
+    /// `ModelConfiguration(id:)`. Reading the sample list as the capability list
+    /// is what once made this catalogue six models. Registry constants are still
+    /// preferred where one exists, because MLX curates their stop tokens.
     ///
     /// What is NOT loadable, whatever its name: GGUF (llama.cpp's format) and
-    /// bitsandbytes 4-bit — which is everything Unsloth publishes. MLX reads
-    /// safetensors with MLX quantisation metadata. A repo is eligible here only
-    /// if mlx-community, or the lab itself, has converted it.
+    /// bitsandbytes 4-bit — which is everything Unsloth publishes. MLX needs
+    /// safetensors with MLX quantization metadata.
+    ///
+    /// THE LIST RUNS PAST WHAT A PHONE CAN HOLD, deliberately. Radiant labels
+    /// every model runs well / runs tight / won't run against THIS device's
+    /// memory, and a list pre-filtered to what fits would make that label
+    /// meaningless — and would hide from a 12 GB iPhone that it can run things a
+    /// 6 GB one cannot. Ordered smallest first within each maker.
     private let catalog: [Entry] = [
-        // ---- runs on anything, including an older iPhone ----
-        Entry(id: "qwen3-0.6b", name: "Qwen 3 0.6B",
-              blurb: "Tiny and instant. Good for quick questions and rewriting.", gb: 0.35,
-              config: LLMRegistry.qwen3_0_6b_4bit),
-        Entry(id: "lfm2.5-1.2b", name: "LFM2.5 1.2B",
-              blurb: "Liquid AI's, designed for phones. Fastest of the capable ones.", gb: 0.66,
-              config: rxRepo("mlx-community/LFM2.5-1.2B-Instruct-4bit")),
-        Entry(id: "exaone4-1.2b", name: "EXAONE 4.0 1.2B",
-              blurb: "LG's. Small, and unusually good at following instructions.", gb: 0.73,
-              config: LLMRegistry.exaone_4_0_1_2b_4bit),
-        Entry(id: "gemma3-1b", name: "Gemma 3 1B",
-              blurb: "Google's smallest, quantisation-aware trained. Steady writer.", gb: 0.77,
-              config: LLMRegistry.gemma3_1B_qat_4bit),
 
-        // ---- the middle: what most people should use ----
-        Entry(id: "qwen3-1.7b", name: "Qwen 3 1.7B",
-              blurb: "The best all-rounder on any recent iPhone.", gb: 0.98,
-              config: LLMRegistry.qwen3_1_7b_4bit),
-        Entry(id: "deepseek-r1-1.5b", name: "DeepSeek R1 1.5B",
-              blurb: "Thinks before it answers. Slower, better at problems.", gb: 1.01,
-              config: rxRepo("mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit")),
-        Entry(id: "lfm2.5-2.6b", name: "LFM2.5 2.6B",
-              blurb: "The bigger Liquid model. Still quick, noticeably more able.", gb: 1.45,
-              config: rxRepo("mlx-community/LFM2.5-2.6B-mxfp4")),
-        Entry(id: "qwen3.5-2b", name: "Qwen 3.5 2B",
-              blurb: "Newest generation. Sharper reasoning for its size.", gb: 1.75,
-              config: LLMRegistry.qwen3_5_2b_4bit),
-        Entry(id: "smollm3-3b", name: "SmolLM3 3B",
-              blurb: "Hugging Face's own. Open training data, strong at chat.", gb: 1.75,
-              config: LLMRegistry.smollm3_3b_4bit),
-        Entry(id: "llama3.2-3b", name: "Llama 3.2 3B",
-              blurb: "Meta's. Strong at everyday writing and rewriting.", gb: 1.82,
-              config: LLMRegistry.llama3_2_3B_4bit),
-        Entry(id: "granite4.1-3b", name: "Granite 4.1 3B",
-              blurb: "IBM's, built for work. Summarising, extraction, tool use.", gb: 1.82,
-              config: rxRepo("mlx-community/granite-4.1-3b-mxfp4")),
+        // ---- Google ----
+        Entry(id: "gemma3-270m", name: "Gemma 3 270M", maker: "Google",
+              blurb: "The smallest model here. Instant, for simple rewrites.",
+              gb: 0.19, config: rxRepo("mlx-community/gemma-3-270m-it-4bit", stop: "<end_of_turn>")),
+        Entry(id: "gemma3-1b", name: "Gemma 3 1B", maker: "Google",
+              blurb: "Trained for its quantization, so it holds up small. Steady writer.",
+              gb: 0.77, config: LLMRegistry.gemma3_1B_qat_4bit),
+        Entry(id: "gemma2-2b", name: "Gemma 2 2B", maker: "Google",
+              blurb: "The older generation, still a dependable everyday model.",
+              gb: 1.49, config: LLMRegistry.gemma_2_2b_it_4bit),
+        Entry(id: "gemma4-e2b", name: "Gemma 4 E2B", maker: "Google",
+              blurb: "Google's newest, in the build they made for phones.",
+              gb: 2.43, config: rxRepo("mlx-community/gemma-4-E2B-it-qat-mobile", stop: "<turn|>")),
+        Entry(id: "gemma3n-e2b", name: "Gemma 3n E2B", maker: "Google",
+              blurb: "Built for on-device use. Good general knowledge.",
+              gb: 2.55, config: LLMRegistry.gemma3n_E2B_it_lm_4bit),
+        Entry(id: "gemma3-4b", name: "Gemma 3 4B", maker: "Google",
+              blurb: "Strong at long answers and summarizing.",
+              gb: 3.03, config: rxRepo("mlx-community/gemma-3-4b-it-qat-4bit", stop: "<end_of_turn>")),
+        Entry(id: "gemma4-e4b", name: "Gemma 4 E4B", maker: "Google",
+              blurb: "Google's phone flagship, and one of the best here.",
+              gb: 3.49, config: rxRepo("mlx-community/gemma-4-E4B-it-qat-mobile", stop: "<turn|>")),
+        Entry(id: "gemma3n-e4b", name: "Gemma 3n E4B", maker: "Google",
+              blurb: "The larger on-device Gemma. Wants room.",
+              gb: 3.9, config: LLMRegistry.gemma3n_E4B_it_lm_4bit),
+        Entry(id: "gemma2-9b", name: "Gemma 2 9B", maker: "Google",
+              blurb: "Desktop-class. Only a 12 GB iPhone gets near it.",
+              gb: 5.22, config: LLMRegistry.gemma_2_9b_it_4bit),
 
-        // ---- wants a Pro, and room on the phone ----
-        Entry(id: "phi4-mini", name: "Phi 4 mini",
-              blurb: "Microsoft's. Punches above its size at maths and code.", gb: 2.18,
-              config: rxRepo("mlx-community/Phi-4-mini-instruct-4bit", stop: "<|end|>")),
-        Entry(id: "nemotron3-4b", name: "Nemotron 3 Nano 4B",
-              blurb: "NVIDIA's. Built for reasoning and calling tools.", gb: 2.25,
-              config: rxRepo("mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit")),
-        Entry(id: "gemma4-e2b", name: "Gemma 4 E2B",
-              blurb: "Google's newest, in the build they made for phones.", gb: 2.43,
-              config: rxRepo("mlx-community/gemma-4-E2B-it-qat-mobile", stop: "<turn|>")),
-        Entry(id: "ministral3-3b", name: "Ministral 3 3B",
-              blurb: "Mistral's edge model. Fluent, and good in French.", gb: 2.78,
-              config: rxRepo("mlx-community/Ministral-3-3B-Instruct-2512-4bit")),
-        Entry(id: "qwen3.5-4b", name: "Qwen 3.5 4B",
-              blurb: "The most capable all-rounder here. Wants headroom.", gb: 3.06,
-              config: rxRepo("mlx-community/Qwen3.5-4B-MLX-4bit")),
-        Entry(id: "gemma4-e4b", name: "Gemma 4 E4B",
-              blurb: "Google's phone flagship. The best of these, and the largest.", gb: 3.49,
-              config: rxRepo("mlx-community/gemma-4-E4B-it-qat-mobile", stop: "<turn|>"))
+        // ---- Alibaba ----
+        Entry(id: "qwen3-0.6b", name: "Qwen 3 0.6B", maker: "Alibaba",
+              blurb: "Tiny and instant. Quick questions and rewriting.",
+              gb: 0.35, config: LLMRegistry.qwen3_0_6b_4bit),
+        Entry(id: "qwen2.5-1.5b", name: "Qwen 2.5 1.5B", maker: "Alibaba",
+              blurb: "The proven older generation. Reliable, well understood.",
+              gb: 0.88, config: LLMRegistry.qwen2_5_1_5b),
+        Entry(id: "qwen3-1.7b", name: "Qwen 3 1.7B", maker: "Alibaba",
+              blurb: "The best all-rounder on any recent iPhone.",
+              gb: 0.98, config: LLMRegistry.qwen3_1_7b_4bit),
+        Entry(id: "qwen2.5-3b", name: "Qwen 2.5 3B", maker: "Alibaba",
+              blurb: "More knowledge than the 1.5B, same steady behavior.",
+              gb: 1.75, config: rxRepo("mlx-community/Qwen2.5-3B-Instruct-4bit")),
+        Entry(id: "qwen3.5-2b", name: "Qwen 3.5 2B", maker: "Alibaba",
+              blurb: "Newest generation. Sharper reasoning for its size.",
+              gb: 1.75, config: LLMRegistry.qwen3_5_2b_4bit),
+        Entry(id: "qwen3-4b", name: "Qwen 3 4B", maker: "Alibaba",
+              blurb: "Noticeably smarter, and good at code.",
+              gb: 2.28, config: rxRepo("mlx-community/Qwen3-4B-Instruct-2507-4bit")),
+        Entry(id: "qwen3.5-4b", name: "Qwen 3.5 4B", maker: "Alibaba",
+              blurb: "The most capable all-rounder that still fits a phone.",
+              gb: 3.06, config: rxRepo("mlx-community/Qwen3.5-4B-MLX-4bit")),
+        Entry(id: "qwen3-8b", name: "Qwen 3 8B", maker: "Alibaba",
+              blurb: "Desktop-class reasoning. Needs a 12 GB iPhone.",
+              gb: 4.62, config: LLMRegistry.qwen3_8b_4bit),
+
+        // ---- Meta ----
+        Entry(id: "llama3.2-1b", name: "Llama 3.2 1B", maker: "Meta",
+              blurb: "Small and fast. Fine for short answers.",
+              gb: 0.71, config: LLMRegistry.llama3_2_1B_4bit),
+        Entry(id: "llama3.2-3b", name: "Llama 3.2 3B", maker: "Meta",
+              blurb: "Strong at everyday writing and rewriting.",
+              gb: 1.82, config: LLMRegistry.llama3_2_3B_4bit),
+        Entry(id: "llama3.1-8b", name: "Llama 3.1 8B", maker: "Meta",
+              blurb: "The full-size Llama. Only for the largest iPhones.",
+              gb: 4.53, config: LLMRegistry.llama3_1_8B_4bit),
+
+        // ---- Mistral ----
+        Entry(id: "ministral3-3b", name: "Ministral 3 3B", maker: "Mistral",
+              blurb: "Mistral's edge model. Fluent, and good in French.",
+              gb: 2.78, config: rxRepo("mlx-community/Ministral-3-3B-Instruct-2512-4bit")),
+        Entry(id: "mistral-7b", name: "Mistral 7B", maker: "Mistral",
+              blurb: "The classic. Even-handed and hard to trip up.",
+              gb: 4.08, config: LLMRegistry.mistral7B4bit),
+        Entry(id: "mistral-nemo", name: "Mistral NeMo 12B", maker: "Mistral",
+              blurb: "Large and multilingual. Past what any iPhone can hold.",
+              gb: 6.91, config: LLMRegistry.mistralNeMo4bit),
+
+        // ---- Microsoft ----
+        Entry(id: "bitnet-2b", name: "BitNet b1.58 2B", maker: "Microsoft",
+              blurb: "An experiment: barely over one bit per weight. Tiny for its size.",
+              gb: 0.72, config: LLMRegistry.bitnet_b1_58_2b_4t_4bit),
+        Entry(id: "phi3.5-mini", name: "Phi 3.5 mini", maker: "Microsoft",
+              blurb: "Trained on textbook-style data. Careful and precise.",
+              gb: 2.15, config: LLMRegistry.phi3_5_4bit),
+        Entry(id: "phi4-mini", name: "Phi 4 mini", maker: "Microsoft",
+              blurb: "Punches above its size at math and code.",
+              gb: 2.18, config: rxRepo("mlx-community/Phi-4-mini-instruct-4bit", stop: "<|end|>")),
+
+        // ---- IBM ----
+        Entry(id: "granite4-micro", name: "Granite 4.0 Micro", maker: "IBM",
+              blurb: "Built for work: summarizing, extraction, tool use.",
+              gb: 1.81, config: rxRepo("mlx-community/granite-4.0-h-micro-4bit")),
+        Entry(id: "granite4.1-3b", name: "Granite 4.1 3B", maker: "IBM",
+              blurb: "IBM's newest small model. Business documents and data.",
+              gb: 1.82, config: rxRepo("mlx-community/granite-4.1-3b-mxfp4")),
+        Entry(id: "granite4-tiny", name: "Granite 4.0 Tiny", maker: "IBM",
+              blurb: "The larger Granite. Long documents, if you have the room.",
+              gb: 3.92, config: rxRepo("mlx-community/granite-4.0-h-tiny-4bit")),
+
+        // ---- Liquid AI ----
+        Entry(id: "lfm2-350m", name: "LFM2 350M", maker: "Liquid AI",
+              blurb: "The lightest model here. Runs on anything, answers instantly.",
+              gb: 0.2, config: rxRepo("mlx-community/LFM2-350M-4bit")),
+        Entry(id: "lfm2.5-1.2b", name: "LFM2.5 1.2B", maker: "Liquid AI",
+              blurb: "Designed for phones. Fastest of the genuinely capable ones.",
+              gb: 0.66, config: rxRepo("mlx-community/LFM2.5-1.2B-Instruct-4bit")),
+        Entry(id: "lfm2.5-2.6b", name: "LFM2.5 2.6B", maker: "Liquid AI",
+              blurb: "Still quick, and noticeably more able.",
+              gb: 1.45, config: rxRepo("mlx-community/LFM2.5-2.6B-mxfp4")),
+        Entry(id: "lfm2-8b-a1b", name: "LFM2 8B A1B", maker: "Liquid AI",
+              blurb: "Only part of it runs per word, so it is faster than its size.",
+              gb: 4.18, config: LLMRegistry.lfm2_8b_a1b_3bit_mlx),
+
+        // ---- DeepSeek ----
+        Entry(id: "deepseek-r1-1.5b", name: "DeepSeek R1 1.5B", maker: "DeepSeek",
+              blurb: "Thinks before it answers. Slower, better at problems.",
+              gb: 1.01, config: rxRepo("mlx-community/DeepSeek-R1-Distill-Qwen-1.5B-4bit")),
+        Entry(id: "deepseek-r1-7b", name: "DeepSeek R1 7B", maker: "DeepSeek",
+              blurb: "The same reasoning, with far more knowledge behind it.",
+              gb: 4.3, config: LLMRegistry.deepSeekR1_7B_4bit),
+
+        // ---- Hugging Face ----
+        Entry(id: "smollm2-360m", name: "SmolLM2 360M", maker: "Hugging Face",
+              blurb: "Very small, and honest about it. Good for quick tasks.",
+              gb: 0.73, config: rxRepo("mlx-community/SmolLM2-360M-Instruct")),
+        Entry(id: "smollm3-3b", name: "SmolLM3 3B", maker: "Hugging Face",
+              blurb: "Open training data end to end. Strong at chat.",
+              gb: 1.75, config: LLMRegistry.smollm3_3b_4bit),
+
+        // ---- NVIDIA ----
+        Entry(id: "nemotron3-4b", name: "Nemotron 3 Nano 4B", maker: "NVIDIA",
+              blurb: "Built for reasoning and calling tools.",
+              gb: 2.25, config: rxRepo("mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit")),
+
+        // ---- LG ----
+        Entry(id: "exaone4-1.2b", name: "EXAONE 4.0 1.2B", maker: "LG",
+              blurb: "Small, and unusually good at following instructions.",
+              gb: 0.73, config: LLMRegistry.exaone_4_0_1_2b_4bit),
+
+        // ---- Allen AI ----
+        Entry(id: "olmo3-7b", name: "Olmo 3 7B", maker: "Allen AI",
+              blurb: "Fully open: data, code, weights. A research favorite.",
+              gb: 4.12, config: rxRepo("mlx-community/Olmo-3-7B-Instruct-4bit", stop: "<|im_end|>")),
+
+        // ---- TII ----
+        Entry(id: "falcon-h1-0.5b", name: "Falcon H1 0.5B", maker: "TII",
+              blurb: "Tiny, with a long memory for its size.",
+              gb: 0.3, config: rxRepo("mlx-community/Falcon-H1-0.5B-Instruct-4bit", stop: "<|im_end|>")),
+        Entry(id: "falcon-h1-1.5b", name: "Falcon H1 1.5B", maker: "TII",
+              blurb: "Handles long inputs better than most at this size.",
+              gb: 0.88, config: rxRepo("mlx-community/Falcon-H1-1.5B-Instruct-4bit", stop: "<|im_end|>")),
+        Entry(id: "falcon-h1-3b", name: "Falcon H1 3B", maker: "TII",
+              blurb: "The largest Falcon that still suits a phone.",
+              gb: 1.78, config: rxRepo("mlx-community/Falcon-H1-3B-Instruct-4bit", stop: "<|im_end|>")),
+
+        // ---- OpenAI ----
+        Entry(id: "gpt-oss-20b", name: "gpt-oss 20B", maker: "OpenAI",
+              blurb: "OpenAI's open model. Listed so you can see the ceiling.",
+              gb: 12.1, config: LLMRegistry.gpt_oss_20b_MXFP4_Q8)
     ]
 
     private var loaded: (id: String, container: ModelContainer)?
@@ -179,7 +289,7 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
 
     @objc func list(_ call: CAPPluginCall) {
         call.resolve(["models": catalog.map { [
-            "id": $0.id, "name": $0.name, "blurb": $0.blurb,
+            "id": $0.id, "name": $0.name, "maker": $0.maker, "blurb": $0.blurb,
             "sizeGB": $0.gb, "downloaded": isOnDisk($0)
         ] }])
     }
@@ -526,6 +636,20 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     ///
     /// volumeAvailableCapacityForImportantUsage is the figure Settings shows,
     /// which is the whole point: a number the user can go and check.
+    /// Disk AND memory, because "will this model run" is two different questions.
+    ///
+    /// ⚠️ `physicalMemory` IS THE WRONG NUMBER TO PLAN AGAINST, and it is the
+    /// obvious one to reach for. iOS never lets one app have the whole device:
+    /// it kills an app that crosses a per-process limit well below the RAM in
+    /// the spec sheet. On a 12 GB iPhone an app may get roughly half. Sizing a
+    /// model against 12 GB would promise the user a load that jetsam ends —
+    /// which does not look like a memory limit, it looks like Radiant crashing.
+    ///
+    /// `os_proc_available_memory()` is the number that matters: the bytes THIS
+    /// process may still allocate before it is killed. It already accounts for
+    /// what the app is holding, so it is a live figure rather than a constant —
+    /// which is why the fit labels are computed on the phone, at the moment the
+    /// list is drawn, and not baked into the catalogue.
     @objc func diskInfo(_ call: CAPPluginCall) {
         let url = URL(fileURLWithPath: NSHomeDirectory())
         do {
@@ -535,7 +659,12 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             ])
             let total = v.volumeTotalCapacity.map(Double.init) ?? 0
             let free = v.volumeAvailableCapacityForImportantUsage.map(Double.init) ?? 0
-            call.resolve(["total": total, "free": free])
+            call.resolve([
+                "total": total,
+                "free": free,
+                "ramTotal": Double(ProcessInfo.processInfo.physicalMemory),
+                "ramAvailable": Double(os_proc_available_memory())
+            ])
         } catch {
             call.reject(error.localizedDescription)
         }

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  ⚠️ NOT WIRED UP YET — AND TURNING IT ON IS A HUMAN-ONLY STEP.
+	  CODE_SIGN_ENTITLEMENTS is deliberately NOT set in project.pbxproj. Setting
+	  it fails the build outright:
+	      Provisioning profile "iOS Team Provisioning Profile: *" doesn't
+	      include the Increased Memory Limit capability.
+	  The capability has to be enabled on the App ID in the Apple Developer
+	  portal (Certificates, Identifiers & Profiles → the com.templetongroup.radiant
+	  identifier → Increased Memory Limit) and the profile regenerated. That
+	  needs Tony's account; no agent can do it. Once it is enabled, add
+	      CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
+	  to both build configurations and rebuild.
+
+	  ⚠️ THIS ENTITLEMENT IS WHAT MAKES THE LARGER MODELS POSSIBLE AT ALL.
+
+	  iOS gives an ordinary app only a fraction of the device's RAM before
+	  jetsam kills it — on a 12 GB iPhone that can be under half. A 4 GB model
+	  needs about 5 GB resident, so without this the top of the catalogue is
+	  permanently "won't run" on hardware that is physically capable of it.
+
+	  With it, iOS raises this process's limit toward the device maximum. It
+	  changes what os_proc_available_memory() reports, which is the number the
+	  fit labels are computed from — so removing it does not just lose
+	  capability, it silently re-labels most of the catalogue.
+	-->
+	<key>com.apple.developer.kernel.increased-memory-limit</key>
+	<true/>
+</dict>
+</plist>
