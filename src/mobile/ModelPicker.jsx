@@ -546,7 +546,14 @@ export default function ModelPicker ({
 
           {error && <p className="rx-mp-note">{error}</p>}
 
-          {hero && <h2 className="rx-mp-sechead">Recommended</h2>}
+          {/* "Recommended" is a claim, and it is only true when the hero IS the
+              recommendation. Once a tapped model leads the sheet, calling it
+              recommended tells the user something false about their own tap. */}
+          {hero && (
+            <h2 className="rx-mp-sechead">
+              {hero.id === RECOMMENDED_ID ? 'Recommended' : 'Selected'}
+            </h2>
+          )}
           {hero && (
             <Hero
               model={hero}
