@@ -1375,7 +1375,8 @@ const GUIDE = [
       ['Multiple accounts', 'Keep more than one account or key per provider and switch the active one; the sidebar meters follow whichever is active.'],
       ['Any OpenAI-compatible provider', 'Add anything else with a name + base URL.'],
       ['Local models', 'Run models from Ollama or LM Studio with no key. Search Hugging Face and download GGUFs straight from Settings → Models, with a disk-space check before you pull. The first reply after switching to a local model shows a "loading into memory" note while its weights load; it stays warm after that.'],
-      ['Compare', 'Run one prompt against two models side by side (command palette → Compare).']
+      ['Compare', 'Run one prompt against two models side by side (command palette → Compare).'],
+      ['Errors you can act on', 'When a provider turns a request down, Radiant explains it in plain language instead of passing along raw API text. If OpenRouter refuses a model because every provider serving it wants to log your prompts, it says so and points you at the privacy setting to change — free and experimental models are usually the ones affected. A model id OpenRouter no longer serves says that instead of a bare 404, and a restricted key, a signed-out account, or an empty balance each name themselves.']
     ]
   },
   {
