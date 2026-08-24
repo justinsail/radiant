@@ -102,6 +102,22 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             .appendingPathComponent("huggingface/models/\(repo)")
     }
 
+    /// Bytes currently on disk for a model. Walking the directory is cheap next
+    /// to a multi-gigabyte download, and unlike a progress callback it cannot
+    /// fail to fire.
+    private func bytesOnDisk(for repo: String) -> Int64 {
+        guard let dir = cacheDir(for: repo) else { return 0 }
+        let fm = FileManager.default
+        guard let en = fm.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey],
+                                     options: [.skipsHiddenFiles]) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in en {
+            let sz = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            total += Int64(sz)
+        }
+        return total
+    }
+
     // MARK: - download
 
     /// Running downloads, so they can be cancelled. Capacitor calls plugin
@@ -161,11 +177,41 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
                     }
                     self?.notifyListeners("downloadProgress", data: [
                         "id": id,
-                        // null-ish when unknowable: the UI must not print "0%"
-                        // for ten minutes and call that progress
                         "progress": total > 0 ? f : -1,
                         "completedBytes": done,
                         "totalBytes": total
+                    ])
+                }
+            }
+
+            // ⚠️ THE CALLBACK CANNOT BE TRUSTED TO FIRE.
+            // Shipped twice on the belief that it would: first reading only
+            // `fractionCompleted`, then adding byte counts. On a real device
+            // neither produced a single event — `downloadStarted` arrived and
+            // then nothing, so the phone read "Downloading…" for gigabytes.
+            //
+            // So progress is MEASURED instead of reported: poll the bytes that
+            // have actually landed in the HuggingFace cache, against the
+            // catalog's own size for this model. It cannot silently do nothing,
+            // it survives the loader changing its progress plumbing, and it is
+            // the number the user actually cares about.
+            let expected = Int64(entry.gb * 1_000_000_000)
+            let repo = entry.config.name
+            let poller = Task { [weak self] in
+                var lastPct = -1
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    if Task.isCancelled { break }
+                    guard let self else { break }
+                    let done = self.bytesOnDisk(for: repo)
+                    guard done > 0 else { continue }
+                    let f = min(0.999, Double(done) / Double(max(expected, 1)))
+                    let pct = Int(f * 100)
+                    guard pct != lastPct else { continue }
+                    lastPct = pct
+                    self.notifyListeners("downloadProgress", data: [
+                        "id": id, "progress": f,
+                        "completedBytes": done, "totalBytes": expected
                     ])
                 }
             }
@@ -181,6 +227,7 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
                     ))
                 }
                 feed.finish()
+                poller.cancel()
                 await pump.value
                 self.setJob(id, nil)
                 self.markDownloaded(id)
@@ -188,6 +235,7 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["id": id])
             } catch {
                 feed.finish()
+                poller.cancel()
                 await pump.value
                 self.setJob(id, nil)
                 // A download the user stopped is not a failure, and must never

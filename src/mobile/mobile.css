@@ -1706,14 +1706,35 @@
   animation: rx-sharpen 900ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 460ms forwards;
 }
 
+/* Three sizes, three jobs: what it is, how it works, who made it. Each one a
+   step quieter than the last, so the eye lands on the product line first. */
 .is-native .rx-intro-line {
   margin: 0;
-  max-width: 20em;
-  font: -apple-system-body;
+  max-width: 18em;
+  font: -apple-system-title3;
+  font-weight: 600;
+  line-height: 1.3;
+  color: oklch(0.965 0.008 262);
+  opacity: 0;
+  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 620ms forwards;
+}
+.is-native .rx-intro-sub {
+  margin: -6px 0 0;
+  max-width: 22em;
+  font: -apple-system-subheadline;
   line-height: 1.45;
   color: oklch(0.74 0.022 262);
   opacity: 0;
-  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 620ms forwards;
+  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 700ms forwards;
+}
+/* the smallest thing on the screen, and the last to arrive */
+.is-native .rx-intro-byline {
+  margin: 6px 0 0;
+  font: -apple-system-caption1;
+  letter-spacing: 0.01em;
+  color: oklch(0.60 0.02 262);
+  opacity: 0;
+  animation: rx-rise 800ms var(--rx-ease, cubic-bezier(.22,1,.36,1)) 860ms forwards;
 }
 
 .is-native .rx-intro-actions {
@@ -1771,4 +1792,13 @@
     animation-duration: 1ms;
     animation-delay: 0ms;
   }
+}
+
+/* The turning mark beside a downloading model's name. 29pt with a 12pt gutter,
+   which is what puts the separator inset at 57px on those rows. */
+.is-native .rx-row-lead {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 12px;
 }

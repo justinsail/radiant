@@ -44,9 +44,20 @@ export default function FirstRun ({ onChooseModel, onConnectMac }) {
         {/* artwork, not type — the wordmark is the logo, not a font choice */}
         <img className="rx-intro-word" src={wordUrl} alt="Radiant" />
 
+        {/* Say what the product IS, first. The old line ("A model that lives on
+            your iPhone. No account. No network once it's here.") described a
+            single model as if the app were one, and led with what it does not
+            do — no account, no network — which tells a first-time reader
+            nothing about what they are holding. */}
         <p className="rx-intro-line">
-          A model that lives on your iPhone.<br />
-          No account. No network once it&rsquo;s here.
+          Open AI models, running on your iPhone.
+        </p>
+        <p className="rx-intro-sub">
+          Download one and talk to it anywhere. It keeps working with no signal,
+          and nothing you type leaves this device.
+        </p>
+        <p className="rx-intro-byline">
+          Radiant is a Templeton&nbsp;Technologies product.
         </p>
       </div>
 

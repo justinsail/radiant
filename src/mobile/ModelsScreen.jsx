@@ -185,7 +185,16 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
       className={'rx-row rx-row-2line' + row.className}
       {...row.handlers}
       data-unavailable={unavailable ? 'true' : undefined}
+      style={{ '--rx-sep-inset': downloading ? '57px' : '16px' }}
     >
+      {/* While it downloads, the logo turns beside the name — Tony: "i want the
+          blue logo to rotate next to the model name to show its downloading."
+          It appears only then, so an idle list keeps its clean single column. */}
+      {downloading && (
+        <span className="rx-row-lead">
+          <BrandSpinner size={29} progress={progress && typeof progress.pct === 'number' ? progress.pct : null} />
+        </span>
+      )}
       <div className="rx-row-text">
         <div className="rx-headline">{model.name}</div>
         <div className="rx-row-blurb">
