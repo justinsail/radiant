@@ -61,9 +61,23 @@ is('explicit local http is accepted', await testServer('http://192.168.1.50:5834
 is('a Tailscale IP is NOT treated as local', await testServer('100.64.118.54', ''), 'https://100.64.118.54')
 is('172.32 is public, not local', (await err(() => testServer('http://172.32.0.1', ''))) !== null, true)
 
+// ⚠️ THE MAC MUST STILL REACH A PLAIN-http HOST. Regression, shipped: the http
+// rule is App Transport Security's and applies to the PHONE. Putting it in
+// shared code unconditionally broke the Mac app's "Connect & reload", which
+// deliberately prepends http:// and has always talked to a Tailscale address
+// that way. window.Capacitor is undefined here, i.e. not the phone.
+globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ models: [] }) })
+is('the Mac may use plain http to a Tailscale host',
+  await testServer('http://100.64.118.54:5834', ''), 'http://100.64.118.54:5834')
+is('the Mac may use plain http to any host',
+  await testServer('http://mac.ts.net', ''), 'http://mac.ts.net')
+
 // http is refused before it leaves the app — the screen has always PROMISED
 // this in its footer text, and it was never implemented.
-is('http to a public host is refused', (await err(() => testServer('http://mac.ts.net', ''))).includes('Wi-Fi'), true)
+globalThis.window = { Capacitor: { isNativePlatform: () => true } }
+is('but the PHONE refuses http to a public host',
+  (await err(() => testServer('http://mac.ts.net', ''))).includes('Wi-Fi'), true)
+globalThis.window = undefined
 is('an empty address is refused', (await err(() => testServer('   ', ''))) !== null, true)
 
 // ⚠️ 200 IS NOT PROOF. The app's own server returns index.html with status 200.

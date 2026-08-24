@@ -121,7 +121,18 @@ function normalizeBase (raw) {
   }
   let u
   try { u = new URL(candidate) } catch { throw new Error('That does not look like a web address.') }
-  if (u.protocol === 'http:' && !isLocalHost(u.hostname)) {
+  // ⚠️ THE http RULE IS iOS's, NOT OURS — SO ONLY APPLY IT ON iOS. App Transport
+  // Security refuses plain http to anything outside the local ranges, so on the
+  // phone this has to be caught before the request hangs. The MAC HAS NO SUCH
+  // RESTRICTION: Electron talks plain http to any host, and Mac-to-Mac over a
+  // Tailscale address has always worked that way — Settings.jsx even prepends
+  // http:// deliberately.
+  //
+  // I shipped this check unconditionally in shared code and broke exactly that:
+  // the Mac's "Connect & reload" started throwing an iPhone error at a Mac.
+  // A platform rule belongs behind a platform check.
+  const onPhone = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.() === true
+  if (onPhone && u.protocol === 'http:' && !isLocalHost(u.hostname)) {
     throw new Error('That address is http, and iPhone only allows that on your own Wi-Fi. Use the https address your Mac shows you.')
   }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('Use a web address starting http or https.')
