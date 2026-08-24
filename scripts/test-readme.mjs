@@ -70,5 +70,14 @@ for (const v of ['Runs well', 'Runs tight', "Won't run"]) {
   is(`the UI still says "${v}"`, fit.includes(v), true)
 }
 
+// ⚠️ BEHAVIOUR CLAIMS, NOT JUST NAMES. The name checks above passed while the
+// Read me still said a red model "cannot be downloaded" — true when written,
+// false an hour later once the block came out. Assert the claims that a code
+// change can silently invert.
+const picker = readFileSync('src/mobile/ModelPicker.jsx', 'utf8')
+const blocksOnMemory = /disabled = downloading \|\| busyElsewhere \|\| blocked \|\| tooBig/.test(picker)
+is('the Read me and the code agree on whether a red model can be downloaded',
+  readme.includes('cannot be downloaded'), blocksOnMemory)
+
 console.log(`${pass}/${pass + fail} passed  ·  Read me checked against the code`)
 process.exit(fail ? 1 : 0)
