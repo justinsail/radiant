@@ -98,7 +98,12 @@ const haptic = (kind, arg) => {
 const SHELL_CSS = `
 .rx-shell-root, .rx-shell-root * { -webkit-tap-highlight-color: transparent; }
 .rx-shell-scroll::-webkit-scrollbar, .rx-shell-menu::-webkit-scrollbar { display: none; }
-.rx-shell-bar {
+/* At rest an iOS bar is not a bar: it is the page, with the large title in the
+   scroller under it. The material and the hairline arrive together, the moment
+   content slides underneath. A permanently frosted bar reads as a web header
+   before anyone has read a word. */
+.rx-shell-bar { background: transparent; }
+.rx-shell-bar[data-solid="true"] {
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
   background: rgba(255,255,255,0.72);
@@ -109,17 +114,17 @@ const SHELL_CSS = `
   background: rgba(242,242,247,0.86);
 }
 @media (prefers-color-scheme: dark) {
-  .rx-shell-bar { background: rgba(30,30,30,0.72); }
+  .rx-shell-bar[data-solid="true"] { background: rgba(30,30,30,0.72); }
   .rx-shell-menu { background: rgba(28,28,30,0.90); }
 }
 /* vibrancy off: go fully opaque plus a hairline, rather than leaving a flat
    translucent-looking fill behind */
 @media (prefers-reduced-transparency: reduce) {
-  .rx-shell-bar { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--rx-bg, #fff); }
+  .rx-shell-bar[data-solid="true"] { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--rx-bg, #fff); }
   .rx-shell-menu { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--rx-bg-grouped, #F2F2F7); }
 }
 @media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-  .rx-shell-bar, .rx-shell-menu { background: #1C1C1E; }
+  .rx-shell-bar[data-solid="true"], .rx-shell-menu { background: #1C1C1E; }
 }
 /* Press states are JS-driven with a 10pt slop cancel. There is not one :hover
    rule in this file: on iOS a :hover sticks after the tap and the control stays
@@ -334,6 +339,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
       el.style.borderBottomColor = on
         ? 'var(--rx-separator, rgba(60,60,67,0.29))'
         : 'transparent'
+      el.dataset.solid = on ? 'true' : 'false'
     }
   }, [])
 

@@ -8,7 +8,12 @@
  */
 import React, { useEffect } from 'react'
 import './mobile.css'
+import installBridge from './bridge.js'
 import MobileShell from './MobileShell.jsx'
+
+// Before anything renders: the injected native bridge does not populate
+// Capacitor.Plugins by itself, and every screen reads plugins off that object.
+installBridge()
 
 export default function Phone () {
   // Dynamic Type: mobile.css cannot test a custom property in a media query, so

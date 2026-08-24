@@ -282,10 +282,12 @@
    kills the `font: -apple-system-*` text styles below, and Dynamic Type is the
    single most valuable native tell this app has. */
 
-.is-native button,
-.is-native input,
-.is-native textarea,
-.is-native select {
+/* :where() so the control reset carries ZERO specificity. It is a reset, not a
+   style: any component class — .rx-primary here, .rx-mp-cta in ModelPicker —
+   must beat it without having to escalate. With a plain `.is-native button`
+   selector the reset out-ranks every single-class rule in the app and quietly
+   strips the fill off every tinted button. */
+:where(.is-native) :where(button, input, textarea, select) {
   font-family: inherit;
   color: inherit;
   letter-spacing: inherit;
@@ -295,7 +297,7 @@
   -webkit-appearance: none;
   appearance: none;
 }
-.is-native button { padding: 0; cursor: default; }
+:where(.is-native) :where(button) { padding: 0; cursor: default; }
 
 /* Global touch behavior. `manipulation` removes the 300ms double-tap delay;
    the tap highlight and the callout are both dead giveaways. Selection comes
