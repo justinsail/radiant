@@ -47,7 +47,7 @@
  */
 import React from 'react'
 import Gauge from './Gauge.jsx'
-import BrandSpinner from './BrandSpinner.jsx'
+import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
 import StorageLine from './StorageLine.jsx'
 import usePress from './usePress.js'
 import { GB } from './useLocalModels.js'
@@ -125,7 +125,7 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
           12.15% of the viewBox from the edge (r 35.2 + half of stroke 5.3, on a
           100-unit box), so the box is pulled left by that fraction of 96 and the
           ink lands on the same 20pt margin as the title and the cards. */}
-      <Gauge size={96} state={resident ? 'resident' : 'absent'} className="rx-hero-gauge" />
+      <BrandMark size={96} className="rx-hero-gauge" />
       <div className="rx-hero-label">
         <div className="rx-title-2">{resident ? model.name : 'No model yet'}</div>
         <div className={'rx-hero-state rx-footnote' + (resident ? ' rx-tabular' : '')}>

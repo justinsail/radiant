@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Gauge from './Gauge.jsx'
 import * as haptics from './haptics.js'
+import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
 
 // The conversation, running on this phone.
 //
@@ -221,7 +222,7 @@ function AssistantTurn ({ model, children, marker }) {
   return (
     <div className='rx-chat-turn rx-chat-turn-model'>
       <div className='rx-chat-byline'>
-        <span className='rx-chat-marker'><Gauge size={22} state={marker} /></span>
+        <span className='rx-chat-marker'><BrandSpinner size={22} /></span>
         <span className='rx-chat-byname'>{model?.name || 'On device'}</span>
       </div>
       {children}
@@ -602,7 +603,7 @@ export default function MobileChat ({
 
           {empty && (
             <div className='rx-chat-empty'>
-              <Gauge size={64} state='resident' />
+              <BrandMark size={64} />
               <div className='rx-chat-empty-name'>{model?.name || 'No model'}</div>
               <div className='rx-chat-empty-sub'>Running on this iPhone. Nothing leaves the device.</div>
               <div className='rx-chat-suggestions'>

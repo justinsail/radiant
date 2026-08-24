@@ -21,6 +21,7 @@ import ModelPicker from './ModelPicker.jsx'
 import Gauge from './Gauge.jsx'
 import usePress from './usePress.js'
 import * as haptics from './haptics.js'
+import { BrandMark } from './BrandSpinner.jsx'
 
 const SPEED = {
   'llama3.2-1b': 'Fastest',
@@ -107,7 +108,7 @@ export default function GetModelSheet ({ local = {}, models = [], modelId, onDis
         {detail ? (
           <div style={{ padding: '24px 20px 0', display: 'flex', flexDirection: 'column', minHeight: 0, flex: '1 1 auto' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <Gauge size={120} state="resident" />
+              <BrandMark size={120} />
               <div className="rx-title-2">{model.name}</div>
             </div>
 

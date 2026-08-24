@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as GaugeModule from './Gauge.jsx'
-import BrandSpinner from './BrandSpinner.jsx'
+import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
 
 // Picking a model is the first thing a new user does, so this screen has one
 // job: make the obvious choice obvious. A recommended model gets the hero —
@@ -705,7 +705,7 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, on
         >
           {downloading
             ? <BrandSpinner size={120} progress={typeof job?.progress === 'number' ? job.progress : null} />
-            : <Gauge state={gaugeState} size={120} />}
+            : <BrandMark size={120} />}
         </span>
       )}
       <div className="rx-mp-hero-name">{model.name}</div>
@@ -718,7 +718,7 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, on
         {...handlers}
       >
         {downloading && (
-          <span className="rx-mp-cta-gauge"><Gauge state="working" size={22} /></span>
+          <span className="rx-mp-cta-gauge"><BrandSpinner size={22} /></span>
         )}
         {label}
       </button>
@@ -768,7 +768,7 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
   // spinning iris becomes a tick, and everyone already knows that story.
   let accessory
   if (downloading) {
-    accessory = <span className="rx-mp-row-glyph is-amber"><Gauge state="working" size={28} /></span>
+    accessory = <span className="rx-mp-row-glyph"><BrandSpinner size={28} /></span>
   } else if (failed) {
     accessory = <span className="rx-mp-row-retry">Try again</span>
   } else if (model.downloaded) {
@@ -795,7 +795,7 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
     >
       {lead && (
         <span className="rx-mp-row-lead" style={{ color: gaugeColor(gaugeState) }}>
-          <Gauge state={gaugeState} size={29} />
+          <BrandMark size={29} />
         </span>
       )}
       <span className="rx-mp-row-text">

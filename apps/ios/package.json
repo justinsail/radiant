@@ -3,7 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "description": "Native iOS shell for Radiant — bundles the UI and connects to a Radiant server on your Mac.",
-  "scripts": { "sync": "cap sync ios", "open": "cap open ios" },
-  "dependencies": { "@capacitor/core": "^7.0.0", "@capacitor/ios": "^7.0.0" },
-  "devDependencies": { "@capacitor/cli": "^7.0.0", "typescript": "^5" }
+  "scripts": {
+    "sync": "cap sync ios",
+    "open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/device": "^7.0.5",
+    "@capacitor/haptics": "^7.0.5",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/keyboard": "^7.0.6",
+    "@capacitor/status-bar": "^7.0.6"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "typescript": "^5"
+  }
 }

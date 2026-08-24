@@ -14,6 +14,17 @@
 import React from 'react'
 import markUrl from '../assets/brand/radiant-mark.png'
 
+/** The mark, still. Anything that means "this is Radiant" uses this. */
+export function BrandMark ({ size = 29, className = '' }) {
+  return (
+    <img
+      className={'rx-brand-static ' + className}
+      src={markUrl} alt="" width={size} height={size}
+      style={{ width: size, height: size }}
+    />
+  )
+}
+
 export default function BrandSpinner ({ size = 26, progress = null }) {
   const known = typeof progress === 'number' && isFinite(progress)
   const r = size / 2 - 1.25

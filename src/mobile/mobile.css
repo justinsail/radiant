@@ -1599,3 +1599,8 @@
 @media (prefers-reduced-motion: reduce) {
   .is-native .rx-brand-spin img { animation: none; }
 }
+
+/* The mark, wherever it stands for the app rather than for a status. It is
+   artwork, so it does not take currentColor — that is the point: one logo,
+   one set of colours, everywhere. */
+.is-native .rx-brand-static { display: block; flex: 0 0 auto; }
