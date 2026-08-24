@@ -117,18 +117,20 @@ const SHELL_CSS = `
   backdrop-filter: blur(50px) saturate(180%);
   background: rgba(242,242,247,0.86);
 }
-@media (prefers-color-scheme: dark) {
-  .rx-shell-bar[data-solid="true"] { background: rgba(30,30,30,0.72); }
-  .rx-shell-menu { background: rgba(28,28,30,0.90); }
-}
+/* Keyed off the app's mode, NOT the phone's — see data-rx-dark in theme.js.
+   This is the FOURTH stylesheet in src/mobile and the one that draws the nav
+   bar; a previous pass converted the other three and left this, so Settings
+   kept a light bar over dark content. */
+.is-native[data-rx-dark='true'] .rx-shell-bar[data-solid="true"] { background: rgba(30,30,30,0.72); }
+.is-native[data-rx-dark='true'] .rx-shell-menu { background: rgba(28,28,30,0.90); }
 /* vibrancy off: go fully opaque plus a hairline, rather than leaving a flat
    translucent-looking fill behind */
 @media (prefers-reduced-transparency: reduce) {
   .rx-shell-bar[data-solid="true"] { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--rx-bg, #fff); }
   .rx-shell-menu { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--rx-bg-grouped, #F2F2F7); }
 }
-@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-  .rx-shell-bar[data-solid="true"], .rx-shell-menu { background: #1C1C1E; }
+@media (prefers-reduced-transparency: reduce) {
+  .is-native[data-rx-dark='true'] .rx-shell-bar[data-solid="true"], .rx-shell-menu { background: #1C1C1E; }
 }
 /* Press states are JS-driven with a 10pt slop cancel. There is not one :hover
    rule in this file: on iOS a :hover sticks after the tap and the control stays

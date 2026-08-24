@@ -67,16 +67,33 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
 
     // MARK: - catalog
 
+    /// Is this model actually on the phone? MEASURED, not remembered.
+    ///
+    /// ⚠️ A UserDefaults flag lies in BOTH directions, and both have bitten:
+    ///  · it said no while a 663 MB Llama sat in the cache, so Settings read
+    ///    "Nothing downloaded yet" over a model the user had just downloaded;
+    ///  · and it can say yes after iOS purges Caches under storage pressure —
+    ///    which it is entitled to do, since that is where the weights live —
+    ///    leaving the app offering a model that is no longer there.
+    ///
+    /// The files are the truth. 60% of the catalog size is the threshold: high
+    /// enough that a handful of stray config files never counts as a model,
+    /// low enough to survive the catalog's rounded sizes.
+    private func isOnDisk(_ entry: Entry) -> Bool {
+        guard let dir = cacheDir(for: entry.config.name),
+              FileManager.default.fileExists(atPath: dir.path) else { return false }
+        return Double(size(of: dir)) >= entry.gb * 1_000_000_000 * 0.6
+    }
+
     @objc func list(_ call: CAPPluginCall) {
-        let have = Set(downloadedIds())
         call.resolve(["models": catalog.map { [
             "id": $0.id, "name": $0.name, "blurb": $0.blurb,
-            "sizeGB": $0.gb, "downloaded": have.contains($0.id)
+            "sizeGB": $0.gb, "downloaded": isOnDisk($0)
         ] }])
     }
 
     @objc func downloaded(_ call: CAPPluginCall) {
-        call.resolve(["ids": downloadedIds()])
+        call.resolve(["ids": catalog.filter { isOnDisk($0) }.map(\.id)])
     }
 
     /// Which models are on the device.
@@ -235,15 +252,27 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
             // the number the user actually cares about.
             let expected = Int64(entry.gb * 1_000_000_000)
             let repo = entry.config.name
+            // ⚠️ MEASURE THE DELTA, NOT THE TOTAL. Whatever is already cached
+            // counts toward the folder's size, so a model that is partly — or
+            // entirely — present made the very first tick read 100% and stay
+            // there. Tony: "now downloading llama starts at 100% and doesnt
+            // change." Progress is what THIS download adds, from here.
+            let baseline = bytesOnDisk(for: repo)
+            let remaining = max(expected - baseline, 0)
             let poller = Task { [weak self] in
                 var lastPct = -1
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     if Task.isCancelled { break }
                     guard let self else { break }
-                    let done = self.bytesOnDisk(for: repo)
-                    guard done > 0 else { continue }
-                    let f = min(0.999, Double(done) / Double(max(expected, 1)))
+                    // Nothing left to fetch: this is a cache hit and it will
+                    // finish on its own. Reporting a percentage would be
+                    // inventing a wait that is not happening.
+                    guard remaining > 0 else { break }
+                    let added = max(self.bytesOnDisk(for: repo) - baseline, 0)
+                    let done = baseline + added
+                    guard added > 0 else { continue }
+                    let f = min(0.999, Double(added) / Double(remaining))
                     let pct = Int(f * 100)
                     guard pct != lastPct else { continue }
                     lastPct = pct

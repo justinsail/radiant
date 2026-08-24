@@ -35,6 +35,9 @@ export const TEXT_SIZES = [
 
 export const MODES = [
   { id: 'dark', name: 'Dark' },
+  // The Mac's third mode: dark, but off true black. It reuses every dark token
+  // and only lifts the grounds, so it counts as dark everywhere below.
+  { id: 'medium', name: 'Medium' },
   { id: 'light', name: 'Light' },
   { id: 'system', name: 'System' }
 ]
@@ -75,7 +78,8 @@ function watchSystem () {
 function syncNativeChrome () {
   const root = document.documentElement
   const mode = root.getAttribute('data-rx-mode')
-  const dark = mode === 'dark' || (mode === 'system' && root.getAttribute('data-rx-system') === 'dark')
+  const dark = mode === 'dark' || mode === 'medium' ||
+    (mode === 'system' && root.getAttribute('data-rx-system') === 'dark')
   // ⚠️ THE flag every stylesheet keys off. src/mobile is three stylesheets —
   // mobile.css plus the ones MobileChat and ModelPicker inject — and they used
   // to decide dark independently from `prefers-color-scheme`. The moment mode

@@ -1610,6 +1610,11 @@
 }
 .is-native .rx-brand-spin-mark {
   display: block;
+  /* MEASURED, not nudged. The swirl's ink sits 13.5px above the centre of its
+     own 1024px canvas (bbox 110,91–912,906 → centre 511, 498.5), so spinning
+     about the box centre makes it rise and fall as it turns — which is exactly
+     what it looked like. Turn about the ink's centre instead. */
+  transform-origin: 49.90% 48.68%;
   animation: rx-spin 2.4s linear infinite;
 }
 .is-native .rx-brand-spin svg { position: absolute; inset: 0; }
@@ -1831,6 +1836,17 @@
   display: inline-flex;
   align-items: center;
   margin-right: 12px;
+}
+
+/* MEDIUM — the Mac's third mode. It takes the whole dark token set (so
+   data-rx-dark is true for it) and then lifts the grounds off true black: dark
+   without the OLED cut-out, which is what people who find #000 harsh actually
+   want. Only the grounds move; every text and tint value stays as dark's,
+   because those are what the contrast ratios were measured against. */
+.is-native[data-rx-mode='medium'] {
+  --rx-bg: #1C1C1E;
+  --rx-bg-grouped: #121214;
+  --rx-cell: #2C2C2E;
 }
 
 /* ═══ settings ═════════════════════════════════════════════════════════════
