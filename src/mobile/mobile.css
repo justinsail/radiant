@@ -2269,11 +2269,13 @@
    Shared behavior lives in MakerSection.jsx — only appearance is here. */
 .is-native .rx-makerhead{
   display:flex; align-items:center; gap:10px;
-  /* ⚠️ SAME INSET AS .rx-group, or the header and the rows it opens are two
-     different widths stacked on each other — which is exactly what made the
-     open shelf look like a misplaced panel rather than one card. `width:100%`
-     is gone with it: with side margins it would overflow by 40px. */
+  /* ⚠️ SAME INSET *AND* SAME WIDTH AS .rx-group. Getting only the inset right
+     is not enough: a <button> shrinks to fit its text, so dropping width left
+     the header 253px against the rows' 353px — aligned on the left and a
+     hundred pixels short on the right. Measured, not guessed. The width has to
+     account for its own margins, hence the calc. */
   margin:8px var(--rx-sp-20) 0; padding:12px 16px;
+  width:calc(100% - var(--rx-sp-20) * 2);
   background:var(--rx-cell); border:0; border-radius:12px;
   font:inherit; color:var(--rx-label); text-align:left;
   -webkit-tap-highlight-color:transparent;
