@@ -96,10 +96,29 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
     private func forget(_ id: String) {
         UserDefaults.standard.set(downloadedIds().filter { $0 != id }, forKey: key)
     }
-    /// Where swift-huggingface puts model files on iOS.
+    /// Where swift-huggingface ACTUALLY puts model files on iOS.
+    ///
+    /// ⚠️ MEASURED ON A DEVICE, NOT ASSUMED. This used to return
+    /// `Documents/huggingface/models/<org>/<name>`, which is wrong twice over,
+    /// and listing a real phone's container settled it:
+    ///
+    ///   Library/Caches/huggingface/hub/models--mlx-community--Llama-3.2-1B-Instruct-4bit/blobs/…
+    ///
+    /// Caches, not Documents — and HuggingFace's own folder convention, where
+    /// the repo id is prefixed with `models--` and every slash becomes `--`.
+    ///
+    /// The cost of getting this wrong was two invisible bugs: the download
+    /// progress poller measured an empty directory and so reported nothing at
+    /// all (three "fixes" chased that symptom elsewhere), and `remove` deleted a
+    /// path that never existed, so freeing space silently freed none.
+    ///
+    /// It also means the weights live in Caches, which iOS may purge under
+    /// storage pressure. That is survivable — the app re-downloads — but it is
+    /// the loader's choice, not ours.
     private func cacheDir(for repo: String) -> URL? {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("huggingface/models/\(repo)")
+        let folder = "models--" + repo.replacingOccurrences(of: "/", with: "--")
+        return FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("huggingface/hub/\(folder)")
     }
 
     /// Bytes currently on disk for a model. Walking the directory is cheap next
