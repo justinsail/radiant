@@ -62,7 +62,7 @@ const pick = (mod, ...names) => {
 
 const Missing = (name) => function MissingScreen () {
   return (
-    <div style={{ padding: 16, color: 'var(--rx-label-2, rgba(60,60,67,0.6))', fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400 }}>
+    <div style={{ padding: 16, color: 'var(--rx-label-2, rgba(60,60,67,0.6))', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400 }}>
       {name} has not landed yet.
     </div>
   )
@@ -167,6 +167,15 @@ function useDynamicType (rootRef) {
       p.style.visibility = 'hidden'
       p.textContent = 'M'
       document.body.appendChild(p)
+      // ⚠️ 17, AND THE MEASUREMENT IS ON RECORD SO NOBODY RE-LITIGATES IT.
+      // `-apple-system-body` does NOT resolve the same everywhere: measured from
+      // inside this app's WKWebView on iPhone 17 Pro / iOS 26 it is 17px, which
+      // is UIKit's real Body size, while MOBILE SAFARI on the same simulator
+      // reports 16px for the identical declaration — Safari steps web system
+      // text down one notch and the app does not. So a probe run in Safari (or
+      // in any browser preview of this UI) will tell you 16 and be wrong for the
+      // shipping app. 17 puts the factor at exactly 1.0 at the default Text Size
+      // and it still tracks Dynamic Type proportionally above that.
       const dt = parseFloat(getComputedStyle(p).fontSize) / 17
       p.remove()
       const el = rootRef.current || document.documentElement
@@ -276,31 +285,31 @@ const Chevron = ({ size = 17 }) => (
 )
 
 /**
- * gearshape. Eight teeth as trapezoids around a ring, which is what the SF
- * Symbol is — an earlier attempt drew eight radial strokes on a circle and read
- * as a sun with uneven rays, which is why the bar sat empty for a while. The
- * bar is not allowed to sit empty: a nav bar with nothing in it is 100pt of
- * dead chrome at the top of the launch screen.
+ * gearshape. ⚠️ IT IS ONE CONTINUOUS OUTLINE, NOT A RING WITH THINGS AROUND IT.
+ * Two earlier attempts drew the teeth as separate marks over a circle — first
+ * eight radial strokes (a sun with uneven rays), then eight small rects over a
+ * ring at r 6.6 with a second ring at r 2.5 inside it, which reads as chunky
+ * triangular teeth around an oversized centre dot. The SF Symbol is a single
+ * closed path that alternates between an outer and an inner radius, stroked at
+ * a constant weight with round joins, plus one hollow centre. The path below is
+ * generated from Ro 10.1 / Ri 7.4 on a 22 box: 8 teeth, each 22° of outer arc,
+ * 6° flanks and a 23° valley, so the teeth are as wide as the gaps the way the
+ * symbol's are. The round joins are what make the corners read as Apple's, and
+ * the centre is a hole at r 3.55, not a dot.
  */
-const Gearshape = ({ size = 22 }) => {
-  const teeth = []
-  for (let i = 0; i < 8; i++) {
-    teeth.push(
-      <rect
-        key={i} x="10.05" y="0.6" width="1.9" height="4.6" rx="0.75"
-        fill="currentColor"
-        transform={`rotate(${i * 45} 11 11)`}
-      />
-    )
-  }
-  return (
-    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden="true">
-      {teeth}
-      <circle cx="11" cy="11" r="6.6" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="11" cy="11" r="2.5" stroke="currentColor" strokeWidth="1.7" />
-    </svg>
-  )
-}
+const GEAR_PATH = 'M9.07 1.09 L12.93 1.09 L13.16 3.92 L14.47 4.47 L16.65 2.63 L19.37 5.35 '
+  + 'L17.53 7.53 L18.08 8.84 L20.91 9.07 L20.91 12.93 L18.08 13.16 L17.53 14.47 L19.37 16.65 '
+  + 'L16.65 19.37 L14.47 17.53 L13.16 18.08 L12.93 20.91 L9.07 20.91 L8.84 18.08 L7.53 17.53 '
+  + 'L5.35 19.37 L2.63 16.65 L4.47 14.47 L3.92 13.16 L1.09 12.93 L1.09 9.07 L3.92 8.84 '
+  + 'L4.47 7.53 L2.63 5.35 L5.35 2.63 L7.53 4.47 L8.84 3.92 Z'
+
+const Gearshape = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden="true">
+    <path d={GEAR_PATH} stroke="currentColor" strokeWidth="1.6"
+      strokeLinejoin="round" strokeLinecap="round" />
+    <circle cx="11" cy="11" r="3.55" stroke="currentColor" strokeWidth="1.6" />
+  </svg>
+)
 
 const EllipsisCircle = ({ size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -332,15 +341,25 @@ const BG = {
 
 const BAR_H = 44
 
+// ⚠️ THE TRAILING BAR BUTTON IS A CIRCULAR CHIP, NOT A BARE GLYPH.
+// Measured off Settings on this simulator (iPhone 17 Pro / iOS 26): its back
+// control is a 44pt circle filled rgb(251,251,255) — very slightly lighter than
+// the grouped background it sits on — with a soft ambient shadow and no border.
+// A glyph floating bare in the bar is a previous OS era, and on the root screen
+// it is the only piece of chrome there is, so it carries the whole first
+// impression. The button is the chip: 44pt of hit area IS the visible circle.
 const barButtonStyle = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  // 44pt of hit area from padding around a 21pt glyph. Taking it from
-  // width: 44 instead would shove the glyph off the bar's optical margin.
-  minWidth: 44, height: 44, padding: '0 16px',
-  appearance: 'none', border: 0, background: 'none',
+  width: 44, height: 44, padding: 0,
+  appearance: 'none', border: 0,
+  borderRadius: 999,
+  background: 'var(--rx-bar-chip)',
+  boxShadow: 'var(--rx-bar-chip-shadow)',
   color: 'var(--rx-tint, #3F69A7)',
   touchAction: 'manipulation'
 }
+// the bar's own 16pt optical margin, now that the chip owns the 44
+const barButtonSlot = { display: 'flex', alignItems: 'center', padding: '0 16px' }
 
 // ── the nav bar ─────────────────────────────────────────────────────────────
 
@@ -400,7 +419,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
               minWidth: 44, padding: '0 8px',
               appearance: 'none', border: 0, background: 'none',
               color: 'var(--rx-tint, #3F69A7)',
-              fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400,
+              fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400,
               touchAction: 'manipulation'
             }}
           >
@@ -424,7 +443,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
           }}
         >
           <span style={{
-            fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 600,
+            fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 600,
             color: 'var(--rx-label, #000)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%'
           }}>{title}</span>
@@ -435,7 +454,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
               // tok/s changes in place, and a figure that jitters as it counts
               // is a small failure people feel without being able to name it
               fontFamily: chrome.subtitleMono
-                ? 'var(--rx-mono, ui-monospace, "SF Mono", Menlo, monospace)'
+                ? 'ui-monospace, "SF Mono", Menlo, monospace'
                 : 'inherit',
               fontVariantNumeric: 'tabular-nums'
             }}>{subtitle}</span>
@@ -443,7 +462,7 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
         </div>
 
         {trailing && (
-          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, display: 'flex', alignItems: 'center' }}>
+          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, ...barButtonSlot }}>
             {trailing}
           </div>
         )}
@@ -637,7 +656,7 @@ function MenuRow ({ item, first, onClose }) {
         appearance: 'none', border: 0, background: 'transparent', textAlign: 'left',
         borderTop: first ? 'none' : '1px solid var(--rx-hairline, rgba(60,60,67,0.12))',
         color: item.destructive ? 'var(--rx-red-text, #D70015)' : 'var(--rx-label, #000)',
-        fontFamily: 'var(--rx-font)', fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400, touchAction: 'manipulation'
+        fontSize: 'calc(17px * var(--rx-dt, 1))', lineHeight: 1.294, fontWeight: 400, touchAction: 'manipulation'
       }}
     >{item.label}</button>
   )
@@ -1076,7 +1095,10 @@ export default function MobileShell () {
         overscrollBehavior: 'none',
         background: 'var(--rx-bg, #FFFFFF)',
         color: 'var(--rx-label, #000)',
-        fontFamily: 'var(--rx-font, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif)',
+        // literal, never behind a custom property: `-apple-system` is a
+        // system-font KEYWORD and a var() round trip is one engine change away
+        // from turning the whole app into Helvetica. See mobile.css.
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif',
         // the shared body sets −0.01em, which over-tightens SF at 17pt; SF's
         // own optical tracking is already correct
         letterSpacing: 'normal',

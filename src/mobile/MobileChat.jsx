@@ -732,7 +732,7 @@ const CSS = `
   display: flex; flex-direction: column;
   height: 100%;
   background: var(--rx-bg); color: var(--rx-label);
-  font-family: var(--rx-font); letter-spacing: normal;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; letter-spacing: normal;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
@@ -759,7 +759,7 @@ const CSS = `
    dropped at parse time and the control falls back to its UA font — a textarea
    lands on monospace. Zero-specificity, so it only fills the gap and never
    overrides the real system font on device. */
-:where(.rx-chat) :where(*) { font-family: var(--rx-font); }
+:where(.rx-chat) :where(*) { font-family: inherit; }
 
 /* ── nav ── */
 .rx-chat-nav {
@@ -776,17 +776,17 @@ const CSS = `
 .rx-chat-back {
   display: flex; align-items: center; gap: 2px; justify-self: start;
   min-height: 44px; padding-right: 10px; color: var(--rx-tint);
-  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; min-width: 0;
+  font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; min-width: 0;
 }
 .rx-chat-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rx-chat-back.is-pressed { opacity: 0.35; }
 .rx-chat-title { text-align: center; min-width: 0; }
-.rx-chat-title-1 { font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 600; color: var(--rx-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-chat-title-1 { font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 600; color: var(--rx-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rx-chat-title-2 {
   font-size: calc(11px * var(--rx-dt, 1)); line-height: 13px;
   color: var(--rx-label-2); margin-top: 1px;
 }
-.rx-chat-title-2.is-mono { font-family: var(--rx-mono); font-variant-numeric: tabular-nums; }
+.rx-chat-title-2.is-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
 .rx-chat-more {
   justify-self: end; display: grid; place-items: center;
   width: 44px; height: 44px; color: var(--rx-tint);
@@ -810,7 +810,7 @@ const CSS = `
 .rx-chat-turn.is-same { margin-top: 4px; }
 .rx-chat-turn-user { align-self: flex-end; max-width: 78%; }
 .rx-chat-bubble {
-  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400;
+  font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400;
   background: var(--rx-tint); color: var(--rx-on-tint);
   border-radius: var(--rx-r-bubble, 20px); padding: 10px 14px;
   white-space: pre-wrap; overflow-wrap: anywhere;
@@ -819,14 +819,14 @@ const CSS = `
 .rx-chat-turn-model { align-self: stretch; max-width: 34em; }
 .rx-chat-byline { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--rx-label-2); }
 .rx-chat-marker { display: block; width: 22px; height: 22px; flex: none; }
-.rx-chat-byname { font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; font-weight: 600; color: var(--rx-label-2); }
+.rx-chat-byname { font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; font-weight: 600; color: var(--rx-label-2); }
 .rx-chat-body {
-  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; line-height: 1.53; /* 400 words needs air a bubble does not give */
+  font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; line-height: 1.53; /* 400 words needs air a bubble does not give */
   color: var(--rx-label); margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
 }
 .rx-chat-body:last-child { margin-bottom: 0; }
-.rx-chat-error { font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-red-text); margin: 4px 0 0; }
+.rx-chat-error { font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-red-text); margin: 4px 0 0; }
 
 /* the only motion in the transcript, and it is amber because the phone is
    burning current */
@@ -840,7 +840,7 @@ const CSS = `
 
 .rx-chat-codewell { position: relative; margin: 0 0 10px; }
 .rx-chat-code {
-  font-family: var(--rx-mono); font-size: 13px; line-height: 18px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; line-height: 18px;
   background: var(--rx-cell-2); color: var(--rx-label);
   border-radius: var(--rx-r-code, 10px); padding: 12px; margin: 0;
   overflow-x: auto; overscroll-behavior-x: contain; /* never scrolls the page */
@@ -850,7 +850,7 @@ const CSS = `
 .rx-chat-code::-webkit-scrollbar { display: none; }
 .rx-chat-copy {
   position: absolute; top: 4px; right: 4px; z-index: 1;
-  font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-tint);
+  font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-tint);
   padding: 8px 10px; min-height: 32px;
 }
 .rx-chat-copy.is-pressed { opacity: 0.35; }
@@ -875,7 +875,7 @@ const CSS = `
 .rx-chat-jump {
   position: absolute; z-index: 2; left: 50%;
   bottom: calc(var(--rx-chat-composerh, 64px) + var(--rx-kb) + 10px);
-  font-family: var(--rx-font); font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-tint);
+  font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; color: var(--rx-tint);
   background: var(--rx-mat);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
@@ -906,7 +906,7 @@ const CSS = `
 }
 .rx-chat-field {
   flex: 1; min-width: 0; resize: none; border: 0; appearance: none;
-  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; /* 17px floor — anything smaller zooms on focus */
+  font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; /* 17px floor — anything smaller zooms on focus */
   color: var(--rx-label); background: var(--rx-fill-2);
   border-radius: var(--rx-r-field, 18px);
   padding: 7px 12px; min-height: 36px; max-height: 45dvh;
@@ -950,7 +950,7 @@ const CSS = `
 .rx-chat-menurow {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   width: 100%; min-height: 44px; padding: 11px 16px; text-align: left;
-  font-family: var(--rx-font); font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; color: var(--rx-label);
+  font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; color: var(--rx-label);
 }
 .rx-chat-menurow.is-destructive { color: var(--rx-red-text); }
 .rx-chat-menurow.is-pressed { background: var(--rx-fill-1); }

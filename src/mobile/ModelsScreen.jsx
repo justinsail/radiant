@@ -7,31 +7,43 @@
  * "Connect to a Mac" is a single plain row two sections down. On-device is the
  * product; the Mac is one tap away and weighs nothing.
  *
- * ⚠️ THREE THINGS ON THIS SCREEN HAVE BEEN ROUND-TRIPPED. Read before changing:
+ * ⚠️ FOUR THINGS ON THIS SCREEN HAVE BEEN ROUND-TRIPPED. Read before changing:
  *
- * 1. THE ROW IS NAME OVER BLURB, AND THE SIZE IS IN THE TRAILING COLUMN.
+ * 1. THE ROW IS NAME OVER BLURB, AND THERE IS NO SIZE IN THE ROW AT ALL.
  *    The size was welded onto the front of the blurb once ("0.7 GB · Fastest…",
- *    the App Store idiom) to get it out of --rx-label-3. Every one of the five
- *    blurbs then wrapped, the rows measured 84.9pt against Settings' 44 on the
- *    same device, and the privacy footer and the Mac row fell below the fold —
- *    which is to say the load-bearing product claim became invisible on launch.
- *    The contrast fix was --rx-label-2, not the relocation. Rows are 60pt now
- *    and the blurb is one line; it reflows only at AX sizes.
+ *    the App Store idiom); every blurb then wrapped, the rows measured 84.9pt
+ *    against Settings' 44, and the privacy footer fell below the fold. It then
+ *    sat under the download glyph in a trailing column — where it stole enough
+ *    width that three of the five blurbs truncated mid-word ("and r…", "on p…",
+ *    "with h…") and, being a variable-width string under a fixed-width glyph,
+ *    left the row's right margin ragged down the list. Both are gone: the
+ *    trailing column is the arrow.down.circle alone, which is the iCloud idiom
+ *    Apple ships with no label, and the weight is stated in the sheet the row
+ *    opens. The blurb now has the width to wrap to two lines instead.
  *
  * 2. THERE IS NO LEADING GAUGE ON A CATALOG ROW. Five of them taught the mark
  *    in the first two seconds — in theory. Measured, the three-ring spiral has
  *    no legibility budget under about 26pt: at 29 the radial gap between the A
  *    and B strokes is 1.3pt and the whole thing renders as a smudge. Five
- *    smudges down the left edge is worse than no mark. The gauge now appears at
- *    64 in the hero, 26 in a downloading row's accessory (where it is moving,
+ *    smudges down the left edge is worse than no mark. The gauge appears at
+ *    96 in the hero, 26 in a downloading row's accessory (where it is moving,
  *    which is what makes it legible), 120 on the sheet and 128 on first run.
  *
- * 3. THE HERO IS LEFT-ALIGNED AND SMALL. A 96pt centred gauge over centred text
- *    above a left-aligned list is two competing alignment axes, and in the
- *    ABSENT state a 96pt --rx-label-3 ring reads as a broken image. It is one
- *    horizontal unit on the same 20pt axis as the cards now. It is still drawn
- *    in both states and it is still a tap target in both — deleting the empty
- *    hero once left the launch screen with no gauge on it at all.
+ * 3. THE HERO IS A LEFT-ALIGNED VERTICAL STACK ON THE 20pt LAYOUT MARGIN.
+ *    It has been centred (two competing alignment axes against a left-aligned
+ *    list) and it has been a horizontal gauge-then-text row, which put the mark
+ *    at an optical 28pt and its label at 100pt while the title, the cards and
+ *    the footer all sat at 20 — three left edges, and the hero aligned to none
+ *    of them. Vertical gives the screen exactly two: 20pt for everything at
+ *    screen level, 36pt for text inside a card. The gauge is optically aligned,
+ *    not box-aligned: its outermost stroke sits 12.15% of the box in from the
+ *    left, so the box carries a negative margin of that fraction.
+ *
+ * 4. THE STORAGE LINE IS DRAWN EVEN WITH NOTHING DOWNLOADED. It used to hide
+ *    until the first model landed, which left the launch screen with a dead
+ *    lower third and no statement of the product argument. With no segments it
+ *    draws no track — an empty 4pt rail reads as a stuck download — and states
+ *    the free space instead.
  */
 import React from 'react'
 import Gauge from './Gauge.jsx'
@@ -97,16 +109,20 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
       data-absent={resident ? undefined : 'true'}
       {...handlers}
     >
-      <Gauge size={64} state={resident ? 'resident' : 'absent'} />
+      {/* optical alignment, not box alignment: ring A's outer stroke reaches
+          12.15% of the viewBox from the edge (r 35.2 + half of stroke 5.3, on a
+          100-unit box), so the box is pulled left by that fraction of 96 and the
+          ink lands on the same 20pt margin as the title and the cards. */}
+      <Gauge size={96} state={resident ? 'resident' : 'absent'} className="rx-hero-gauge" />
       <div className="rx-hero-label">
-        <div className="rx-title-3">{resident ? model.name : 'No model yet'}</div>
-        <div className={'rx-footnote' + (resident ? ' rx-tabular' : '')}>
+        <div className="rx-title-2">{resident ? model.name : 'No model yet'}</div>
+        <div className={'rx-hero-state rx-footnote' + (resident ? ' rx-tabular' : '')}>
           {resident
             ? `Ready on this iPhone · ${fmtGB(model.sizeGB)}`
             : 'Choose a model to run on this iPhone'}
+          <Chevron />
         </div>
       </div>
-      {resident && <Chevron />}
     </div>
   )
 }
@@ -131,20 +147,15 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
 
   const downloading = state === 'downloading'
 
-  // The trailing column: glyph over the size, both quiet. The one moment the
-  // gauge appears in a row is mid-download, at 26pt, where it is turning — and
-  // motion is what carries a mark this small, not stroke weight.
+  // The trailing column is ONE fixed-width glyph and nothing else, so every
+  // row's right edge agrees. The one moment the gauge appears in a row is
+  // mid-download, at 26pt, where it is turning — and motion is what carries a
+  // mark this small, not stroke weight.
   const glyph = model.downloaded
     ? <span className="rx-tinted"><Checkmark /></span>
     : downloading
       ? <Gauge size={26} state="working" progress={typeof progress === 'number' ? progress : null} />
       : <span className={state === 'failed' ? 'rx-destructive' : undefined}><ArrowDownCircle /></span>
-
-  // Always the weight, because that is the decision the row is asking for —
-  // except mid-download, where the percentage is the only thing worth reading.
-  const caption = downloading
-    ? (pct === null ? '' : `${pct}%`)
-    : fmtGB(model.sizeGB)
 
   return (
     <div
@@ -159,7 +170,18 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
             ? 'That download did not finish. Tap to try again.'
             : unavailable
               ? <span className="rx-warm">Needs {fmtGB(shortBy / GB)} more room</span>
-              : model.blurb}
+              : downloading
+                // Not the size — see the .rx-accessory note in mobile.css, that
+                // string is always present and always costs the blurb its
+                // width. This one exists only while the download runs, and it
+                // replaces a blurb nobody is reading at that moment: a
+                // determinate arc still does not answer "how much longer".
+                ? <span className="rx-tabular" aria-hidden="true">
+                    {typeof progress === 'number'
+                      ? `Downloading… ${Math.round(progress * 100)}%`
+                      : 'Downloading…'}
+                  </span>
+                : model.blurb}
         </div>
       </div>
       <div
@@ -167,7 +189,6 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
         {...(model.downloaded ? { 'aria-hidden': 'true' } : acc.handlers)}
       >
         {glyph}
-        <span className="rx-row-size" aria-hidden="true">{caption}</span>
       </div>
     </div>
   )
@@ -197,10 +218,12 @@ export default function ModelsScreen ({
   )
 
   const pick = recommend(models)
-  // The strip earns its place only once there is a segment to draw. An empty
-  // 4pt track over "0 GB of 995 GB used by models." reads as a stuck download,
-  // in the most valuable strip on the screen.
-  const showStorage = !!(disk && disk.total && downloaded.length > 0)
+  // Drawn whenever the device will tell us its disk, downloaded models or not.
+  // Hiding it until the first download left the launch screen — the one screen
+  // every judge sees — with a dead lower third and no statement of the argument
+  // the whole app is making. The zero state draws no rail (an empty 4pt track
+  // reads as a stuck download); StorageLine states the free space instead.
+  const showStorage = !!(disk && disk.total)
 
   return (
     <>
@@ -260,7 +283,7 @@ export default function ModelsScreen ({
       </div>
 
       {/* room for the storage line, which is pinned over the scroller */}
-      <div style={{ height: showStorage ? 76 : 24 }} aria-hidden="true" />
+      <div style={{ height: showStorage ? 72 : 24 }} aria-hidden="true" />
 
       {showStorage && (
         <StorageLine downloaded={downloaded} disk={disk} usedBytes={usedBytes} bytesOf={bytesOf} />

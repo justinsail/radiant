@@ -75,8 +75,9 @@ const CSS = `
   --mp-red:var(--rx-red-text,#D70015);
   --mp-green:var(--rx-green,#248A3D);
 
-  --mp-font:var(--rx-font,-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif);
-  --mp-mono:var(--rx-mono,ui-monospace,'SF Mono',Menlo,monospace);
+  /* no --mp-font: the family is inherited from .is-native body, which
+     declares the system keyword literally. See mobile.css. */
+  --mp-mono:ui-monospace,'SF Mono',Menlo,monospace;
   --mp-r-cell:var(--rx-r-cell,10px);
   --mp-r-button:var(--rx-r-button,14px);
 
@@ -92,7 +93,7 @@ const CSS = `
 
   display:flex; flex-direction:column; min-height:100%;
   background:var(--mp-bg); color:var(--mp-label);
-  font-family:var(--mp-font); letter-spacing:normal;
+  letter-spacing:normal;
   -webkit-tap-highlight-color:transparent; touch-action:manipulation;
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
@@ -124,10 +125,10 @@ const CSS = `
 .rx-mp-inner{padding:0 16px max(20px,env(safe-area-inset-bottom)); margin:0 auto; width:100%; max-width:34em; box-sizing:border-box}
 
 .rx-mp-title{
-  font-family:var(--mp-font); font-size:calc(34px*var(--mp-dt)); line-height:1.21;
+  font-size:calc(34px*var(--mp-dt)); line-height:1.21;
   font-weight:700; letter-spacing:-0.4px; margin:8px 0 0; color:var(--mp-label);
 }
-.rx-mp-lede{font-size:calc(15px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); margin:6px 0 0; line-height:1.33}
+.rx-mp-lede{font-size:calc(15px*var(--mp-dt)); font-weight:400; color:var(--mp-label-2); margin:6px 0 0; line-height:1.33}
 
 /* ---- hero: the recommended model, no card and no plate. The gauge on the
    grouped background IS the hero; a bordered box would make it a settings
@@ -136,9 +137,9 @@ const CSS = `
 /* height:auto — the gauge is 120pt when it is reporting a download and absent
    the rest of the time, so this box must not pin itself to the old 96 */
 .rx-mp-hero-gauge{display:block; line-height:0; height:auto; margin-bottom:12px; color:var(--mp-tint)}
-.rx-mp-hero-name{font-family:var(--mp-font); font-size:calc(22px*var(--mp-dt)); line-height:1.27; font-weight:600; margin:0}
-.rx-mp-hero-blurb{font-size:calc(15px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); margin:4px 0 0; line-height:1.33; max-width:26em}
-.rx-mp-hero-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); margin:10px 0 0; line-height:1.38}
+.rx-mp-hero-name{font-size:calc(22px*var(--mp-dt)); line-height:1.27; font-weight:600; margin:0}
+.rx-mp-hero-blurb{font-size:calc(15px*var(--mp-dt)); font-weight:400; color:var(--mp-label-2); margin:4px 0 0; line-height:1.33; max-width:26em}
+.rx-mp-hero-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; margin:10px 0 0; line-height:1.38}
 .rx-mp-hero-note.is-amber{color:var(--mp-amber)}
 .rx-mp-hero-note.is-red{color:var(--mp-red)}
 
@@ -146,7 +147,7 @@ const CSS = `
   -webkit-appearance:none; appearance:none; border:0; display:flex; align-items:center;
   justify-content:center; gap:8px; width:100%; min-height:50px; margin:20px 0 0;
   border-radius:var(--mp-r-button); background:var(--mp-tint); color:var(--mp-on-tint);
-  font-size:calc(17px*var(--mp-dt)); font-family:var(--mp-font); font-weight:600;
+  font-size:calc(17px*var(--mp-dt)); font-weight:600;
   transition:transform var(--mp-dur-press) var(--mp-press), background-color 200ms linear;
 }
 .rx-mp-cta.is-pressed{background:var(--mp-tint-pressed); transform:scale(.96); transition:transform var(--mp-dur-down) var(--mp-down), background-color 0s}
@@ -158,13 +159,12 @@ const CSS = `
 .rx-mp-secondary{
   -webkit-appearance:none; appearance:none; border:0; background:none; display:block;
   width:100%; min-height:44px; margin:4px 0 0;
-  font-size:calc(17px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font);
-  color:var(--mp-tint); transition:opacity var(--mp-dur-press) var(--mp-press);
+  font-size:calc(17px*var(--mp-dt)); font-weight:400;  color:var(--mp-tint); transition:opacity var(--mp-dur-press) var(--mp-press);
 }
 .rx-mp-secondary.is-pressed{opacity:.4; transition:opacity var(--mp-dur-down) var(--mp-down)}
 
-.rx-mp-sechead{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); margin:20px 0 6px; padding:0 4px}
-.rx-mp-secfoot{font-family:var(--mp-font); font-size:calc(12px*var(--mp-dt)); line-height:1.33; color:var(--mp-label-2); margin:6px 0 0; padding:0 4px}
+.rx-mp-sechead{font-size:calc(13px*var(--mp-dt)); font-weight:400; color:var(--mp-label-2); margin:20px 0 6px; padding:0 4px}
+.rx-mp-secfoot{font-size:calc(12px*var(--mp-dt)); line-height:1.33; color:var(--mp-label-2); margin:6px 0 0; padding:0 4px}
 
 .rx-mp-group{list-style:none; margin:0; padding:0; background:var(--mp-cell); border-radius:var(--mp-r-cell); overflow:hidden}
 
@@ -189,13 +189,12 @@ const CSS = `
 .rx-mp-row-lead{flex:0 0 29px; height:29px; display:block}
 .rx-mp-row-lead > *{display:block; height:29px; color:inherit}
 .rx-mp-row-text{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px}
-.rx-mp-row-name{font-size:calc(17px*var(--mp-dt)); font-weight:600; font-family:var(--mp-font); color:var(--mp-label)}
+.rx-mp-row-name{font-size:calc(17px*var(--mp-dt)); font-weight:600; color:var(--mp-label)}
 /* ⚠️ WRAPS to two lines. It used to be white-space:nowrap, which clipped
    every blurb mid-word and left a column of identical ellipses. Nothing in an
    Apple stock app truncates 100% of its secondary text. */
 .rx-mp-row-sub{
-  font-size:calc(15px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font);
-  color:var(--mp-label-2); line-height:1.33;
+  font-size:calc(15px*var(--mp-dt)); font-weight:400;  color:var(--mp-label-2); line-height:1.33;
   overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
 }
 .rx-mp-row-sub .rx-mp-size{color:var(--mp-label-2); font-variant-numeric:tabular-nums; font-feature-settings:'tnum'}
@@ -213,9 +212,9 @@ const CSS = `
 .rx-mp-row-glyph.is-green{color:var(--mp-green)}
 .rx-mp-row-glyph.is-amber{color:var(--mp-amber)}
 .rx-mp-row-glyph > *{display:block; height:28px}
-.rx-mp-row-retry{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-tint); padding:4px 0}
+.rx-mp-row-retry{font-size:calc(13px*var(--mp-dt)); font-weight:400; color:var(--mp-tint); padding:4px 0}
 
-.rx-mp-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); text-align:center; padding:32px 8px; line-height:1.38}
+.rx-mp-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; color:var(--mp-label-2); text-align:center; padding:32px 8px; line-height:1.38}
 
 /* the completion beat: one 500ms pop, then the row settles back to tint.
    Green is a confirmation here, never a state. */
@@ -273,6 +272,7 @@ function measureDynamicType () {
   p.style.pointerEvents = 'none'
   p.textContent = 'M'
   document.body.appendChild(p)
+  // 17 — measured inside the app, not in Safari. See MobileShell.useDynamicType.
   const raw = parseFloat(getComputedStyle(p).fontSize) / 17
   p.remove()
   return Math.min(Math.max(Number.isFinite(raw) ? raw : 1, 0.82), 1.6)

@@ -30,6 +30,15 @@ export default function Phone () {
       p.style.visibility = 'hidden'
       p.textContent = 'M'
       document.body.appendChild(p)
+      // ⚠️ 17, AND THE MEASUREMENT IS ON RECORD SO NOBODY RE-LITIGATES IT.
+      // `-apple-system-body` does NOT resolve the same everywhere: measured from
+      // inside this app's WKWebView on iPhone 17 Pro / iOS 26 it is 17px, which
+      // is UIKit's real Body size, while MOBILE SAFARI on the same simulator
+      // reports 16px for the identical declaration — Safari steps web system
+      // text down one notch and the app does not. So a probe run in Safari (or
+      // in any browser preview of this UI) will tell you 16 and be wrong for the
+      // shipping app. 17 puts the factor at exactly 1.0 at the default Text Size
+      // and it still tracks Dynamic Type proportionally above that.
       const dt = parseFloat(getComputedStyle(p).fontSize) / 17
       p.remove()
       const v = Math.min(Math.max(dt || 1, 0.82), 1.6)

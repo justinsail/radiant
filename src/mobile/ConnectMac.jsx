@@ -43,7 +43,9 @@ export default function ConnectMac ({ onConnected }) {
     color: 'var(--rx-label)',
     // 17px minimum, never reduced: below 16px iOS zooms the page on focus
     fontSize: 17,
-    fontFamily: 'var(--rx-font)'
+    // inherited from .is-native body, which declares the system keyword
+    // literally — a var() indirection would risk dropping it
+    fontFamily: 'inherit'
   }
 
   return (
