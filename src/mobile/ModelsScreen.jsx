@@ -138,14 +138,17 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
           : unavailable ? ', not enough room' : ''
     )
   })
+  const downloading = state === 'downloading'
   const acc = usePress((e) => { e.stopPropagation?.(); onAccessory?.(model) }, {
     haptic: 'MEDIUM',
     // the trailing control is a glyph; without this it is announced as
     // "button" five times down the screen
-    label: model.downloaded ? `Chat with ${model.name}` : `Download ${model.name}`
+    label: model.downloaded
+      ? `Chat with ${model.name}`
+      : downloading
+        ? `Stop downloading ${model.name}${pct === null ? '' : `, ${pct} percent done`}`
+        : `Download ${model.name}`
   })
-
-  const downloading = state === 'downloading'
 
   // The trailing column is ONE fixed-width glyph and nothing else, so every
   // row's right edge agrees. The one moment the gauge appears in a row is
@@ -154,7 +157,14 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
   const glyph = model.downloaded
     ? <span className="rx-tinted"><Checkmark /></span>
     : downloading
-      ? <Gauge size={26} state="working" progress={typeof progress === 'number' ? progress : null} />
+      // The turning arc is also the stop button, with a square inside it — the
+      // iCloud idiom, where the progress indicator IS the cancel target. A
+      // separate ✕ elsewhere in the row would break the single-glyph trailing
+      // column every other row keeps.
+      ? <span className="rx-stoppable">
+          <Gauge size={26} state="working" progress={typeof progress === 'number' ? progress : null} />
+          <span className="rx-stop-square" aria-hidden="true" />
+        </span>
       : <span className={state === 'failed' ? 'rx-destructive' : undefined}><ArrowDownCircle /></span>
 
   return (
@@ -206,7 +216,7 @@ export default function ModelsScreen ({
 }) {
   const {
     jobs = {}, failures = {}, progress = {}, disk, downloaded = [], usedBytes = 0,
-    bytesOf, fits, shortfall, download
+    bytesOf, fits, shortfall, download, cancel
   } = local
   const connect = usePress(() => onConnectMac?.(), { label: 'Connect to a Mac' })
 
@@ -251,6 +261,7 @@ export default function ModelsScreen ({
                 onAccessory={() => {
                   if (blocked) return
                   if (m.downloaded) onOpenChat?.(m.id)
+                  else if (stateOf(m) === 'downloading') cancel?.(m.id)
                   else download?.(m.id)
                 }}
               />

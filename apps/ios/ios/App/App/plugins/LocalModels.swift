@@ -25,6 +25,10 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "list", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "downloaded", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "download", returnType: CAPPluginReturnPromise),
+        // ⚠️ A method missing from THIS list compiles, links, and has a live
+        // ObjC selector — and Capacitor still refuses the call at runtime. It
+        // is how you ship a button that does nothing. Add here as well as below.
+        CAPPluginMethod(name: "cancelDownload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "remove", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "generate", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
@@ -100,12 +104,29 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
 
     // MARK: - download
 
+    /// Running downloads, so they can be cancelled. Capacitor calls plugin
+    /// methods off the main thread, and cancelDownload can land while the job
+    /// is clearing its own entry — hence the lock rather than a bare dictionary.
+    private let jobLock = NSLock()
+    private var jobs: [String: Task<Void, Never>] = [:]
+
+    private func setJob(_ id: String, _ task: Task<Void, Never>?) {
+        jobLock.lock(); defer { jobLock.unlock() }
+        jobs[id] = task
+    }
+    private func job(_ id: String) -> Task<Void, Never>? {
+        jobLock.lock(); defer { jobLock.unlock() }
+        return jobs[id]
+    }
+
     @objc func download(_ call: CAPPluginCall) {
         guard let entry = catalog.first(where: { $0.id == call.getString("id") }) else {
             return call.reject("Unknown model")
         }
         let id = entry.id
-        Task {
+        // A second tap must not start a second download of the same weights.
+        if job(id) != nil { return call.resolve(["id": id, "alreadyRunning": true]) }
+        let task = Task {
             // The progress overload's handler is @Sendable, so it cannot touch
             // the plugin — that is what blocked real percentages. It can hold an
             // AsyncStream continuation, which IS Sendable, so the continuation
@@ -138,18 +159,54 @@ public class LocalModels: CAPPlugin, CAPBridgedPlugin {
                 }
                 feed.finish()
                 await pump.value
+                self.setJob(id, nil)
                 self.markDownloaded(id)
                 self.notifyListeners("downloadDone", data: ["id": id])
                 call.resolve(["id": id])
             } catch {
                 feed.finish()
                 await pump.value
-                self.notifyListeners("downloadFailed", data: [
-                    "id": id, "message": error.localizedDescription
-                ])
-                call.reject("Download failed: \(error.localizedDescription)")
+                self.setJob(id, nil)
+                // A download the user stopped is not a failure, and must never
+                // surface as a red error. URLSession surfaces cancellation as
+                // CancellationError from the async API and as URLError.cancelled
+                // from the older path, so both count.
+                let cancelled = error is CancellationError
+                    || (error as? URLError)?.code == .cancelled
+                    || Task.isCancelled
+                if cancelled {
+                    self.notifyListeners("downloadCancelled", data: ["id": id])
+                    call.resolve(["id": id, "cancelled": true])
+                } else {
+                    self.notifyListeners("downloadFailed", data: [
+                        "id": id, "message": error.localizedDescription
+                    ])
+                    call.reject("Download failed: \(error.localizedDescription)")
+                }
             }
         }
+        setJob(id, task)
+    }
+
+    /// Stop a running download. Cancellation propagates through the Swift Task
+    /// into swift-huggingface's URLSession calls, so this really does stop the
+    /// transfer rather than only hiding the UI.
+    ///
+    /// Whatever bytes already landed stay in the HuggingFace cache — starting
+    /// the same model again picks up from there rather than from zero. Removing
+    /// them here would turn "I tapped that by mistake" into "and now do the
+    /// whole 2.3 GB again."
+    @objc func cancelDownload(_ call: CAPPluginCall) {
+        guard let id = call.getString("id") else {
+            return call.reject("Missing id")
+        }
+        guard let running = job(id) else {
+            // Already finished or never started. Not an error — the UI may have
+            // been a frame behind the download.
+            return call.resolve(["id": id, "running": false])
+        }
+        running.cancel()
+        call.resolve(["id": id, "running": true])
     }
 
     @objc func remove(_ call: CAPPluginCall) {

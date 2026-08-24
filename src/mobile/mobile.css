@@ -908,6 +908,32 @@
   color: var(--rx-label-2);
 }
 .is-native .rx-accessory .rx-tinted { color: var(--rx-tint); }
+
+/* The stop control: a square centred inside the turning download arc. This is
+   how iCloud, the App Store and Music all present "stop this transfer" — the
+   indicator is the target, so the trailing column stays one glyph wide and every
+   row's right edge still agrees.
+
+   9pt inside a 26pt arc. Any larger and it crowds the ring; any smaller and it
+   stops reading as a deliberate square and starts looking like a rendering
+   artefact. Square corners are 1pt, not 0 — a hard corner at this size aliases. */
+.is-native .rx-stoppable {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.is-native .rx-stop-square {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  /* --rx-amber-glyph, matching the arc exactly. Not --rx-amber, which is the
+     darker text-contrast amber: two ambers inside one 26pt object reads as a
+     mistake. The square only ever renders mid-download, so it needs no state
+     selector to know it should be amber. */
+  background: var(--rx-amber-glyph);
+}
 /* ⚠️ THERE IS NO .rx-row-size, AND ADDING ONE BACK COSTS THE BLURB ITS WIDTH.
    The download weight has been in front of the blurb (every row wrapped, the
    footer fell off the screen) and under the accessory (three blurbs truncated

@@ -130,6 +130,15 @@ export function useLocalModels () {
         refreshDisk()
         setTimeout(() => { if (alive.current) setJustDone(cur => (cur === id ? null : cur)) }, 900)
       },
+      // Stopping a download is a choice, not a failure: clear the job, the
+      // progress and any stale error, and say nothing. Surfacing it as an error
+      // would scold the user for doing exactly what they asked for.
+      downloadCancelled: ({ id }) => {
+        setJobs(j => { const n = { ...j }; delete n[id]; return n })
+        setProgress(p => { if (!(id in p)) return p; const n = { ...p }; delete n[id]; return n })
+        setFailures(f => { if (!(id in f)) return f; const n = { ...f }; delete n[id]; return n })
+        refreshDisk()
+      },
       downloadFailed: ({ id, message }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })
         setProgress(p => { if (!(id in p)) return p; const n = { ...p }; delete n[id]; return n })
@@ -172,6 +181,20 @@ export function useLocalModels () {
       haptics.notification('ERROR')
     }
   }, [jobs])
+
+  // Stop a running download. The optimistic clear matters: cancelling a 2.3 GB
+  // transfer is the one moment the user is already annoyed, and waiting for the
+  // native round trip to redraw the row reads as the tap not landing. The
+  // downloadCancelled event then confirms it; if the native side says the job
+  // had already finished, the next refresh reconciles.
+  const cancel = useCallback(async (id) => {
+    const lm = LM()
+    if (!lm?.cancelDownload || !id) return
+    haptics.impact('MEDIUM')
+    setJobs(j => { const n = { ...j }; delete n[id]; return n })
+    setProgress(p => { if (!(id in p)) return p; const n = { ...p }; delete n[id]; return n })
+    try { await lm.cancelDownload({ id }) } catch { /* the event still reconciles */ }
+  }, [])
 
   const remove = useCallback(async (id) => {
     const lm = LM()
@@ -219,6 +242,7 @@ export function useLocalModels () {
     fits,
     shortfall,
     download,
+    cancel,
     remove,
     refresh,
     refreshDisk
