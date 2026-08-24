@@ -29,7 +29,13 @@ const config: CapacitorConfig = {
   },
   plugins: {
     // the composer rides visualViewport itself; the web view must not resize
-    Keyboard: { resize: 'none' }
+    Keyboard: {
+      resize: 'none',
+      // Without this WKWebView floats its own form-assistant bar — up
+      // chevron, down chevron, Done — above the keyboard. Nothing else in
+      // the app announces "this is a web view" as loudly.
+      hideFormAccessoryBar: true
+    }
   },
   server: {
     // no `url`: the bundled UI loads first and asks which Mac to connect to

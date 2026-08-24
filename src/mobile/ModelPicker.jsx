@@ -426,6 +426,21 @@ export default function ModelPicker ({
       // downloadStarted also arrives for a download we did not initiate (a
       // retry from the sheet, say), so the reducer is idempotent.
       downloadStarted: ({ id }) => setJobs(j => ({ ...j, [id]: { state: 'downloading' } })),
+      // This sheet stays open over the download it started, so it — not the
+      // list behind it — is where the percentage and the stop control have to
+      // live. It carried neither until 2026-08-24.
+      downloadProgress: ({ id, progress }) => {
+        if (typeof progress !== 'number' || !isFinite(progress)) return
+        setJobs(j => (j[id]?.state === 'downloading'
+          ? { ...j, [id]: { ...j[id], progress: Math.min(Math.max(progress, 0), 1) } }
+          : j))
+      },
+      // Stopping is a choice, not a failure: clear it and say nothing.
+      downloadCancelled: ({ id }) => {
+        setJobs(j => { const n = { ...j }; delete n[id]; return n })
+        if (pendingRef.current === id) pendingRef.current = null
+        refreshDisk()
+      },
       downloadDone: ({ id }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })
         setModels(ms => (ms || []).map(m => (m.id === id ? { ...m, downloaded: true } : m)))
@@ -500,14 +515,30 @@ export default function ModelPicker ({
     }
   }, [])
 
+  const cancelDownload = useCallback(async id => {
+    const lm = LM()
+    if (!lm?.cancelDownload || !id) return
+    hapt.light()
+    // Clear optimistically: cancelling a multi-GB pull is the one moment the
+    // user is already annoyed, and waiting for the native round trip to redraw
+    // reads as the tap not landing. downloadCancelled then confirms it.
+    setJobs(j => { const n = { ...j }; delete n[id]; return n })
+    if (pendingRef.current === id) pendingRef.current = null
+    try { await lm.cancelDownload({ id }) } catch { /* the event still reconciles */ }
+  }, [])
+
   const commit = useCallback(model => {
     hapt.light()
     if (model.downloaded) { onChoose?.(model); return }
-    // Exactly one gauge animates at a time, and two multi-GB pulls at once
-    // would only make both slower — so a second tap while one runs is a no-op.
+    // Tapping the running download stops it. This used to be a disabled button,
+    // which is how 2.3 GB became uncancellable from the very screen that
+    // started it — the sheet stays open over its own download.
+    if (downloadingId === model.id) { cancelDownload(model.id); return }
+    // Two multi-GB pulls at once would only make both slower, so a tap on a
+    // DIFFERENT model while one runs stays a no-op.
     if (downloadingId) return
     startDownload(model)
-  }, [downloadingId, onChoose, startDownload])
+  }, [downloadingId, onChoose, startDownload, cancelDownload])
 
   /* -- derived ------------------------------------------------------------ */
   const list = models || []
@@ -611,11 +642,14 @@ const gaugeColor = state => (
       : 'var(--mp-label-3)'
 )
 
-function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
+function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, onCancel }) {
   const downloading = job?.state === 'downloading'
   const failed = job?.state === 'failed'
   const blocked = shortfall > 0 && !model.downloaded && !downloading
-  const disabled = downloading || busyElsewhere || blocked
+  const pct = typeof job?.progress === 'number' ? Math.round(job.progress * 100) : null
+  // Mid-download this button is NOT disabled — it is the way out. Disabling it
+  // was how 2.3 GB became uncancellable from the screen that started it.
+  const disabled = busyElsewhere || blocked
 
   const gaugeState = downloading ? 'working'
     : failed ? 'failed'
@@ -631,7 +665,7 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
   const showGauge = downloading || failed || done
 
   let label
-  if (downloading) label = 'Downloading…'
+  if (downloading) label = pct === null ? 'Stop' : `Stop · ${pct}%`
   else if (blocked) label = 'Not enough room'
   else if (model.downloaded) label = 'Start chatting'
   else if (failed) label = 'Try again'
@@ -660,7 +694,7 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
           className={`rx-mp-hero-gauge${done ? ' rx-mp-pop' : ''}`}
           style={{ color: gaugeColor(gaugeState) }}
         >
-          <Gauge state={gaugeState} size={120} />
+          <Gauge state={gaugeState} size={120} progress={downloading ? (job?.progress ?? null) : null} />
         </span>
       )}
       <div className="rx-mp-hero-name">{model.name}</div>

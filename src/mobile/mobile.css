@@ -349,11 +349,18 @@
 
 /* No focus ring for a finger — styles.css has one, it is not loaded, and it is
    not coming back. But a phone is not only a touch device: Full Keyboard
-   Access, Switch Control and a paired keyboard all drive focus, and they are
-   exactly what :focus-visible matches and a tap never does. Without this the
-   controls are reachable and invisible, which is worse than unreachable. */
+   Access, Switch Control and a paired keyboard all drive focus, and without a
+   ring the controls are reachable and invisible, which is worse than
+   unreachable.
+   ⚠️ CORRECTION, measured 2026-08-24. The previous comment here claimed
+   ":focus-visible matches [assistive input] and a tap never does". That is FALSE
+   for text-entry elements: per spec, an element that supports keyboard input
+   always matches :focus-visible whenever it is focused, however focus arrived.
+   The result was a 3pt blue web ring around the address field on a plain tap —
+   the single most web-looking artefact in the app, on the only typing flow it
+   ships. So the ring is scoped to things you press, never things you type in. */
 .is-native :focus { outline: none; }
-.is-native :focus-visible {
+.is-native :focus-visible:not(input):not(textarea):not([contenteditable]) {
   outline: 3px solid var(--rx-tint);
   outline-offset: 1px;
   border-radius: 6px;

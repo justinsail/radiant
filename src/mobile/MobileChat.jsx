@@ -748,8 +748,10 @@ const CSS = `
    that ring for every control on this screen — including the composer, where
    losing the caret's focus outline is worst. :focus-visible never matches a
    tap, so there is nothing to hide from a finger. */
-.rx-chat button:focus-visible,
-.rx-chat textarea:focus-visible {
+/* Buttons only — NOT the composer. A textarea matches :focus-visible on a plain
+   tap (spec: any keyboard-editable element does), so ringing it drew a blue web
+   outline around the composer every time someone went to type. */
+.rx-chat button:focus-visible {
   outline: 3px solid var(--rx-tint);
   outline-offset: 2px;
   border-radius: 8px;
