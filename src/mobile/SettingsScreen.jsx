@@ -15,7 +15,7 @@
 import React, { useCallback, useState } from 'react'
 import usePress from './usePress.js'
 import { BrandMark } from './BrandSpinner.jsx'
-import { THEMES, TEXT_SIZES, MODES, applyAppearance, swatch } from './theme.js'
+import { THEMES, TEXT_SIZES, MODES, OPEN_TO, applyAppearance, swatch } from './theme.js'
 
 const GB = 1e9
 const fmt = (b) => (b >= GB ? `${(b / GB).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`)
@@ -85,6 +85,12 @@ export default function SettingsScreen ({
     onAppearance?.(next)
   }, [appearance, onAppearance])
 
+  const setOpenTo = useCallback((openTo) => {
+    const next = { ...appearance, openTo }
+    applyAppearance(next)
+    onAppearance?.(next)
+  }, [appearance, onAppearance])
+
   const setMode = useCallback((mode) => {
     const next = { ...appearance, mode }
     applyAppearance(next)
@@ -116,6 +122,17 @@ export default function SettingsScreen ({
 
   return (
     <>
+      <h2 className="rx-section-header">Open to</h2>
+      <div className="rx-group rx-seg">
+        {OPEN_TO.map(o => (
+          <SegItem key={o.id} label={o.name} on={o.id === appearance.openTo} onPick={() => setOpenTo(o.id)} />
+        ))}
+      </div>
+      <p className="rx-section-footer">
+        Whether Radiant opens on Home or straight back into the conversation you
+        were last having.
+      </p>
+
       <h2 className="rx-section-header">Appearance</h2>
       <div className="rx-group rx-seg">
         {MODES.map(m => (

@@ -47,6 +47,8 @@ import * as ConnectMacMod from './ConnectMac.jsx'
 import * as GetModelSheetMod from './GetModelSheet.jsx'
 import * as FirstRunMod from './FirstRun.jsx'
 import SettingsScreen from './SettingsScreen.jsx'
+import HomeScreen from './HomeScreen.jsx'
+import { listChats, newChatId } from './chats.js'
 import ReadMeScreen from './ReadMeScreen.jsx'
 import ProvidersScreen from './ProvidersScreen.jsx'
 import { loadAppearance, applyAppearance } from './theme.js'
@@ -328,6 +330,9 @@ const EllipsisCircle = ({ size = 22 }) => (
 // composer cannot live inside somebody else's scroll view.
 
 const SCREENS = {
+  // Home is the root. Models used to be, which is why the app opened onto an
+  // inventory of files to install rather than somewhere to arrive.
+  home: { title: 'Radiant', large: true, scroll: true, bg: 'grouped' },
   models: { title: 'Models', large: true, scroll: true, bg: 'grouped' },
   // `bare` means the screen draws its own nav bar too. Chat does: its title,
   // its composer and its transcript scroller are one layout, and splitting the
@@ -735,8 +740,11 @@ export default function MobileShell () {
   )
 
   const [stack, setStack] = useState(() => {
-    const base = [{ key: 'root', route: 'models', props: {} }]
-    if (hasSavedConversation()) base.push({ key: 'k1', route: 'chat', props: {} })
+    const base = [{ key: 'root', route: 'home', props: {} }]
+    // "Open to" in Settings: Home, or straight back into the last conversation.
+    if (loadAppearance().openTo === 'chat' && listChats()[0]) {
+      base.push({ key: 'k1', route: 'chat', props: { chatId: listChats()[0].id } })
+    }
     return base
   })
   const [popping, setPopping] = useState(null)
@@ -980,13 +988,15 @@ export default function MobileShell () {
 
   // ── actions handed to the screens ─────────────────────────────────────────
 
-  const openChat = useCallback((modelId) => {
+  const openChat = useCallback((modelId, opts = {}) => {
     if (modelId) {
       setActiveModelId(modelId)
       try { localStorage.setItem(ACTIVE_MODEL_KEY, modelId) } catch { /* private mode */ }
     }
     if (stackRef.current[stackRef.current.length - 1]?.route === 'chat') return
-    push('chat', {})
+    // "New chat" means a NEW conversation, not the last one reopened — the
+    // whole point of keeping history is that starting again does not overwrite.
+    push('chat', opts.fresh ? { chatId: newChatId() } : {})
   }, [push])
 
   const presentSheet = useCallback((modelId) => {
@@ -1043,6 +1053,17 @@ export default function MobileShell () {
             onModelInfo={() => presentSheet(activeModel?.id)}
           />
         )
+      case 'home':
+        return (
+          <HomeScreen
+            {...common}
+            activeModel={activeModel}
+            onStartChat={() => openChat(activeModel?.id, { fresh: true })}
+            onOpenChat={(chatId) => push('chat', { chatId })}
+            onChooseModel={() => push('models', {})}
+            onConnectMac={connectMac}
+          />
+        )
       case 'connect':
         return <ConnectMac {...common} onConnected={pop} />
       case 'readme':
@@ -1084,7 +1105,7 @@ export default function MobileShell () {
           aria-label="More" style={barButtonStyle}><EllipsisCircle /></button>
       )
     }
-    if (entry.route === 'models') {
+    if (entry.route === 'home') {
       return (
         <button type="button" className="rx-shell-barbtn" {...gearPress}
           aria-label="Settings" style={barButtonStyle}><Gearshape /></button>

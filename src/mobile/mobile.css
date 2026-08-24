@@ -2100,3 +2100,45 @@
 }
 .is-native .rx-row-remove.is-pressed { opacity: 0.5; }
 
+/* ═══ home ═════════════════════════════════════════════════════════════════
+   Somewhere to arrive. The greeting and the model answer "who am I talking
+   to", the actions answer "what now", and Recent answers "what was I doing" —
+   in that order, because that is the order the questions occur. */
+.is-native .rx-home-head {
+  padding: 4px calc(var(--rx-sp-20) + var(--rx-sp-16)) 0;
+}
+.is-native .rx-home-greeting {
+  margin: 0 0 10px;
+  font: -apple-system-title3;
+  font-weight: 600;
+  color: var(--rx-label);
+}
+.is-native .rx-home-model {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--rx-r-cell, 24px);
+  background: var(--rx-cell, rgba(120,120,128,0.12));
+}
+.is-native .rx-home-model-text { min-width: 0; }
+.is-native .rx-home-empty {
+  margin: 0;
+  max-width: 30em;
+  font: -apple-system-subheadline;
+  line-height: 1.45;
+  color: var(--rx-label-2);
+}
+.is-native .rx-home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px calc(var(--rx-sp-20) + var(--rx-sp-16)) 4px;
+}
+/* side by side once there is room, stacked when there is not — and always
+   stacked at accessibility sizes, where two labels never fit on one line */
+@media (min-width: 380px) {
+  .is-native:not([data-ax='true']) .rx-home-actions { flex-direction: row; }
+  .is-native:not([data-ax='true']) .rx-home-actions > * { flex: 1 1 0; min-width: 0; }
+}
+

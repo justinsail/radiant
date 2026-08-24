@@ -42,6 +42,12 @@ export const MODES = [
   { id: 'system', name: 'System' }
 ]
 
+/** Where the app lands when you open it. */
+export const OPEN_TO = [
+  { id: 'home', name: 'Home' },
+  { id: 'chat', name: 'Last chat' }
+]
+
 const KEY = 'radiant.phone.appearance'
 
 export function loadAppearance () {
@@ -52,9 +58,10 @@ export function loadAppearance () {
       textScale: TEXT_SIZES.some(t => t.id === raw.textScale) ? raw.textScale : 1,
       // dark unless the user has said otherwise — "it should also always start
       // in dark mode", which is a default, not a lock
-      mode: MODES.some(m => m.id === raw.mode) ? raw.mode : 'dark'
+      mode: MODES.some(m => m.id === raw.mode) ? raw.mode : 'dark',
+      openTo: OPEN_TO.some(o => o.id === raw.openTo) ? raw.openTo : 'home'
     }
-  } catch { return { themeId: 'radiant', textScale: 1, mode: 'dark' } }
+  } catch { return { themeId: 'radiant', textScale: 1, mode: 'dark', openTo: 'home' } }
 }
 
 // The phone's CURRENT appearance, watched live so "System" tracks a change made
@@ -106,7 +113,10 @@ export function applyAppearance (a) {
   watchSystem()
   syncNativeChrome()
   try {
-    localStorage.setItem(KEY, JSON.stringify({ themeId: t.id, textScale: a?.textScale || 1, mode }))
+    localStorage.setItem(KEY, JSON.stringify({
+      themeId: t.id, textScale: a?.textScale || 1, mode,
+      openTo: OPEN_TO.some(o => o.id === a?.openTo) ? a.openTo : 'home'
+    }))
   } catch {}
   return t
 }
