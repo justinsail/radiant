@@ -33,6 +33,12 @@ export const TEXT_SIZES = [
   { id: 1.2, name: 'Larger' }
 ]
 
+export const MODES = [
+  { id: 'dark', name: 'Dark' },
+  { id: 'light', name: 'Light' },
+  { id: 'system', name: 'System' }
+]
+
 const KEY = 'radiant.phone.appearance'
 
 export function loadAppearance () {
@@ -40,18 +46,55 @@ export function loadAppearance () {
     const raw = JSON.parse(localStorage.getItem(KEY) || '{}')
     return {
       themeId: THEMES.some(t => t.id === raw.themeId) ? raw.themeId : 'radiant',
-      textScale: TEXT_SIZES.some(t => t.id === raw.textScale) ? raw.textScale : 1
+      textScale: TEXT_SIZES.some(t => t.id === raw.textScale) ? raw.textScale : 1,
+      // dark unless the user has said otherwise — "it should also always start
+      // in dark mode", which is a default, not a lock
+      mode: MODES.some(m => m.id === raw.mode) ? raw.mode : 'dark'
     }
-  } catch { return { themeId: 'radiant', textScale: 1 } }
+  } catch { return { themeId: 'radiant', textScale: 1, mode: 'dark' } }
+}
+
+// The phone's CURRENT appearance, watched live so "System" tracks a change made
+// in Control Centre while the app is open rather than only at launch.
+let watcher = null
+function watchSystem () {
+  if (watcher || typeof window === 'undefined' || !window.matchMedia) return
+  watcher = window.matchMedia('(prefers-color-scheme: dark)')
+  const write = () => {
+    document.documentElement.setAttribute('data-rx-system', watcher.matches ? 'dark' : 'light')
+    syncNativeChrome()
+  }
+  write()
+  watcher.addEventListener?.('change', write)
+}
+
+/**
+ * The status bar is drawn by UIKit, not by CSS, so it has to be told separately
+ * — otherwise a light app gets white-on-white clock glyphs.
+ */
+function syncNativeChrome () {
+  const root = document.documentElement
+  const mode = root.getAttribute('data-rx-mode')
+  const dark = mode === 'dark' || (mode === 'system' && root.getAttribute('data-rx-system') === 'dark')
+  const bar = window.Capacitor?.Plugins?.StatusBar
+  // Style.Dark means DARK CONTENT on a light bar, which is the opposite of what
+  // the name suggests. Getting this backwards is the classic iOS mistake.
+  bar?.setStyle?.({ style: dark ? 'DARK' : 'LIGHT' })
 }
 
 export function applyAppearance (a) {
   const t = THEMES.find(x => x.id === a?.themeId) || THEMES[0]
+  const mode = MODES.some(m => m.id === a?.mode) ? a.mode : 'dark'
   const root = document.documentElement
   root.style.setProperty('--rx-accent-h', String(t.hue))
   root.style.setProperty('--rx-accent-c', String(t.chroma))
   root.style.setProperty('--rx-text-scale', String(a?.textScale || 1))
-  try { localStorage.setItem(KEY, JSON.stringify({ themeId: t.id, textScale: a?.textScale || 1 })) } catch {}
+  root.setAttribute('data-rx-mode', mode)
+  watchSystem()
+  syncNativeChrome()
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ themeId: t.id, textScale: a?.textScale || 1, mode }))
+  } catch {}
   return t
 }
 

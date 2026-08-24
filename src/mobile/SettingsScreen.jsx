@@ -15,7 +15,7 @@
 import React, { useCallback, useState } from 'react'
 import usePress from './usePress.js'
 import { BrandMark } from './BrandSpinner.jsx'
-import { THEMES, TEXT_SIZES, applyAppearance, swatch } from './theme.js'
+import { THEMES, TEXT_SIZES, MODES, applyAppearance, swatch } from './theme.js'
 
 const GB = 1e9
 const fmt = (b) => (b >= GB ? `${(b / GB).toFixed(1)} GB` : `${Math.round(b / 1e6)} MB`)
@@ -65,6 +65,12 @@ export default function SettingsScreen ({
     onAppearance?.(next)
   }, [appearance, onAppearance])
 
+  const setMode = useCallback((mode) => {
+    const next = { ...appearance, mode }
+    applyAppearance(next)
+    onAppearance?.(next)
+  }, [appearance, onAppearance])
+
   const size = useCallback((textScale) => {
     const next = { ...appearance, textScale }
     applyAppearance(next)
@@ -83,6 +89,17 @@ export default function SettingsScreen ({
   return (
     <>
       <h2 className="rx-section-header">Appearance</h2>
+      <div className="rx-group rx-seg">
+        {MODES.map(m => (
+          <SegItem key={m.id} label={m.name} on={m.id === appearance.mode} onPick={() => setMode(m.id)} />
+        ))}
+      </div>
+      <p className="rx-section-footer">
+        Radiant opens dark unless you change this. The welcome screen stays dark
+        either way — it is a branded moment, like the launch screen.
+      </p>
+
+      <h2 className="rx-section-header">Colour</h2>
       <div className="rx-group rx-swatches">
         {THEMES.map(t => (
           <Swatch key={t.id} theme={t} selected={t.id === appearance.themeId} onPick={pick} />

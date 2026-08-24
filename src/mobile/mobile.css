@@ -34,9 +34,20 @@
      backgrounds, section headers, washes, gradients, glows, colored shadows.
      Budget is under 8% of colored pixels per screen — a tinted surface is the
      loudest "branded web app" signal in existence. */
-  --rx-tint: #3F69A7;              /* 5.54:1 on white, 4.97:1 on #F2F2F7 */
+  /* ── the accent, themeable ────────────────────────────────────────────────
+     Every blue in the phone UI derives from these two numbers, so a theme is a
+     hue and a chroma and nothing else — the same shape the Mac's twelve themes
+     use in src/theme.js. theme.js writes them; the literals here are Radiant's
+     own and are what an un-themed install gets.
+     They live in the BASE block, not the dark one, because a theme is not a
+     mode: the same accent has to be available whichever ground it sits on.
+     Lightness is NOT themeable — it is what keeps contrast legible, and a theme
+     able to darken the tint could make the app unreadable. */
+  --rx-accent-h: 262;
+  --rx-accent-c: 0.11;
+  --rx-tint: oklch(0.52 var(--rx-accent-c) var(--rx-accent-h));
   --rx-on-tint: #FFFFFF;
-  --rx-tint-pressed: #35588C;      /* same hue, L × 0.88 */
+  --rx-tint-pressed: oklch(0.46 var(--rx-accent-c) var(--rx-accent-h));
 
   /* neutrals */
   --rx-bg: #FFFFFF;
@@ -228,25 +239,22 @@
    [data-mode] would pin the phone to dark forever and it would never follow the
    system. The Mac app's twelve themes do not ship here — Light/Dark/System
    only. A theme picker on iOS announces "this is a web view". */
-/* ⚠️ ALWAYS DARK, at Tony's direction (2026-08-24): "it should also always
-   start in dark mode." So this is NOT a media query any more — these values
-   land unconditionally and override the light ones above, which stay only as
-   the base layer the tokens are declared in. Following the system was the
-   previous, deliberate behaviour; the note above is kept for the reasoning, but
-   the decision has changed. Do not restore the media query. */
-.is-native, .is-native:root {
-  color-scheme: dark;
+/* ── DARK, AND WHEN ──────────────────────────────────────────────────────────
+   Three states, one block. `data-rx-mode` is the user's choice from Settings
+   and `data-rx-system` is what the phone currently is, written by theme.js from
+   a live matchMedia listener — so "System" tracks the phone without this file
+   needing a second copy of every token.
+
+   It is a selector rather than a media query because the choice has to be able
+   to BEAT the system: someone who picks Dark on a light phone gets dark.
+   Default is dark — Tony: "it should also always start in dark mode" — which
+   theme.js applies before first paint. */
+.is-native:is([data-rx-mode='light'], [data-rx-mode='system'][data-rx-system='light']) {
+  color-scheme: light;
 }
-.is-native {
-    /* ── the accent, themeable ──────────────────────────────────────────────
-       Every blue in the phone UI derives from these two numbers, so a theme is
-       a hue and a chroma and nothing else — the same shape the Mac's twelve
-       themes use in src/theme.js. SettingsScreen writes them; the literals here
-       are Radiant's own and are what an un-themed install gets.
-       Lightness is NOT themeable: it is what keeps contrast legible on black,
-       and a theme that could darken the tint could make the app unreadable. */
-    --rx-accent-h: 262;
-    --rx-accent-c: 0.11;
+.is-native:is([data-rx-mode='dark'], [data-rx-mode='system'][data-rx-system='dark']) {
+  color-scheme: dark;
+    /* only the LIGHTNESS differs by mode — brighter on black, deeper on white */
     --rx-tint: oklch(0.72 var(--rx-accent-c) var(--rx-accent-h));
     /* Note the flip to a near-black label. White on the dark-mode tint measures
        ~2.4:1 and is the single fastest way to make an iOS button look amateur.
@@ -1627,7 +1635,12 @@
    EVERY ANIMATION RUNS ONCE AND HOLDS. No `infinite`, anywhere. The stars are a
    pre-rendered PNG rather than a canvas for the same reason: this phone is
    about to run a language model. */
+/* Pinned dark in every mode. Its ground, three glows, constellation and the
+   launch image it continues are all built against black — a light variant would
+   be a different design, not a recolour. Branded moments do this: Apple's own
+   light-mode apps still open on dark splash art. */
 .is-native .rx-intro {
+  color-scheme: dark;
   /* NOT `position: relative`. .rx-cover above is `fixed; inset: 0`, this rule
      is later in the file at equal specificity, and relative won — the screen
      stopped filling and collapsed to its content. Keep the fixed fill, and keep

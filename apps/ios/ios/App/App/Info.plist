@@ -2,10 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Always dark. Without this UIKit hands the web view a light trait on a
-	     light phone and the first frame flashes white before CSS lands. -->
-	<key>UIUserInterfaceStyle</key>
-	<string>Dark</string>
+	<!-- NOT pinned. Light mode is a real option now (Settings → Appearance), and
+	     forcing Dark here would leave a light app with dark UIKit chrome —
+	     wrong keyboard, wrong scroll indicators, wrong selection handles.
+	     theme.js drives the status bar via the StatusBar plugin instead, and the
+	     launch screen is branded dark on purpose so nothing flashes. -->
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
