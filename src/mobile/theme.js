@@ -108,7 +108,12 @@ export function applyAppearance (a) {
   const root = document.documentElement
   root.style.setProperty('--rx-accent-h', String(t.hue))
   root.style.setProperty('--rx-accent-c', String(t.chroma))
-  root.style.setProperty('--rx-text-scale', String(a?.textScale || 1))
+  // ⚠️ NOT a variable of its own that nothing reads. The type scale is driven
+  // by --rx-dt in 21 rules; a second "--rx-text-scale" nobody consumed is
+  // exactly why Text size did nothing at all. This publishes the user's
+  // multiplier and tells the Dynamic Type writer to fold it in.
+  root.style.setProperty('--rx-user-scale', String(a?.textScale || 1))
+  try { window.dispatchEvent(new CustomEvent('rx:text-scale')) } catch {}
   root.setAttribute('data-rx-mode', mode)
   watchSystem()
   syncNativeChrome()

@@ -166,7 +166,7 @@ function useMedia (query) {
  * --rx-dt for the hand-set sizes. Re-measure on resize and on return from the
  * background: the setting can change while we are not running.
  */
-function useDynamicType (rootRef) {
+function useDynamicType () {
   useEffect(() => {
     const measure = () => {
       const p = document.createElement('span')
@@ -186,17 +186,37 @@ function useDynamicType (rootRef) {
       // and it still tracks Dynamic Type proportionally above that.
       const dt = parseFloat(getComputedStyle(p).fontSize) / 17
       p.remove()
-      const el = rootRef.current || document.documentElement
-      el.style.setProperty('--rx-dt', String(Math.min(Math.max(dt || 1, 0.82), 1.6)))
+      // The SYSTEM's factor, times the user's own multiplier from Settings.
+      // Both, in one number, because --rx-dt is what every hand-set role
+      // actually reads — Settings used to write a separate variable that no
+      // rule consumed, so Text size moved nothing.
+      const user = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--rx-user-scale')
+      ) || 1
+      const v = Math.min(Math.max((dt || 1) * user, 0.82), 2.0)
+      // On the ROOT, not the shell element: mobile.css keys accessibility
+      // reflow off `.is-native[data-ax]`, and several rules that read --rx-dt
+      // live on overlays (the sheet, the menu) that are not inside the shell.
+      const root = document.documentElement
+      root.style.setProperty('--rx-dt', String(v))
+      if (v > 1.2) root.setAttribute('data-ax', 'true')
+      else root.removeAttribute('data-ax')
     }
     measure()
     window.addEventListener('resize', measure)
     document.addEventListener('visibilitychange', measure)
+    // re-measure when the user changes the size in Settings, and when iOS
+    // changes it under us — the review found a live change left this frozen
+    window.addEventListener('rx:text-scale', measure)
+    const ro = new ResizeObserver(measure)
+    try { ro.observe(document.body) } catch {}
     return () => {
       window.removeEventListener('resize', measure)
       document.removeEventListener('visibilitychange', measure)
+      window.removeEventListener('rx:text-scale', measure)
+      ro.disconnect()
     }
-  }, [rootRef])
+  }, [])
 }
 
 /* The status bar is written by theme.js:syncNativeChrome() and by NOTHING
@@ -718,7 +738,7 @@ export default function MobileShell () {
   const dark = useMedia('(prefers-color-scheme: dark)')
   const reduce = useMedia('(prefers-reduced-motion: reduce)')
 
-  useDynamicType(rootRef)
+  useDynamicType()
   useKeyboardMetrics(rootRef)
 
   useEffect(() => { document.documentElement.classList.add('is-native') }, [])
