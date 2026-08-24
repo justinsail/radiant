@@ -112,12 +112,22 @@ export default function HomeScreen ({
 
       <div className="rx-home-actions">
         <button type="button" className={'rx-intro-cta' + start.className} {...start.handlers}>
-          {activeModel ? `New chat with ${activeModel.name}` : 'New chat'}
+          New chat
         </button>
         <button type="button" className={'rx-intro-second' + choose.className} {...choose.handlers}>
           {downloaded.length ? 'Models' : 'Choose a model'}
         </button>
       </div>
+
+      {/* Under the buttons rather than in one: the label stays "New chat" and
+          this line carries the state. It is aria-hidden because the button's
+          own accessible name already says which model it will use — a screen
+          reader hearing the model twice on one action is noise. */}
+      {activeModel && (
+        <p className="rx-home-current" aria-hidden="true">
+          Current model: <span className="rx-home-current-name">{activeModel.name}</span>
+        </p>
+      )}
 
       {chats.length > 0 && (
         <>

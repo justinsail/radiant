@@ -2133,6 +2133,15 @@
   line-height: 1.45;
   color: var(--rx-label-2);
 }
+.is-native .rx-home-current {
+  margin: 12px 0 0;
+  text-align: center;
+  font: -apple-system-footnote;
+  color: var(--rx-label-2);
+}
+/* the name is the part worth reading; the label is scaffolding */
+.is-native .rx-home-current-name { color: var(--rx-label); font-weight: 600; }
+
 .is-native .rx-home-actions {
   display: flex;
   flex-direction: column;
