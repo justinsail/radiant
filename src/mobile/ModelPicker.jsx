@@ -132,9 +132,11 @@ const CSS = `
 /* ---- hero: the recommended model, no card and no plate. The gauge on the
    grouped background IS the hero; a bordered box would make it a settings
    row with ambitions. ---- */
-.rx-mp-hero{display:flex; flex-direction:column; align-items:center; text-align:center; padding:24px 0 4px}
-.rx-mp-hero-gauge{display:block; height:96px; color:var(--mp-tint)}
-.rx-mp-hero-name{font-family:var(--mp-font); font-size:calc(22px*var(--mp-dt)); line-height:1.27; font-weight:600; margin:16px 0 0}
+.rx-mp-hero{display:flex; flex-direction:column; align-items:center; text-align:center; padding:6px 0 4px}
+/* height:auto — the gauge is 120pt when it is reporting a download and absent
+   the rest of the time, so this box must not pin itself to the old 96 */
+.rx-mp-hero-gauge{display:block; line-height:0; height:auto; margin-bottom:12px; color:var(--mp-tint)}
+.rx-mp-hero-name{font-family:var(--mp-font); font-size:calc(22px*var(--mp-dt)); line-height:1.27; font-weight:600; margin:0}
 .rx-mp-hero-blurb{font-size:calc(15px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); color:var(--mp-label-2); margin:4px 0 0; line-height:1.33; max-width:26em}
 .rx-mp-hero-note{font-size:calc(13px*var(--mp-dt)); font-weight:400; font-family:var(--mp-font); margin:10px 0 0; line-height:1.38}
 .rx-mp-hero-note.is-amber{color:var(--mp-amber)}
@@ -282,7 +284,14 @@ function measureDynamicType () {
 // sticks after a tap and the row stays lit, which is disqualifying on its own.
 // The commit fires on pointerup inside the bounds, so a finger that slides off
 // cancels the way it does in every Apple list.
-function usePress (onCommit, disabled) {
+//
+// This is a private copy of ../usePress.js, kept so this file stays standalone.
+// It must carry the same semantics: the rows it drives are <li> and <div>, so
+// without a role, a tab stop and a key handler the sheet is a wall of text to
+// VoiceOver and unreachable to Switch Control — and this sheet is the only way
+// a new user gets their first model. Pass `label` for a control whose meaning
+// is not in its own text.
+function usePress (onCommit, disabled, label) {
   const [pressed, setPressed] = useState(false)
   const origin = useRef(null)
 
@@ -306,8 +315,25 @@ function usePress (onCommit, disabled) {
     },
     onPointerUp: () => end(true),
     onPointerCancel: () => end(false),
-    onLostPointerCapture: () => end(false)
-  }), [disabled, end])
+    onLostPointerCapture: () => end(false),
+    onKeyDown: e => {
+      if (disabled) return
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return
+      e.preventDefault()
+      origin.current = { x: 0, y: 0 }
+      setPressed(true)
+    },
+    onKeyUp: e => {
+      if (disabled) return
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return
+      e.preventDefault()
+      end(true)
+    },
+    role: 'button',
+    tabIndex: disabled ? -1 : 0,
+    'aria-label': label,
+    'aria-disabled': disabled || undefined
+  }), [disabled, end, label])
 
   return [pressed, handlers]
 }
@@ -322,7 +348,9 @@ function usePress (onCommit, disabled) {
  * @param {string}          [heading]      "Choose a model" reads right in the first-run cover and in the sheet
  * @param {React.Component} [Gauge]        override for the shared iris, for tests
  */
-export default function ModelPicker ({ onChoose, onConnectMac, heading = 'Choose a model', Gauge = SharedGauge }) {
+export default function ModelPicker ({
+  onChoose, onConnectMac, heading = 'Choose a model', featureId, Gauge = SharedGauge
+}) {
   const [models, setModels] = useState(null)   // null = still asking the plugin
   const [error, setError] = useState(null)     // list() blew up
   const [jobs, setJobs] = useState({})         // id -> { state:'downloading'|'failed', message }
@@ -483,7 +511,12 @@ export default function ModelPicker ({ onChoose, onConnectMac, heading = 'Choose
 
   /* -- derived ------------------------------------------------------------ */
   const list = models || []
-  const hero = list.find(m => m.id === RECOMMENDED_ID) || list[0] || null
+  // `featureId` is the model the user actually asked about by tapping its row.
+  // Opening on a different one — the house recommendation — silently discards
+  // that, and reads as the app arguing with the tap. The recommendation is only
+  // the default for someone who has expressed no preference.
+  const hero = (featureId && list.find(m => m.id === featureId)) ||
+    list.find(m => m.id === RECOMMENDED_ID) || list[0] || null
   const rest = hero ? list.filter(m => m.id !== hero.id) : list
 
   const shortfallFor = useCallback(model => {
@@ -513,6 +546,7 @@ export default function ModelPicker ({ onChoose, onConnectMac, heading = 'Choose
 
           {error && <p className="rx-mp-note">{error}</p>}
 
+          {hero && <h2 className="rx-mp-sechead">Recommended</h2>}
           {hero && (
             <Hero
               model={hero}
@@ -576,13 +610,18 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
   const blocked = shortfall > 0 && !model.downloaded && !downloading
   const disabled = downloading || busyElsewhere || blocked
 
-  // 'mark', not 'absent': Gauge paints its own color from data-state, and
-  // data-state="absent" is --rx-label-3 — a 96pt grey donut in the highest-
-  // value slot on the sheet. 'mark' is the same geometry in tint with no core
-  // dot: the icon, held still. It still turns amber the moment a download runs.
   const gaugeState = downloading ? 'working'
     : failed ? 'failed'
-      : model.downloaded ? 'resident' : 'mark'
+      : model.downloaded ? 'resident' : 'absent'
+
+  // ⚠️ THE BIG GAUGE APPEARS ONLY WHEN IT HAS WORK TO REPORT.
+  // It used to be drawn at 96pt in tint at rest, which made the sheet open on
+  // the mark as a brand splash — the one thing the spec bans — while the screen
+  // the app actually launches into had no gauge on it at all. The gauge is a
+  // status object, not a logo: it is 120pt here while a download is in flight,
+  // failing, or has just landed, and nothing at rest. Identity is carried by
+  // the root screen's hero and by the 29pt glyph on every row below.
+  const showGauge = downloading || failed || done
 
   let label
   if (downloading) label = 'Downloading…'
@@ -591,25 +630,32 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
   else if (failed) label = 'Try again'
   else label = `Download · ${model.sizeGB.toFixed(1)} GB`
 
-  const [pressed, handlers] = usePress(onCommit, disabled)
+  // Spoken on its own, "Download · 1.1 GB" does not say what is being
+  // downloaded — the model's name is a separate element further up the sheet.
+  const spoken = downloading
+    ? `Downloading ${model.name}`
+    : blocked
+      ? `${model.name}, not enough room`
+      : model.downloaded
+        ? `Start chatting with ${model.name}`
+        : failed
+          ? `Try downloading ${model.name} again`
+          : `Download ${model.name}, ${model.sizeGB.toFixed(1)} GB`
+  const [pressed, handlers] = usePress(onCommit, disabled, spoken)
 
   return (
     <div className="rx-mp-hero">
       {/* currentColor is set here as well as inside Gauge, so the mark is right
           whether Gauge paints its own stroke or inherits. Amber only ever means
           the phone is spending something. */}
-      {/* Tint, not grey, when the model is simply not here yet. At 96pt a
-          --mp-label-3 iris is a large grey donut in the highest-value slot on
-          the sheet; here the gauge is the subject of the screen, so it is drawn
-          as the mark. It still goes amber while downloading and it still gets
-          its core dot only once the weights are resident — the state is carried
-          by the dot and the motion, which is where it belongs. */}
-      <span
-        className={`rx-mp-hero-gauge${done ? ' rx-mp-pop' : ''}`}
-        style={{ color: gaugeColor(gaugeState) }}
-      >
-        <Gauge state={gaugeState} size={96} />
-      </span>
+      {showGauge && (
+        <span
+          className={`rx-mp-hero-gauge${done ? ' rx-mp-pop' : ''}`}
+          style={{ color: gaugeColor(gaugeState) }}
+        >
+          <Gauge state={gaugeState} size={120} />
+        </span>
+      )}
       <div className="rx-mp-hero-name">{model.name}</div>
       <p className="rx-mp-hero-blurb">{model.blurb}</p>
 
@@ -646,7 +692,15 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
   const blocked = shortfall > 0 && !model.downloaded && !downloading
   const disabled = downloading || busyElsewhere || blocked
 
-  const [pressed, handlers] = usePress(onCommit, disabled)
+  const [pressed, handlers] = usePress(
+    onCommit, disabled,
+    `${model.name}, ${model.sizeGB.toFixed(1)} GB` + (
+      model.downloaded ? ', on this iPhone'
+        : downloading ? ', downloading'
+          : failed ? ', that download did not finish'
+            : blocked ? ', not enough room' : ''
+    )
+  )
 
   const gaugeState = downloading ? 'working'
     : failed ? 'failed'

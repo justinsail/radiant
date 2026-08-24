@@ -148,6 +148,10 @@ export default function GetModelSheet ({ local = {}, models = [], modelId, onDis
             <ModelPicker
               heading="Choose a model"
               Gauge={Gauge}
+              // The row that opened this sheet leads it. Without this the sheet
+              // always opened on the recommendation, so tapping "Gemma 3 1B"
+              // presented Qwen — the tap's whole meaning thrown away.
+              featureId={modelId || undefined}
               onChoose={(m) => onStartChat?.(m.id)}
             />
           </div>
