@@ -3,17 +3,29 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  ⚠️ NOT WIRED UP YET — AND TURNING IT ON IS A HUMAN-ONLY STEP.
-	  CODE_SIGN_ENTITLEMENTS is deliberately NOT set in project.pbxproj. Setting
-	  it fails the build outright:
+	  ⚠️ STILL NOT WIRED UP. CODE_SIGN_ENTITLEMENTS is deliberately NOT set in
+	  project.pbxproj, because setting it fails the build.
+
+	  DONE (2026-08-24): the App ID `com.templetongroup.radiant` is now
+	  registered explicitly in the developer portal with Increased Memory Limit
+	  enabled. It did not exist before — Radiant had been signing against the
+	  XC Wildcard App ID (`*`), and a WILDCARD APP ID CANNOT CARRY CAPABILITIES,
+	  which is why there was no checkbox to find.
+
+	  REMAINING, AND HUMAN-ONLY: Xcode has no Apple ID signed in.
+	      $ defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists
+	      { "IDE.Identifiers.Prod" = ( ); }
+	  With no account, -allowProvisioningUpdates cannot generate a profile for
+	  the new App ID, so the build keeps falling back to the wildcard and fails:
+	      No Accounts: Add a new account in Accounts settings.
 	      Provisioning profile "iOS Team Provisioning Profile: *" doesn't
 	      include the Increased Memory Limit capability.
-	  The capability has to be enabled on the App ID in the Apple Developer
-	  portal (Certificates, Identifiers & Profiles → the com.templetongroup.radiant
-	  identifier → Increased Memory Limit) and the profile regenerated. That
-	  needs Tony's account; no agent can do it. Once it is enabled, add
+	  Signing in requires a password, which no agent may type.
+
+	  ONCE TONY SIGNS IN (Xcode → Settings → Accounts → +, then pick the team
+	  and Download Manual Profiles), add
 	      CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-	  to both build configurations and rebuild.
+	  to BOTH build configurations in project.pbxproj and rebuild.
 
 	  ⚠️ THIS ENTITLEMENT IS WHAT MAKES THE LARGER MODELS POSSIBLE AT ALL.
 
