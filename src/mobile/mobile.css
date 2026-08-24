@@ -2200,14 +2200,22 @@
   .is-native .rx-maker-chev{transition:none}
 }
 
-/* The verdict, beside the model name. A weighted word, not a filled pill:
-   forty-four pills down a scroll is a color chart and the ones that matter
-   stop standing out. "Runs well" is the expected case, so it is the quietest
-   of the three — it needs to not be a warning, not to be celebrated. */
+/* The verdict, beside the model name. Traffic lights, at Tony's call: green
+   runs, amber is tight, red will not. A weighted word rather than a filled
+   pill — forty-four filled pills down a scroll is a color chart, and the ones
+   that matter stop standing out; the color alone carries it.
+
+   ⚠️ THESE THREE TOKENS, NOT LITERALS. Each was chosen for measured contrast
+   in BOTH themes (see the :root blocks — 4.4:1 green on white, 10.4:1 on
+   black). A hand-picked #00C853 would look right in dark and fail in light.
+
+   Color is never the only signal: a row that cannot run is also dimmed, its
+   subtitle says how much memory it needs, and it is not tappable — so the
+   verdict still lands for a red-green colorblind reader. */
 .is-native .rx-fit{
   margin-left:8px; font-size:0.82em; font-weight:600;
   letter-spacing:0.01em; white-space:nowrap;
 }
-.is-native .rx-fit.is-well{color:var(--rx-label-3); font-weight:400}
+.is-native .rx-fit.is-well{color:var(--rx-green)}
 .is-native .rx-fit.is-tight{color:var(--rx-amber)}
-.is-native .rx-fit.is-no{color:var(--rx-label-3); font-weight:400}
+.is-native .rx-fit.is-no{color:var(--rx-red-text)}

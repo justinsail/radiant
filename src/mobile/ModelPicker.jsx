@@ -206,17 +206,23 @@ const CSS = `
 }
 .rx-mp-maker-none{color:var(--mp-label-3)}
 
-/* The verdict. A weighted word rather than a filled pill: forty-four filled
-   pills down a scroll is a colour chart, and the ones that matter stop
-   standing out. Green is never used — "runs well" is the expected case and
-   does not need celebrating; it just needs to not be a warning. */
+/* The verdict. Traffic lights, at Tony's call: green runs, amber is tight, red
+   will not. A weighted word rather than a filled pill — forty-four filled pills
+   down a scroll is a color chart, and the ones that matter stop standing out.
+
+   ⚠️ THE SHARED TOKENS, NOT LITERALS. Each was chosen for measured contrast in
+   both themes; see mobile.css. These fall back to the same literals the rest of
+   this stylesheet does, so the screen is still correct if it renders alone.
+
+   Color is never the only signal: a row that cannot run is also dimmed, says
+   how much memory it needs, and is not tappable. */
 .rx-mp-fit{
   margin-left:8px; font-size:calc(12px*var(--mp-dt)); font-weight:600;
   letter-spacing:0.01em; white-space:nowrap;
 }
-.rx-mp-fit.is-well{color:var(--mp-label-3); font-weight:400}
+.rx-mp-fit.is-well{color:var(--mp-green)}
 .rx-mp-fit.is-tight{color:var(--mp-amber)}
-.rx-mp-fit.is-no{color:var(--mp-label-3); font-weight:400}
+.rx-mp-fit.is-no{color:var(--mp-red)}
 /* A row that cannot run is dimmed as a whole, so the eye skips it on the way
    down rather than reading the name and then discovering the verdict. */
 .rx-mp-row.is-toobig .rx-mp-row-name{color:var(--mp-label-2)}
