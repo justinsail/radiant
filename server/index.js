@@ -1736,4 +1736,18 @@ export const ready = new Promise((resolve, reject) => {
   })
   server.listen(PORT, BIND_HOST, () => resolve(server.address().port))
 })
+// ⚠️ SET UP THE AWAY-FROM-HOME ADDRESS AT BOOT, not only when the checkbox is
+// flipped. Tony's bottom line: "i would like people using their iphone away from
+// their home to be able to connect to radiant running on their mac and use the
+// models within it." That needs an https address reachable off the local
+// network, and Tailscale Serve is what provides it — but wiring it only to the
+// toggle meant everyone who had ALREADY enabled sharing never got one, which is
+// exactly the state Tony was in when nothing worked from outside the house.
+if (SHARE_ENABLED) {
+  try {
+    const r = enableTailscaleServe(PORT)
+    if (r?.ok) console.log(`radiant reachable from anywhere at ${r.url}`)
+  } catch { /* never block startup on this */ }
+}
+
 ready.then(port => console.log(`radiant server listening on http://${BIND_HOST}:${port}${SHARE_ENABLED ? ' (shared — token required for remote clients)' : ''}`))

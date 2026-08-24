@@ -2018,13 +2018,19 @@
   text-align: left;
   padding: 11px 12px;
   white-space: normal;
+  border-radius: calc(var(--rx-r-cell) - 6px);
 }
 .is-native .rx-seg-item {
   flex: 1 1 0;
   min-width: 0;
   text-align: center;
   padding: 9px 4px;
-  border-radius: 9px;
+  /* ⚠️ CONCENTRIC, NOT ARBITRARY. The card is --rx-r-cell (24px) and .rx-seg
+     insets by 6px, so the pill inside must be 24 − 6 = 18px. It was 9px, which
+     leaves a thick dark wedge at each corner where the two curves disagree —
+     Tony: "the button elements here dont match up with the pill. very sloppy."
+     Derived rather than hard-coded so it cannot drift when the token moves. */
+  border-radius: calc(var(--rx-r-cell) - 6px);
   font: -apple-system-subheadline;
   color: var(--rx-label);
   white-space: nowrap;
