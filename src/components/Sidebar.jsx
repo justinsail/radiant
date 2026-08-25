@@ -266,6 +266,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                         : <span className='bot-head-name'>{project.name}</span>}
                       <span className='bot-head-count'>{rows.length}</span>
                     </button>
+                    <span className='bot-head-actions'>
                     {onNew && (
                       <button className='bot-new' title={`New chat in ${project.name}`}
                         onClick={() => onNew({ projectId: project.id })}>+</button>
@@ -285,6 +286,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                           if (window.confirm(msg)) onDeleteProject(project.id)
                         }}>✕</button>
                     )}
+                    </span>
                   </div>
                   {!isCollapsed && rows.map(s => <SessionRow key={s.id} s={s} />)}
                   {!isCollapsed && !rows.length && (

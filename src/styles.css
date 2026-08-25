@@ -432,6 +432,20 @@ code, pre, .mono { font-family: var(--font-mono); }
 .bot-new { border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); width: 20px; height: 20px; border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; }
 .bot-new svg { display: block; }
 .bot-new:hover { border-color: var(--accent-dim); color: var(--accent); }
+/* ⚠️ THE SHELF ACTIONS LEAVE THE FLOW ENTIRELY UNTIL HOVER. Three always-visible
+   buttons ate the width the project's own name needed — Tony: "the project
+   names are getting cut off." visibility:hidden is NOT enough: it keeps the
+   boxes in the layout, so the name stays exactly as squeezed as before. They
+   are taken out of flow and floated over the right edge on hover, which is what
+   .session-actions already does on a chat row — one rule for this, not two. */
+.bot-head { position: relative; }
+.bot-head-actions {
+  position: absolute; right: 8px; top: 4px;
+  display: none; gap: 2px; padding: 1px;
+  background: var(--bg-hover); border-radius: 6px;
+}
+.bot-head:hover .bot-head-actions,
+.bot-head:focus-within .bot-head-actions { display: flex; }
 .bot-group .session-item { margin-left: 8px; }
 /* An open project with nothing in it yet. Without this the shelf collapses to
    its header and reads as broken rather than empty. */
@@ -449,6 +463,16 @@ code, pre, .mono { font-family: var(--font-mono); }
 .design-ask { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
 .design-ask .inline-edit { flex: 1; font-size: 13px; }
 .design-ask-hint { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+/* Data folder block in Devices & sharing. */
+.data-folder { margin-bottom: 18px; }
+.data-folder-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.data-folder-path {
+  flex: 1; min-width: 200px; font-size: 12px; padding: 6px 10px;
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set-hint.is-warn { color: var(--danger); }
+.set-hint.is-restart { color: var(--accent); }
 /* The move-to-project control. It sits in .session-actions, which only reveals
    itself on hover, so it costs the title nothing at rest. Narrow on purpose:
    the sidebar is 248px by default and the chat's name matters more than the
