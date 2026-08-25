@@ -1312,26 +1312,26 @@ function DevicesPane () {
       <h3>Devices &amp; sharing</h3>
 
       {/*
-        ⚠️ REWRITTEN BECAUSE IT WAS UNUSABLE. Tony: "this whole window is now a
-        confusing mess. fix it." It was: a checkbox, a raw secret token printed
-        in full, two bare IP:port rows labelled "Tailscale" and "en8", four
-        identical-looking Copy buttons, a red error telling the user to run a
-        terminal command, and a paragraph about a button that no longer had that
-        name. Six things competing, none of them the answer to the only question
-        being asked — "how do I use this on my phone?"
+        ⚠️ THIS PANEL IS ABOUT MACS NOW. The iPhone app never implemented
+        connecting to a Mac — the screen stored an address and nothing in the
+        phone UI ever read it — so that feature was removed. This panel still
+        said "Use this Mac from your phone" and walked the user through opening
+        Radiant on their iPhone and tapping Connect to a Mac, a screen that no
+        longer exists. Tony found it after the removal, which is the same
+        half-a-fix pattern that has cost him all day: the feature went and its
+        advertising stayed.
 
-        Now: one switch, then the two values the phone asks for, in the order the
-        phone asks for them. Everything else is either done automatically or
-        folded away.
+        Sharing itself is real and verified — another Mac connects to this one
+        and uses its models, agents and sessions.
       */}
       <div className='set-block'>
-        <div className='set-block-title'>Use this Mac from your phone</div>
+        <div className='set-block-title'>Share this Mac with your other Macs</div>
         <p className='hint' style={{ marginTop: 2 }}>
-          Run the models here and use them from your iPhone. Best on a Mac that
-          stays awake.
+          Run the models here and use them from your other Macs. Best on a Mac
+          that stays awake.
         </p>
         <label className='agent-skill-chk'>
-          <input type='checkbox' checked={Boolean(share?.desired)} onChange={toggleShare} /> Share with my devices
+          <input type='checkbox' checked={Boolean(share?.desired)} onChange={toggleShare} /> Share with my other Macs
         </label>
         {share && share.desired !== share.enabled && (
           <div className='error-note' style={{ marginTop: 6 }}>
@@ -1340,37 +1340,27 @@ function DevicesPane () {
         )}
 
         {share?.desired && share?.enabled && share?.token && (() => {
-          /*
-            ⚠️ ONE ADDRESS. Tony, twice: "this whole window is now a confusing
-            mess" and then "this makes even less sense. why are you making this
-            so complex?" Both times I answered a simple question with more UI —
-            first a terminal command, then two labelled routes with a
-            disclosure and conditional advice about a VPN.
-
-            The question is "how do I use this on my phone". The answer is an
-            address and a token. So this picks the BEST address available and
-            shows only that, with one line saying where it works. Nobody has to
-            choose, because there is no choice worth making: if Tailscale is set
-            up it works everywhere, and if it is not, Wi-Fi is the only thing
-            that works at all.
-          */
           const wifi = (share.addresses || []).find(a => a.wifi)
-          const best = share.phone?.ready
-            ? { url: share.phone.url, where: 'Works anywhere, over Tailscale.' }
+          const anywhere = share.phone?.ready ? share.phone.url : null
+          // Same network is the common case and needs nothing installed; the
+          // Tailscale address is what a Mac somewhere else needs.
+          const best = anywhere
+            ? { url: anywhere, where: 'Works from anywhere, over Tailscale.' }
             : wifi
-              ? { url: `${wifi.address}:${share.port}`, where: 'Works when both devices are on this Wi-Fi.' }
+              ? { url: `${wifi.address}:${share.port}`, where: 'Works when both Macs are on this network.' }
               : null
           if (!best) {
             return (
               <div className='hint' style={{ marginTop: 12 }}>
-                No network address yet — is this Mac connected to Wi-Fi?
+                No network address yet — is this Mac connected to a network?
               </div>
             )
           }
           return (
             <div style={{ marginTop: 14 }}>
               <p className='hint' style={{ marginTop: 0 }}>
-                On your iPhone, open Radiant and tap <b>Connect to a Mac</b>.
+                On the other Mac, open Radiant &rarr; Settings &rarr; Devices and
+                enter these under <b>Connect this app to another Radiant</b>.
               </p>
               <div className='connect-field' style={{ marginTop: 10 }}>Address
                 <div className='row'>
@@ -1390,29 +1380,15 @@ function DevicesPane () {
               </div>
               <div className='hint' style={{ marginTop: 8 }}>{best.where}</div>
 
-              {/* ⚠️ SAY WHAT TAILSCALE IS AND WHY IT IS NEEDED. Tony: "explain
-                  tailscale is required to create the secure connection. it needs
-                  to be explained on mac and ios apps." Naming a product the user
-                  has never heard of, with no reason attached, is how the old
-                  panel lost people — and iPhones genuinely will not connect over
-                  the internet without an encrypted address, which is the thing
-                  Tailscale provides. */}
-              <div className='hint' style={{ marginTop: 10, lineHeight: 1.5 }}>
-                <b>Using it away from home needs Tailscale.</b> iPhone will only talk
-                to your Mac over an encrypted connection, and Tailscale is what
-                creates one — a free private link between your own devices, so your
-                Mac is reachable from anywhere without being exposed to the internet.
-                {share.phone?.ready
-                  ? ' It is set up here, and Radiant configured the rest for you.'
-                  : share.phone?.reason === 'no-serve'
-                    // ⚠️ TAILSCALE IS THERE BUT THE DOOR IS NOT UP. Saying
-                    // "install Tailscale" to someone who already has it is how
-                    // you lose their trust in the rest of the panel.
-                    ? ' Tailscale is running here, but the secure address is not up yet — quit and reopen Radiant, and it will set it up.'
-                    : ' Install it on this Mac and your iPhone and sign in to both with the same account; Radiant does the rest.'}
-                {' '}
-                <a href='https://tailscale.com/download' target='_blank' rel='noreferrer'>tailscale.com/download</a>
-              </div>
+              {!anywhere && (
+                <div className='hint' style={{ marginTop: 10, lineHeight: 1.5 }}>
+                  <b>To reach this Mac from somewhere else, both Macs need Tailscale</b>
+                  {' '}— a free private network between your own machines, so this Mac is
+                  reachable without being exposed to the internet. Install it on both,
+                  sign in with the same account, and Radiant sets up the rest.{' '}
+                  <a href='https://tailscale.com/download' target='_blank' rel='noreferrer'>tailscale.com/download</a>
+                </div>
+              )}
             </div>
           )
         })()}
@@ -1492,8 +1468,7 @@ const GUIDE = [
   {
     title: 'Your devices',
     items: [
-      ['One server, all your devices', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share on my network) and connect your other Macs and phone to it — they share the same agents, models, and sessions.'],
-      ['On your phone', 'On the host Mac hit Settings → Devices → “Copy phone link”, open it once in Safari on the phone, then Add to Home Screen — it installs like an app, with a mobile-tuned layout. The link carries the access token, so you never type an address or a token, and the token is dropped from the URL immediately so it doesn’t linger in history.'],
+      ['One server, all your Macs', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share with my other Macs) and connect your other Macs to it — they share the same agents, models, and sessions. It gives you an address and a token; enter them on the other Mac under “Connect this app to another Radiant”.'],
       ['Behind a proxy, the token still applies', 'Radiant skips the access token for the app talking to its own server on this Mac. If you put a reverse proxy in front — Tailscale Serve, nginx — those requests come from the proxy, so they must present the token like any other device. Nothing reaches your files or shell without it.'],
       ['Signed in for good', 'Once a device is signed in it stays signed in — the token is held in a secure cookie rather than page storage, which iOS can clear out from under a Home Screen app. If you do land on the connect screen, it only asks for the token: the address is wherever you opened it from.']
     ]
