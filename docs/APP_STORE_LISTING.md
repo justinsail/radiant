@@ -143,25 +143,66 @@ Apple does not count either as collection by the developer.
 
 ## Age rating
 
-Expect **4+** on the questionnaire as answered below, but see the flag.
+**Submitted 2026-08-24. Result: 13+** in 172 countries, 12+ in Vietnam and
+Korea, A14 in Brazil. On iOS versions earlier than 26 it maps to a global 12+.
 
-| Question | Answer |
+### How the answers were chosen
+
+The benchmark is **Locally AI** (by LM Studio) — the closest peer to Radiant on
+the store, rated **12+** with four descriptors: Mature/Suggestive Themes,
+Horror/Fear, Alcohol-Tobacco-Drugs, and Medical/Treatment, all Infrequent/Mild.
+Private LLM sits at 12+, LLM Studio at 9+, Enclave and MLC Chat at 17+.
+
+Radiant differs from Locally in one way that matters: it also reaches cloud
+models through OpenRouter, which carries unfiltered models. So the declaration
+is Locally's, plus profanity and plus the two lightest violence rows.
+
+⚠️ **DO NOT answer "None" down the content steps to chase a 4+.** The app ships
+no content of its own, but it generates text from a model with no content
+filter. A reviewer who types a rude question and gets a rude answer has caught
+an inaccurate declaration — guideline 2.3, and a rejection costs more than the
+rating ever would.
+
+### Step 1 — Features. All eight NO, each verified against the code.
+
+| Question | Answer | Why |
+|---|---|---|
+| Parental Controls | No | none exist |
+| Age Assurance | No | none exists |
+| Unrestricted Web Access | No | the only external link is the privacy page, and it opens in Safari |
+| User-Generated Content | No | chats are local and never distributed |
+| Social Media | No | — |
+| Social Media Disabled for Users Under 13 | No | — |
+| Messaging and Chat | No | this asks whether users can talk to *each other*. They cannot |
+| Advertising | No | — |
+
+### Steps 2–6 — Content
+
+| Item | Answer |
 |---|---|
-| Cartoon or fantasy violence | None |
-| Realistic violence | None |
-| Sexual content or nudity | None |
-| Profanity or crude humour | None |
-| Alcohol, tobacco, drug use | None |
-| Simulated gambling | None |
-| Horror/fear themes | None |
-| Medical/treatment information | None |
-| Unrestricted web access | **No** |
-| User-generated content | **No** |
+| Profanity or Crude Humor | Infrequent |
+| Horror/Fear Themes | Infrequent |
+| Alcohol, Tobacco, or Drug Use or References | Infrequent |
+| Medical or Treatment Information | Infrequent |
+| Health or Wellness Topics | Yes |
+| Mature or Suggestive Themes | Infrequent |
+| Sexual Content or Nudity | None |
+| Graphic Sexual Content and Nudity | None |
+| Cartoon or Fantasy Violence | Infrequent |
+| Realistic Violence | None |
+| Prolonged Graphic or Sadistic Realistic Violence | None |
+| Guns or Other Weapons | Infrequent |
+| Simulated Gambling · Contests · Gambling · Loot Boxes | None / No |
 
-> ⚠️ **The one to think about.** A language model can produce arbitrary text.
-> Apple has been asking about this for AI apps. If the questionnaire offers an
-> AI-generated-content question, answer it honestly — it may push the rating to
-> 12+ or 17+. Do not answer "no" to make the rating lower.
+Step 7 override: **Not Applicable**. No EULA age requirement, no age category.
+
+### Two things that make the low rows defensible
+
+All 44 catalogue models are mainstream instruction-tuned releases from Google,
+Meta, Mistral, Microsoft, Alibaba, IBM, Nvidia, Liquid, Allen AI and Hugging
+Face — nothing abliterated or uncensored. And there is no field anywhere in the
+phone UI for pasting an arbitrary Hugging Face repo, so the list is closed.
+**If either of those changes, this questionnaire has to be answered again.**
 
 ---
 
