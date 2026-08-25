@@ -38,7 +38,7 @@ Radiant - Local AI Chat
 ```
 Open AI models, on your iPhone
 ```
-*(29)*
+*(30 — exactly at the limit)*
 
 ---
 
