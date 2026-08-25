@@ -143,7 +143,8 @@ Apple does not count either as collection by the developer.
 
 ## Submission status — 2026-08-24
 
-**Build 1.0 (2) uploaded to App Store Connect at 22:59.** App ID 6804891721,
+**SUBMITTED. Status: "1.0 Waiting for Review" as of 2026-08-24 ~23:20.**
+Build 1.0 (2) uploaded at 22:59. App ID 6804891721,
 bundle `com.templetongroup.radiant`, arm64, iPhone only (device family 1).
 
 Done and verified by reload:
@@ -163,8 +164,30 @@ Done and verified by reload:
 | DSA trader | declared as a trader; NY Certificate of Assumed Name uploaded; **In Review** |
 | Export compliance | no prompt — `ITSAppUsesNonExemptEncryption` is false in Info.plist (HTTPS only) |
 
-**Left for Tony:** select build 1.0 (2) once processing finishes, then
-**Add for Review**.
+**Nothing left to do.** Wait for Apple.
+
+### ⚠️ APP PRIVACY HAS A PUBLISH STEP, AND SAVING IS NOT PUBLISHING
+
+This blocked the submission and cost a round trip. The App Privacy answers
+were entered and verified-by-reload early in the evening, and the section still
+read "Data Not Collected" on screen — but a **Publish** button sat unpressed in
+the corner, so the answers were a draft. "Add for Review" refused with *"an
+Admin must provide information about the app's privacy practices"*, which
+does not sound like "you forgot to publish".
+
+**The lesson generalizes: verifying a value persisted is not verifying the
+section is complete.** Reloading proved the draft saved. It could not prove the
+draft had been published, because a saved draft and a published label look
+identical on that page apart from one button.
+
+### If Apple rejects
+
+Most likely ground is guideline 1.2 — apps surfacing AI-generated content are
+sometimes asked for a content filter, a report mechanism and a way to block
+abusive users. Radiant has none; the counter-argument, already in the review
+notes, is that it runs models on-device with no accounts and no other users to
+report or block. If it comes back, the cheap fix is a first-run content
+disclaimer plus a report control, not a rebuild.
 
 ### ⚠️ The seller name is "Anthony Ricciardi", not Templeton Technologies
 
