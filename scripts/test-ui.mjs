@@ -157,6 +157,26 @@ await page.waitForTimeout(600)
   })
   ok('a maker shelf is one card, not two widths', geo && geo.hw === geo.gw && geo.left && geo.right)
 
+  // ⚠️ EVERY CARD ON THIS SCREEN SHARES ONE INSET. The phone-spec card shipped
+  // full-bleed at 0→393 while the list cards sat at 20→373, so the one card
+  // that is not a list ran 40pt wider and touched both screen edges. Tony:
+  // "why is the phone spec card wider than the on this phone card or the model
+  // selector card?" Compares edges, not just width — a card can match width
+  // and still be offset.
+  // ⚠️ COMPARED AGAINST THE MAKER SHELF, not a global `.rx-group`. Home stays
+  // mounted beneath and is translated off-screen mid-transition, so the first
+  // `.rx-group` in the document is its recent-chats card at left -98; and the
+  // "On this iPhone" card is not present in every state this file drives
+  // through. The shelf is always there, and the assertion above already ties it
+  // to its own rows, so matching it matches the whole screen.
+  const cards = await page.evaluate(() => {
+    const box = s => { const e = document.querySelector(s); if (!e) return null
+      const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.right)] }
+    return { specs: box('.rx-specs'), maker: box('.rx-makerhead') }
+  })
+  ok('both cards are on screen to compare', cards.specs && cards.maker && cards.specs[0] >= 0)
+  is('the spec card sits on the same inset as the list cards', cards.specs, cards.maker)
+
   // ⚠️ EVERY CATALOG ROW STATES ITS WEIGHT. Tony, scanning the list: "models
   // have no sizes. no way to tell whats small." The size had been removed from
   // the row and left only in the sheet a row opens — which is the one place it

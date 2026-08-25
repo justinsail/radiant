@@ -2332,8 +2332,14 @@
 /* ---- the device panel above the model list ----------------------------- */
 /* The Mac's `.spec-card`, on a phone. Three parts: what it is, what it has,
    and what that means for the list underneath. */
+/* ⚠️ SAME INSET AS EVERY OTHER CARD ON THIS SCREEN. This shipped full-bleed —
+   0→393 against .rx-group's and .rx-makerhead's 20→373 — so the one card that
+   is not a list ran 40pt wider than its neighbours and touched both screen
+   edges. Tony: "why is the phone spec card wider than the on this phone card
+   or the model selector card?" Measured, not eyeballed. Use the token, not a
+   literal 20px, so all three move together. */
 .is-native .rx-specs{
-  margin:4px 0 0; padding:14px 16px;
+  margin:4px var(--rx-sp-20) 0; padding:14px 16px;
   background:var(--rx-cell); border-radius:12px;
 }
 .is-native .rx-specs-name{font:-apple-system-headline}

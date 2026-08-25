@@ -246,10 +246,17 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, o
     >
       {/* While it downloads, the logo turns beside the name — Tony: "i want the
           blue logo to rotate next to the model name to show its downloading."
-          It appears only then, so an idle list keeps its clean single column. */}
+          It appears only then, so an idle list keeps its clean single column.
+          ⚠️ TURNING ONLY — NO PROGRESS RING. It used to carry an arc that grew
+          around the swirl. Tony, once the byte counter was working: "you can
+          just have the blue swirl at the left rotate during downloads. we dont
+          need the outer blue ring that grows with progress." He is right that
+          it was saying the same thing twice: the blurb on this very row already
+          reads "Downloading… 0.4 GB". At 29pt the arc was a 1.5pt stroke
+          restating a number set in full beside it. */}
       {downloading && (
         <span className="rx-row-lead">
-          <BrandSpinner size={29} progress={progress && typeof progress.pct === 'number' ? progress.pct : null} />
+          <BrandSpinner size={29} />
         </span>
       )}
       <div className="rx-row-text">
