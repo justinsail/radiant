@@ -21,6 +21,7 @@ import ModelPicker from './ModelPicker.jsx'
 import Gauge from './Gauge.jsx'
 import usePress from './usePress.js'
 import * as haptics from './haptics.js'
+import { BrandMark } from './BrandSpinner.jsx'
 
 const SPEED = {
   'llama3.2-1b': 'Fastest',
@@ -52,10 +53,42 @@ export default function GetModelSheet ({ local = {}, models = [], modelId, onDis
     return () => cancelAnimationFrame(r)
   }, [])
 
+
   const close = useCallback(() => {
     setP(1)
     setTimeout(() => onDismiss?.(), 300)
   }, [onDismiss])
+
+  // Modal behaviour: move focus in, keep it in, put it back, and answer Escape.
+  useEffect(() => {
+    const opener = document.activeElement
+    const focusables = () => Array.from(
+      sheetRef.current?.querySelectorAll(
+        'button:not([disabled]), [role="button"]:not([aria-disabled="true"]), input, textarea, [tabindex]:not([tabindex="-1"])'
+      ) || []
+    )
+    // first frame: the sheet is on screen but its content may not be laid out
+    const t = setTimeout(() => (focusables()[0] || sheetRef.current)?.focus?.(), 60)
+
+    const onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return }
+      if (e.key !== 'Tab') return
+      const items = focusables()
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      // wrap, so Tab cannot walk out of the sheet into the screen behind it
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('keydown', onKey, true)
+      // put focus back where it came from, so the list does not jump to the top
+      if (opener instanceof HTMLElement && document.contains(opener)) opener.focus()
+    }
+  }, [close])
 
   const onPointerDown = (e) => {
     drag.current = { y0: e.clientY, last: e.clientY, lastT: performance.now(), v: 0, h: sheetRef.current?.offsetHeight || 400 }
@@ -92,6 +125,13 @@ export default function GetModelSheet ({ local = {}, models = [], modelId, onDis
       <div
         ref={sheetRef}
         className="rx-sheet"
+        // A sheet is a modal, and it was not announced as one: no role, no
+        // aria-modal, focus never entered it, twelve controls behind it stayed
+        // tabbable, and Escape did nothing — leaving a keyboard or Switch
+        // Control user unable to close the app's central screen.
+        role="dialog"
+        aria-modal="true"
+        aria-label={detail ? model?.name : 'Choose a model'}
         data-dragging={dragging ? 'true' : undefined}
         style={{ '--rx-sheet-p': p, '--rx-sheet-h': detail ? '55dvh' : '92dvh' }}
       >
@@ -107,7 +147,7 @@ export default function GetModelSheet ({ local = {}, models = [], modelId, onDis
         {detail ? (
           <div style={{ padding: '24px 20px 0', display: 'flex', flexDirection: 'column', minHeight: 0, flex: '1 1 auto' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <Gauge size={120} state="resident" />
+              <BrandMark size={120} />
               <div className="rx-title-2">{model.name}</div>
             </div>
 

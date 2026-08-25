@@ -17,7 +17,7 @@
  * ── CONTRACT WITH THE SIBLING SCREENS ───────────────────────────────────────
  * Every screen receives:
  *   nav        { push, pop, replace, presentSheet, dismissSheet, openChat,
- *                connectMac, depth }
+ *                depth }
  *   local      the whole useLocalModels() value, so a screen can use whatever
  *              shape that hook ended up with without the shell re-deriving it
  *   models     local.models normalized to an array
@@ -43,13 +43,18 @@ import React, {
 
 import * as ModelsScreenMod from './ModelsScreen.jsx'
 import * as ChatScreenMod from './ChatScreen.jsx'
-import * as ConnectMacMod from './ConnectMac.jsx'
 import * as GetModelSheetMod from './GetModelSheet.jsx'
 import * as FirstRunMod from './FirstRun.jsx'
+import SettingsScreen from './SettingsScreen.jsx'
+import HomeScreen from './HomeScreen.jsx'
+import { listChats, newChatId } from './chats.js'
+import ReadMeScreen from './ReadMeScreen.jsx'
+import ProvidersScreen from './ProvidersScreen.jsx'
+import { loadAppearance, applyAppearance } from './theme.js'
 import * as useLocalModelsMod from './useLocalModels.js'
 import * as hapticsMod from './haptics.js'
 
-import { getServer } from '../api.js'
+import { chosenAsModel, onChosenChanged, saveChosen } from './providers.js'
 
 // ── module resolution ───────────────────────────────────────────────────────
 
@@ -70,7 +75,6 @@ const Missing = (name) => function MissingScreen () {
 
 const ModelsScreen = pick(ModelsScreenMod, 'ModelsScreen') || Missing('ModelsScreen')
 const ChatScreen = pick(ChatScreenMod, 'ChatScreen') || Missing('ChatScreen')
-const ConnectMac = pick(ConnectMacMod, 'ConnectMac', 'ConnectMacScreen') || Missing('ConnectMac')
 const GetModelSheet = pick(GetModelSheetMod, 'GetModelSheet') || null
 const FirstRun = pick(FirstRunMod, 'FirstRun') || null
 // a hook has to be resolved once, at module scope — resolving it per render
@@ -113,18 +117,20 @@ const SHELL_CSS = `
   backdrop-filter: blur(50px) saturate(180%);
   background: rgba(242,242,247,0.86);
 }
-@media (prefers-color-scheme: dark) {
-  .rx-shell-bar[data-solid="true"] { background: rgba(30,30,30,0.72); }
-  .rx-shell-menu { background: rgba(28,28,30,0.90); }
-}
+/* Keyed off the app's mode, NOT the phone's — see data-rx-dark in theme.js.
+   This is the FOURTH stylesheet in src/mobile and the one that draws the nav
+   bar; a previous pass converted the other three and left this, so Settings
+   kept a light bar over dark content. */
+.is-native[data-rx-dark='true'] .rx-shell-bar[data-solid="true"] { background: rgba(30,30,30,0.72); }
+.is-native[data-rx-dark='true'] .rx-shell-menu { background: rgba(28,28,30,0.90); }
 /* vibrancy off: go fully opaque plus a hairline, rather than leaving a flat
    translucent-looking fill behind */
 @media (prefers-reduced-transparency: reduce) {
   .rx-shell-bar[data-solid="true"] { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--rx-bg, #fff); }
   .rx-shell-menu { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--rx-bg-grouped, #F2F2F7); }
 }
-@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-  .rx-shell-bar[data-solid="true"], .rx-shell-menu { background: #1C1C1E; }
+@media (prefers-reduced-transparency: reduce) {
+  .is-native[data-rx-dark='true'] .rx-shell-bar[data-solid="true"], .rx-shell-menu { background: #1C1C1E; }
 }
 /* Press states are JS-driven with a 10pt slop cancel. There is not one :hover
    rule in this file: on iOS a :hover sticks after the tap and the control stays
@@ -158,7 +164,7 @@ function useMedia (query) {
  * --rx-dt for the hand-set sizes. Re-measure on resize and on return from the
  * background: the setting can change while we are not running.
  */
-function useDynamicType (rootRef) {
+function useDynamicType () {
   useEffect(() => {
     const measure = () => {
       const p = document.createElement('span')
@@ -178,30 +184,46 @@ function useDynamicType (rootRef) {
       // and it still tracks Dynamic Type proportionally above that.
       const dt = parseFloat(getComputedStyle(p).fontSize) / 17
       p.remove()
-      const el = rootRef.current || document.documentElement
-      el.style.setProperty('--rx-dt', String(Math.min(Math.max(dt || 1, 0.82), 1.6)))
+      // The SYSTEM's factor, times the user's own multiplier from Settings.
+      // Both, in one number, because --rx-dt is what every hand-set role
+      // actually reads — Settings used to write a separate variable that no
+      // rule consumed, so Text size moved nothing.
+      const user = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--rx-user-scale')
+      ) || 1
+      const v = Math.min(Math.max((dt || 1) * user, 0.82), 2.0)
+      // On the ROOT, not the shell element: mobile.css keys accessibility
+      // reflow off `.is-native[data-ax]`, and several rules that read --rx-dt
+      // live on overlays (the sheet, the menu) that are not inside the shell.
+      const root = document.documentElement
+      root.style.setProperty('--rx-dt', String(v))
+      if (v > 1.2) root.setAttribute('data-ax', 'true')
+      else root.removeAttribute('data-ax')
     }
     measure()
     window.addEventListener('resize', measure)
     document.addEventListener('visibilitychange', measure)
+    // re-measure when the user changes the size in Settings, and when iOS
+    // changes it under us — the review found a live change left this frozen
+    window.addEventListener('rx:text-scale', measure)
+    const ro = new ResizeObserver(measure)
+    try { ro.observe(document.body) } catch {}
     return () => {
       window.removeEventListener('resize', measure)
       document.removeEventListener('visibilitychange', measure)
+      window.removeEventListener('rx:text-scale', measure)
+      ro.disconnect()
     }
-  }, [rootRef])
+  }, [])
 }
 
-/**
- * Status bar. Capacitor's Style.Dark means DARK CONTENT on a LIGHT bar, so the
- * mapping reads backwards from the name: system light appearance wants 'DARK'.
- * Getting it the other way round paints white glyphs on a white bar, which is
- * invisible rather than merely wrong.
- */
-function useStatusBar (dark) {
-  useEffect(() => {
-    window.Capacitor?.Plugins?.StatusBar?.setStyle?.({ style: dark ? 'LIGHT' : 'DARK' })
-  }, [dark])
-}
+/* The status bar is written by theme.js:syncNativeChrome() and by NOTHING
+   ELSE. There used to be a useStatusBar() here as well, keyed off
+   prefers-color-scheme and with the opposite polarity, and because its effect
+   ran last it won — so with the phone in Dark the clock and battery rendered as
+   dark glyphs on a dark bar at 1.02:1, invisible, for the app's own default
+   audience. Two owners of one piece of native chrome is the bug; deleting one
+   is the fix. */
 
 /**
  * Keyboard metrics, published as --rx-kb (px) and --rx-kb-dur (ms) on the shell
@@ -326,12 +348,19 @@ const EllipsisCircle = ({ size = 22 }) => (
 // composer cannot live inside somebody else's scroll view.
 
 const SCREENS = {
+  // Home is the root. Models used to be, which is why the app opened onto an
+  // inventory of files to install rather than somewhere to arrive.
+  // no large title: Home's own lockup is its header, and 'Radiant' set in
+  // the bar above a RADIANT wordmark would be the name twice.
+  home: { title: '', large: false, scroll: true, bg: 'grouped' },
   models: { title: 'Models', large: true, scroll: true, bg: 'grouped' },
   // `bare` means the screen draws its own nav bar too. Chat does: its title,
   // its composer and its transcript scroller are one layout, and splitting the
   // bar off would put a pinned composer inside somebody else's scroll view.
   chat: { title: '', large: false, scroll: false, bg: 'plain', bare: true },
-  connect: { title: 'Connect to a Mac', large: false, scroll: true, bg: 'grouped' }
+  settings: { title: 'Settings', large: true, scroll: true, bg: 'grouped' },
+  readme: { title: 'Read me', large: false, scroll: true, bg: 'grouped' },
+  providers: { title: 'Providers', large: false, scroll: true, bg: 'grouped' }
 }
 
 const BG = {
@@ -413,6 +442,12 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
         {onBack && (
           <button
             type="button" className="rx-shell-barbtn" {...back}
+            /* ⚠️ WITHOUT THIS VOICEOVER SAYS ONLY "button". The label text
+               beside the chevron can be empty — it is elided at narrow widths
+               and absent on some routes — so the button's name cannot depend on
+               it. Caught by the runtime gauntlet, which reads what is actually
+               rendered rather than what the source implies. */
+            aria-label={backTitle ? `Back to ${backTitle}` : "Back"}
             style={{
               position: 'absolute', left: 0, top: 0, bottom: 0,
               display: 'flex', alignItems: 'center', gap: 4,
@@ -587,6 +622,14 @@ function Layer ({
       ref={layerRef}
       className="rx-shell-layer"
       aria-hidden={inert ? 'true' : undefined}
+      // ⚠️ `inert`, not just aria-hidden + pointer-events. Those two hide a
+      // buried layer from the eye and the finger and leave every control on it
+      // FOCUSABLE: with Settings open, ten controls on the Models screen
+      // underneath were still reachable by keyboard, and Enter on one started an
+      // 0.8 GB download on a screen the user cannot see. aria-hidden over a
+      // focusable control is also a straight WCAG 4.1.2 failure. `inert` removes
+      // a subtree from focus, hit-testing and the accessibility tree at once.
+      inert={inert ? '' : undefined}
       style={{
         position: 'absolute', inset: 0,
         background: BG[config.bg],
@@ -698,8 +741,7 @@ export default function MobileShell () {
   const dark = useMedia('(prefers-color-scheme: dark)')
   const reduce = useMedia('(prefers-reduced-motion: reduce)')
 
-  useDynamicType(rootRef)
-  useStatusBar(dark)
+  useDynamicType()
   useKeyboardMetrics(rootRef)
 
   useEffect(() => { document.documentElement.classList.add('is-native') }, [])
@@ -717,14 +759,38 @@ export default function MobileShell () {
   const [activeModelId, setActiveModelId] = useState(() => {
     try { return localStorage.getItem(ACTIVE_MODEL_KEY) || null } catch { return null }
   })
+  // ⚠️ A CHOSEN CLOUD MODEL IS THE ACTIVE MODEL. MobileChat already sends to it
+  // instead of the on-device one; before this, every screen still named a local
+  // model, so the app told the user one thing and did another.
+  const [cloudModel, setCloudModel] = useState(() => chosenAsModel())
+  useEffect(() => onChosenChanged(() => setCloudModel(chosenAsModel())), [])
+
+  // ⚠️ SEARCH `downloaded`, NOT `models`. This read the whole 44-model catalogue,
+  // so a model the user had REMOVED still matched by id — it is still in the
+  // catalogue, just with downloaded:false. Tony removed every model and Home
+  // went on saying "Current model: Qwen 3 1.7B", New chat stayed enabled, and
+  // the chat it opened was titled Qwen: a conversation pointed at weights that
+  // were no longer on the phone. Falling through to downloaded[0], or to null,
+  // is the honest answer — Home already handles null by offering the model list
+  // and disabling New chat.
   const activeModel = useMemo(
-    () => models.find(m => m.id === activeModelId) || downloaded[0] || null,
-    [models, activeModelId, downloaded]
+    () => cloudModel || downloaded.find(m => m.id === activeModelId) || downloaded[0] || null,
+    [cloudModel, activeModelId, downloaded]
+  )
+
+  // What the switcher offers: everything on the phone, plus the cloud model
+  // when one is set, so there is always a way back to on-device.
+  const switchable = useMemo(
+    () => (cloudModel ? [cloudModel, ...downloaded] : downloaded),
+    [cloudModel, downloaded]
   )
 
   const [stack, setStack] = useState(() => {
-    const base = [{ key: 'root', route: 'models', props: {} }]
-    if (hasSavedConversation()) base.push({ key: 'k1', route: 'chat', props: {} })
+    const base = [{ key: 'root', route: 'home', props: {} }]
+    // "Open to" in Settings: Home, or straight back into the last conversation.
+    if (loadAppearance().openTo === 'chat' && listChats()[0]) {
+      base.push({ key: 'k1', route: 'chat', props: { chatId: listChats()[0].id } })
+    }
     return base
   })
   const [popping, setPopping] = useState(null)
@@ -774,16 +840,20 @@ export default function MobileShell () {
   // No model on the phone and no Mac configured. It is a cover, not a screen —
   // there is nothing behind it worth showing.
 
+  const [appearance, setAppearance] = useState(() => {
+    const a = loadAppearance()
+    applyAppearance(a)
+    return a
+  })
+
   const [firstRunDone, setFirstRunDone] = useState(() => {
     try { return localStorage.getItem(FIRSTRUN_KEY) === '1' } catch { return true }
   })
-  const hasServer = useMemo(() => {
-    try { const s = getServer(); return !!(s.base || s.token) } catch { return false }
-  }, [])
+  const hasServer = false
   // wait for the catalog before judging: flashing the cover for one frame on
   // every cold launch would be worse than never showing it
   const catalogKnown = models.length > 0 || local.ready === true || local.loaded === true
-  const showFirstRun = !!FirstRun && !firstRunDone && catalogKnown && downloaded.length === 0 && !hasServer
+  const showFirstRun = !!FirstRun && !firstRunDone && catalogKnown && downloaded.length === 0 && !cloudModel
 
   const finishFirstRun = useCallback(() => {
     setFirstRunDone(true)
@@ -962,13 +1032,15 @@ export default function MobileShell () {
 
   // ── actions handed to the screens ─────────────────────────────────────────
 
-  const openChat = useCallback((modelId) => {
+  const openChat = useCallback((modelId, opts = {}) => {
     if (modelId) {
       setActiveModelId(modelId)
       try { localStorage.setItem(ACTIVE_MODEL_KEY, modelId) } catch { /* private mode */ }
     }
     if (stackRef.current[stackRef.current.length - 1]?.route === 'chat') return
-    push('chat', {})
+    // "New chat" means a NEW conversation, not the last one reopened — the
+    // whole point of keeping history is that starting again does not overwrite.
+    push('chat', opts.fresh ? { chatId: newChatId() } : {})
   }, [push])
 
   const presentSheet = useCallback((modelId) => {
@@ -981,23 +1053,28 @@ export default function MobileShell () {
   // The Mac path is real and one tap away, and its demotion — one plain row two
   // sections down on Models, plus the gear — IS the argument that on-device is
   // the product. It never gets a card, an icon treatment or equal billing.
-  const connectMac = useCallback(() => push('connect', {}), [push])
 
   const nav = useMemo(() => ({
-    push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, depth: stack.length
-  }), [push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, stack.length])
+    push, pop, replace, presentSheet, dismissSheet, openChat, depth: stack.length
+  }), [push, pop, replace, presentSheet, dismissSheet, openChat, stack.length])
 
   const menuPress = usePress(() => setMenuOpen('chat'))
-  const gearPress = usePress(() => setMenuOpen('models'))
+  // The gear used to open a three-item menu, which is why Tony reported the
+  // app had no settings at all. It pushes a real screen now.
+  const gearPress = usePress(() => push('settings', {}), { label: 'Settings' })
 
   // ── render ────────────────────────────────────────────────────────────────
 
   const layers = popping ? [...stack, popping] : stack
   const topKey = stack[stack.length - 1]?.key
 
-  // Chat's bar carries the privacy promise permanently, in the quietest place
-  // in the app: a two-line title, model name over "On device". ChatScreen
-  // replaces the subtitle with a tok/s readout while it is generating.
+  // Chat's bar carries WHERE THE ANSWER COMES FROM, in the quietest place in
+  // the app: a two-line title, model name over its origin. ChatScreen replaces
+  // the subtitle with a tok/s readout while it is generating.
+  //
+  // ⚠️ IT USED TO SAY "On device" WHATEVER WAS ANSWERING — including a cloud
+  // model reached over the network with the user's own key. A privacy claim
+  // that is hard-coded is a privacy claim that will eventually be false.
   const titleFor = (entry) => {
     const chrome = chromeMap[entry.key] || {}
     if (chrome.title != null) return chrome.title
@@ -1007,24 +1084,74 @@ export default function MobileShell () {
   const subtitleFor = (entry) => {
     const chrome = chromeMap[entry.key] || {}
     if (chrome.subtitle != null) return chrome.subtitle
-    return entry.route === 'chat' ? 'On device' : null
+    if (entry.route !== 'chat') return null
+    return activeModel?.cloud ? (activeModel.maker || 'Cloud') : 'On device'
   }
 
   const renderScreen = (entry) => {
     const { setChrome } = bindings(entry.key)
-    const common = { nav, local, models, setChrome, ...entry.props }
+    // `isTop` is how a screen knows it has been RETURNED to. A pushed layer
+    // does not unmount the one beneath it, so a screen that loads a list on
+    // mount will still be showing that list minutes later — which is why a chat
+    // started and left did not appear on Home. Anything that reads storage
+    // needs to re-read when this flips back to true.
+    const common = {
+      nav, local, models, setChrome,
+      isTop: entry.key === topKey && !popping,
+      ...entry.props
+    }
     switch (entry.route) {
       case 'chat':
         return (
           <ChatScreen
             {...common}
-            modelId={activeModel?.id || activeModelId}
+            // ⚠️ NO `|| activeModelId` FALLBACK. That is the same bug one layer
+            // down: with nothing downloaded, activeModel is null and this
+            // handed Chat the id of a model that had been removed.
+            modelId={activeModel?.id || null}
             model={activeModel}
+            downloadedModels={switchable}
             onModelInfo={() => presentSheet(activeModel?.id)}
+            onSwitchModel={(id) => {
+              // Switching mid-conversation KEEPS the conversation: the messages
+              // belong to the chat, not to the model that answered them.
+              // ⚠️ CHOOSING A LOCAL MODEL MUST CLEAR THE CLOUD ONE. The chat
+              // checks the cloud choice FIRST, so leaving it set would send to
+              // the cloud while the title named a local model — the exact lie
+              // this change exists to end.
+              if (String(id).startsWith('cloud:')) return
+              saveChosen(null)
+              setActiveModelId(id)
+              try { localStorage.setItem(ACTIVE_MODEL_KEY, id) } catch { /* private mode */ }
+            }}
           />
         )
-      case 'connect':
-        return <ConnectMac {...common} onConnected={pop} />
+      case 'home':
+        return (
+          <HomeScreen
+            {...common}
+            activeModel={activeModel}
+            onStartChat={() => openChat(activeModel?.id, { fresh: true })}
+            onOpenChat={(chatId) => push('chat', { chatId })}
+            onChooseModel={() => push('models', {})}
+          />
+        )
+      case 'readme':
+        return <ReadMeScreen {...common} />
+      case 'providers':
+        return <ProvidersScreen {...common} onStartChat={() => openChat(null, { fresh: true })} />
+      case 'settings':
+        return (
+          <SettingsScreen
+            {...common}
+            appearance={appearance}
+            onAppearance={setAppearance}
+            onReadMe={() => push('readme', {})}
+            onProviders={() => push('providers', {})}
+            onGetModels={() => push('models', {})}
+            version={typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : null}
+          />
+        )
       case 'models':
       default:
         return (
@@ -1034,7 +1161,6 @@ export default function MobileShell () {
             activeModel={activeModel}
             onOpenChat={openChat}
             onGetModel={presentSheet}
-            onConnectMac={connectMac}
           />
         )
     }
@@ -1048,7 +1174,7 @@ export default function MobileShell () {
           aria-label="More" style={barButtonStyle}><EllipsisCircle /></button>
       )
     }
-    if (entry.route === 'models') {
+    if (entry.route === 'home') {
       return (
         <button type="button" className="rx-shell-barbtn" {...gearPress}
           aria-label="Settings" style={barButtonStyle}><Gearshape /></button>
@@ -1070,7 +1196,6 @@ export default function MobileShell () {
   // the Mac path (which also has its own row, because that row IS the argument
   // that on-device is the product) and reclaiming the disk in one move.
   const modelsMenu = [
-    { key: 'mac', label: 'Connect to a Mac', run: () => connectMac() },
     ...(local.downloaded?.length
       ? [{
           key: 'purge',
@@ -1146,7 +1271,12 @@ export default function MobileShell () {
               trailing={trailingFor(entry)}
               layerRef={b.layerRef}
               dimRef={b.dimRef}
-              inert={entry.key !== topKey && !popping}
+              // A presented sheet makes EVERY layer inert, not just the ones
+              // buried under another layer. The sheet is an overlay sibling
+              // rather than a pushed layer, so without this the whole Models
+              // screen stays keyboard-reachable behind it — thirteen controls,
+              // including the ones that start a multi-gigabyte download.
+              inert={sheetOpen || (entry.key !== topKey && !popping)}
             >
               {renderScreen(entry)}
             </Layer>
@@ -1190,7 +1320,8 @@ export default function MobileShell () {
             local={local}
             models={models}
             onChooseModel={() => { finishFirstRun(); presentSheet(null) }}
-            onConnectMac={() => { finishFirstRun(); connectMac() }}
+            onStartChat={() => { finishFirstRun(); openChat(activeModel?.id || downloaded[0]?.id) }}
+            hasModel={downloaded.length > 0}
           />
         </div>
       )}

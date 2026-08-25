@@ -21,6 +21,7 @@
  * than guessing.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fitOf } from './fit.js'
 import * as haptics from './haptics.js'
 
 const LM = () => (typeof window !== 'undefined' ? window.Capacitor?.Plugins?.LocalModels : null)
@@ -74,7 +75,14 @@ export function useLocalModels () {
       if (lm?.diskInfo) {
         const d = await lm.diskInfo()
         if (typeof d?.total === 'number' && d.total > 0) {
-          return { total: d.total, free: typeof d.free === 'number' ? d.free : null }
+          return {
+            total: d.total,
+            free: typeof d.free === 'number' ? d.free : null,
+            // Bytes this app may still allocate. Disk says whether the download
+            // can land; this says whether the model can then be loaded, and a
+            // phone can easily have room for a file it cannot run.
+            ram: typeof d.ramAvailable === 'number' && d.ramAvailable > 0 ? d.ramAvailable : null
+          }
         }
       }
       const dev = DEVICE()
@@ -117,9 +125,13 @@ export function useLocalModels () {
       // The native side throttles to whole percents. A stale event can still
       // land just after downloadDone; harmless, because the row reads as
       // downloaded by then and only a downloading row consults this.
-      downloadProgress: ({ id, progress: f }) => {
-        if (typeof f !== 'number' || !isFinite(f)) return
-        setProgress(p => ({ ...p, [id]: Math.min(Math.max(f, 0), 1) }))
+      // -1 means the total size is unknowable, so there is no honest percent
+      // to show; the byte counts are still real and the UI prints those.
+      downloadProgress: ({ id, progress: f, completedBytes, totalBytes }) => {
+        const pct = typeof f === 'number' && isFinite(f) && f >= 0
+          ? Math.min(Math.max(f, 0), 1)
+          : null
+        setProgress(p => ({ ...p, [id]: { pct, done: Number(completedBytes) || 0, total: Number(totalBytes) || 0 } }))
       },
       downloadDone: ({ id }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })
@@ -129,6 +141,15 @@ export function useLocalModels () {
         haptics.notification('SUCCESS')
         refreshDisk()
         setTimeout(() => { if (alive.current) setJustDone(cur => (cur === id ? null : cur)) }, 900)
+      },
+      // Stopping a download is a choice, not a failure: clear the job, the
+      // progress and any stale error, and say nothing. Surfacing it as an error
+      // would scold the user for doing exactly what they asked for.
+      downloadCancelled: ({ id }) => {
+        setJobs(j => { const n = { ...j }; delete n[id]; return n })
+        setProgress(p => { if (!(id in p)) return p; const n = { ...p }; delete n[id]; return n })
+        setFailures(f => { if (!(id in f)) return f; const n = { ...f }; delete n[id]; return n })
+        refreshDisk()
       },
       downloadFailed: ({ id, message }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })
@@ -173,6 +194,20 @@ export function useLocalModels () {
     }
   }, [jobs])
 
+  // Stop a running download. The optimistic clear matters: cancelling a 2.3 GB
+  // transfer is the one moment the user is already annoyed, and waiting for the
+  // native round trip to redraw the row reads as the tap not landing. The
+  // downloadCancelled event then confirms it; if the native side says the job
+  // had already finished, the next refresh reconciles.
+  const cancel = useCallback(async (id) => {
+    const lm = LM()
+    if (!lm?.cancelDownload || !id) return
+    haptics.impact('MEDIUM')
+    setJobs(j => { const n = { ...j }; delete n[id]; return n })
+    setProgress(p => { if (!(id in p)) return p; const n = { ...p }; delete n[id]; return n })
+    try { await lm.cancelDownload({ id }) } catch { /* the event still reconciles */ }
+  }, [])
+
   const remove = useCallback(async (id) => {
     const lm = LM()
     if (!lm?.remove || !id) return
@@ -203,6 +238,13 @@ export function useLocalModels () {
     return Math.max(0, bytesOf(m) - disk.free)
   }, [disk, bytesOf])
 
+  /**
+   * Runs well / runs tight / won't run on THIS iPhone, or null before the phone
+   * has said how much memory it can spare. Thresholds live in fit.js and are
+   * shared with the Mac app's, so the two never disagree about a model.
+   */
+  const fitOfModel = useCallback((m) => fitOf(m?.sizeGB, disk?.ram || 0), [disk])
+
   return {
     models,
     downloaded,
@@ -218,7 +260,10 @@ export function useLocalModels () {
     bytesOf,
     fits,
     shortfall,
+    fitOf: fitOfModel,
+    ramAvailable: disk?.ram || null,
     download,
+    cancel,
     remove,
     refresh,
     refreshDisk

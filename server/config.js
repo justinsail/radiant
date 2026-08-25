@@ -79,6 +79,12 @@ export function scanExternalSkills () {
 }
 
 const DEFAULT_CONFIG = {
+  // A project is a named piece of work with a folder attached. Sessions point at
+  // one by id. It is deliberately its OWN entity rather than being derived from
+  // each session's cwd: two projects can share a directory, a project can be
+  // renamed without moving anything on disk, and a session can belong to a
+  // project before anyone has decided where its files live.
+  projects: [],
   providers: [
     { id: 'anthropic', name: 'Anthropic', type: 'anthropic', baseUrl: 'https://api.anthropic.com', auth: 'key', removable: false },
     { id: 'openai', name: 'OpenAI', type: 'openai', baseUrl: 'https://api.openai.com/v1', auth: 'key', removable: false },
@@ -188,6 +194,7 @@ export function loadConfig () {
     cfg.oauth = saved.oauth || {}
     cfg.accounts = saved.accounts || {}
     cfg.activeAccount = saved.activeAccount || {}
+    if (Array.isArray(saved.projects)) cfg.projects = saved.projects
     if (saved.removedSkills) cfg.removedSkills = saved.removedSkills
     if (saved.skills) {
       cfg.skills = saved.skills
@@ -346,7 +353,7 @@ export function listSessions () {
     .map(f => {
       try {
         const s = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, f), 'utf8'))
-        return { id: s.id, title: s.title, model: s.model, provider: s.provider, cwd: s.cwd, agentId: s.agentId || null, pinned: Boolean(s.pinned), updatedAt: s.updatedAt, messageCount: s.messages.length }
+        return { id: s.id, title: s.title, model: s.model, provider: s.provider, cwd: s.cwd, agentId: s.agentId || null, projectId: s.projectId || null, pinned: Boolean(s.pinned), updatedAt: s.updatedAt, messageCount: s.messages.length }
       } catch { return null }
     })
     .filter(Boolean)

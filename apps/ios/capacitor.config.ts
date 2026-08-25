@@ -23,13 +23,38 @@ const config: CapacitorConfig = {
     contentInset: 'never',
     // true black, not the Mac app's tinted #121417: on an OLED iPhone a tinted
     // near-black is exactly what makes a dark UI read as a web page
-    backgroundColor: '#000000',
+    // the site's ground, so the launch screen, the native window and the web
+    // layer are all the same colour and nothing flashes between them
+    backgroundColor: '#070B13',
     // only tailnet hosts — the app never needs the open web
     limitsNavigationsToAppBoundDomains: false
   },
   plugins: {
+    // ⚠️ WITHOUT THIS PLUGIN THERE IS NO SPLASH TO SEE. Capacitor shows the
+    // launch storyboard only until the web view paints its first frame, which
+    // for a bundled app on a fast phone is a flicker — Tony reported "not
+    // seeing the splash page" three times while the storyboard, the imageset and
+    // the Info.plist key were all correct. They were: it was on screen for
+    // roughly a tenth of a second.
+    //
+    // Held for 900ms, then faded over 250ms into the first-run screen it is
+    // frame one of, so the handoff still reads as one continuous moment.
+    SplashScreen: {
+      // 900ms still read as a flash. Long enough to actually see and read.
+      launchShowDuration: 1800,
+      launchFadeOutDuration: 320,
+      launchAutoHide: true,
+      backgroundColor: '#070B13',
+      showSpinner: false
+    },
     // the composer rides visualViewport itself; the web view must not resize
-    Keyboard: { resize: 'none' }
+    Keyboard: {
+      resize: 'none',
+      // Without this WKWebView floats its own form-assistant bar — up
+      // chevron, down chevron, Done — above the keyboard. Nothing else in
+      // the app announces "this is a web view" as loudly.
+      hideFormAccessoryBar: true
+    }
   },
   server: {
     // no `url`: the bundled UI loads first and asks which Mac to connect to

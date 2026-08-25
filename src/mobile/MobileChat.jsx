@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Gauge from './Gauge.jsx'
 import * as haptics from './haptics.js'
+import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
+import { loadChosen, providerById } from './providers.js'
 
 // The conversation, running on this phone.
 //
@@ -63,6 +65,55 @@ function segments (text) {
   }
   if (at < text.length) out.push({ type: 'text', text: text.slice(at) })
   return out.filter(s => s.text.trim().length)
+}
+
+/**
+ * The inline markdown a model actually emits, rendered.
+ *
+ * ⚠️ IT WAS SHOWING THE ASTERISKS. Tony's own App Store screenshot has
+ * "1. **Time**: How much time do you have" in it — literal stars, because
+ * segments() only ever handled ``` fences and everything else fell through as
+ * plain text. Bold is the single most common thing a model emits, and every
+ * reply that used it looked unfinished.
+ *
+ * ⚠️ NEVER dangerouslySetInnerHTML HERE. This text comes from a language model,
+ * which means it is untrusted input that can contain anything — a model can be
+ * talked into emitting a <script> tag or an onerror attribute. React elements
+ * are built instead, so nothing it produces can ever become markup.
+ *
+ * Deliberately small: bold, italic, inline code. Headings and lists already read
+ * correctly as plain text on a phone, and a full markdown engine is weight this
+ * screen does not need.
+ */
+const INLINE = /(\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`|\*[^*\n]+\*|_[^_\n]+_)/g
+
+function inline (text, keyBase) {
+  const parts = String(text).split(INLINE)
+  return parts.map((part, i) => {
+    if (!part) return null
+    const k = `${keyBase}-${i}`
+    if (/^\*\*[^*\n]+\*\*$/.test(part) || /^__[^_\n]+__$/.test(part)) {
+      return <strong key={k}>{part.slice(2, -2)}</strong>
+    }
+    if (/^`[^`\n]+`$/.test(part)) {
+      return <code className='rx-chat-inlinecode' key={k}>{part.slice(1, -1)}</code>
+    }
+    if (/^\*[^*\n]+\*$/.test(part) || /^_[^_\n]+_$/.test(part)) {
+      return <em key={k}>{part.slice(1, -1)}</em>
+    }
+    return part
+  })
+}
+
+/** A text block, line by line, so headings and list markers keep their shape. */
+function richText (text, keyBase) {
+  return String(text).split('\n').map((line, i) => {
+    // "### Heading" reads as a heading without a heading element: the marker is
+    // noise, the emphasis is the point.
+    const h = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/)
+    const body = h ? <strong>{inline(h[2], `${keyBase}-h${i}`)}</strong> : inline(line, `${keyBase}-l${i}`)
+    return <span key={`${keyBase}-r${i}`}>{body}{'\n'}</span>
+  })
 }
 
 async function copyText (s) {
@@ -176,6 +227,13 @@ const NewChatGlyph = () => (
     <path d='M12.6 2.2l3.2 3.2-5.6 5.6-3.8.6.6-3.8 5.6-5.6z' stroke='currentColor' strokeWidth='1.5' strokeLinejoin='round' />
   </svg>
 )
+const TickGlyph = () => (
+  <svg viewBox='0 0 16 16' width='16' height='16' aria-hidden='true'>
+    <path d='M3.5 8.5l3 3 6-7' fill='none' stroke='currentColor' strokeWidth='1.8'
+          strokeLinecap='round' strokeLinejoin='round' />
+  </svg>
+)
+
 const InfoGlyph = () => (
   <svg width='18' height='18' viewBox='0 0 18 18' fill='none' aria-hidden='true'>
     <circle cx='9' cy='9' r='7.4' stroke='currentColor' strokeWidth='1.5' />
@@ -221,8 +279,8 @@ function AssistantTurn ({ model, children, marker }) {
   return (
     <div className='rx-chat-turn rx-chat-turn-model'>
       <div className='rx-chat-byline'>
-        <span className='rx-chat-marker'><Gauge size={22} state={marker} /></span>
-        <span className='rx-chat-byname'>{model?.name || 'On device'}</span>
+        <span className='rx-chat-marker'><BrandSpinner size={22} /></span>
+        <span className='rx-chat-byname'>{model?.name || 'No model'}</span>
       </div>
       {children}
     </div>
@@ -258,6 +316,8 @@ export default function MobileChat ({
   model,
   onBack,
   onModelInfo,
+  downloadedModels = [],
+  onSwitchModel,
   initialMessages = [],
   onMessagesChange,
   onDeleteConversation
@@ -268,6 +328,7 @@ export default function MobileChat ({
   const [scrolled, setScrolled] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [menu, setMenu] = useState(false)
+  const [pickModel, setPickModel] = useState(false)
   const [rate, setRate] = useState(null) // tok/s, or null when we cannot say honestly
 
   const rootRef = useRef(null)
@@ -297,9 +358,27 @@ export default function MobileChat ({
   }, [messages, onMessagesChange])
 
   // ── scrolling ─────────────────────────────────────────────────────────────
+  // ⚠️ AUTOSCROLL MUST NOT OUTVOTE THE FINGER. stick() moves the scroller,
+  // which fires onScroll, which measures "am I near the bottom" — and because
+  // stick() just put us there, the answer is yes, so follow stays on. During a
+  // fast stream that loop re-arms every frame: the user scrolls up, the next
+  // token yanks them back, and the screen reads as frozen. Tony: "i cant scroll
+  // up to read it... screen is frozen."
+  //
+  // The flag tells onScroll to ignore scrolls WE caused, so only the user's own
+  // scrolling decides whether to keep following.
+  // ⚠️ MY FIRST FIX FOR THIS WAS ALSO WRONG, and the runtime gauntlet caught it.
+  // Ignoring scroll events for two frames after a stick() meant a REAL scroll
+  // landing in that window was thrown away too — so during a fast stream the
+  // user could still be dragged back. A time window cannot tell who scrolled.
+  //
+  // Intent is observable, so observe it: a finger or a wheel on the transcript
+  // means the user is driving, and from then on only their position decides
+  // whether to keep following.
+  const userDriving = useRef(false)
   const stick = useCallback((smooth = false) => {
     const el = scrollRef.current
-    if (!el) return
+    if (!el || userDriving.current) return
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
   }, [])
 
@@ -398,17 +477,32 @@ export default function MobileChat ({
     // most-hated behavior in every chat app ever shipped.
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     follow.current = near
+    // Back at the bottom by their own hand: hand control back to autoscroll.
+    if (near) userDriving.current = false
     setShowJump(prev => (near ? false : prev || Boolean(run.current)))
   }, [])
 
   // Drag down over the transcript dismisses the keyboard. A webview cannot
   // track the system keyboard 1:1 with the finger, so this commits to the
   // dismissal on a clear downward drag and lets iOS animate it.
+  // ⚠️ THIS WAS THE SAME GESTURE AS SCROLLING UP. Reading back through the
+  // transcript means dragging your finger DOWN, and this dismissed the keyboard
+  // after 16px of exactly that — so the one thing you do to read history fought
+  // the one thing that closes the keyboard.
+  //
+  // It now only fires when the transcript CANNOT scroll any further up, which
+  // is the moment a downward drag has no other meaning. Same idea as UIKit's
+  // interactive dismissal, and 48px so a stray flick does not trigger it.
   const dragStart = useRef(0)
-  const onTranscriptTouchStart = e => { dragStart.current = e.touches[0].clientY }
+  const onTranscriptTouchStart = e => {
+    dragStart.current = e.touches[0].clientY
+    userDriving.current = true   // a finger on the transcript outranks autoscroll
+  }
   const onTranscriptTouchMove = e => {
     if (document.activeElement !== taRef.current) return
-    if (e.touches[0].clientY - dragStart.current > 16) taRef.current.blur()
+    const el = scrollRef.current
+    if (el && el.scrollTop > 0) return          // still scrollable — this is a scroll
+    if (e.touches[0].clientY - dragStart.current > 48) taRef.current.blur()
   }
 
   // ── the composer ──────────────────────────────────────────────────────────
@@ -448,7 +542,7 @@ export default function MobileChat ({
       if (follow.current) requestAnimationFrame(() => stick())
     }
 
-    const offToken = listen(lm, 'token', e => {
+    const onToken = e => {
       const r = run.current
       if (!r || r.done) return
       const chunk = e?.text
@@ -474,11 +568,11 @@ export default function MobileChat ({
           r.raf = requestAnimationFrame(() => { r.raf = 0; if (follow.current) stick() })
         }
       }
-    })
+    }
 
-    const offDone = listen(lm, 'done', () => finish(bufRef.current.trim(), null))
+    const onDone = () => finish(bufRef.current.trim(), null)
 
-    const offFailed = listen(lm, 'failed', e => {
+    const onFailed = e => {
       const r = run.current
       if (!r || r.done) return
       // A deliberate cancel comes back as a cancelled Task and must never
@@ -490,9 +584,21 @@ export default function MobileChat ({
       if (r.stoppedAt) return finish(bufRef.current.trim(), null)
       haptics.notification?.('ERROR')
       finish(bufRef.current.trim(), e?.message || 'Generation failed.')
-    })
+    }
 
-    return () => { offToken(); offDone(); offFailed() }
+    // Both sources, one set of handlers — the transcript does not care whether
+    // the text came from the model on this phone or from a provider.
+    const pc = plugins().ProviderChat
+    const offs = [
+      listen(lm, 'token', onToken),
+      listen(lm, 'done', onDone),
+      listen(lm, 'failed', onFailed),
+      listen(pc, 'cloudToken', onToken),
+      listen(pc, 'cloudDone', onDone),
+      listen(pc, 'cloudFailed', onFailed)
+    ]
+
+    return () => offs.forEach(off => off())
   }, [stick])
 
   const send = useCallback(text => {
@@ -518,6 +624,33 @@ export default function MobileChat ({
     follow.current = true
     setShowJump(false)
     requestAnimationFrame(() => stick())
+
+    // A chosen cloud model wins over the on-device one. The request is made
+    // NATIVELY — see ProviderChat.swift — so the API key never enters this web
+    // layer; from here the two paths are identical, because the cloud plugin
+    // emits the same token / done / failed shape LocalModels does.
+    const cloud = loadChosen()
+    const pc = typeof window !== 'undefined' ? window.Capacitor?.Plugins?.ProviderChat : null
+    if (cloud && pc?.send) {
+      const provider = providerById(cloud.providerId)
+      if (provider) {
+        pc.send({
+          provider: provider.id,
+          baseUrl: provider.baseUrl,
+          model: cloud.model,
+          // the transcript, not a flattened prompt: a cloud model has real
+          // multi-turn memory and flattening it away would throw that out
+          messages: [
+            ...messages.slice(-12).map(m => ({
+              role: m.role === 'user' ? 'user' : 'assistant',
+              content: m.text
+            })),
+            { role: 'user', content: body }
+          ]
+        }).catch(() => { /* cloudFailed carries the message */ })
+        return
+      }
+    }
 
     lm.generate({ id: model.id, prompt }).catch(() => {
       // The rejection and the `failed` event describe the same failure; the
@@ -578,12 +711,40 @@ export default function MobileChat ({
             <Chevron />
             <span>Models</span>
           </button>
-          <div className='rx-chat-title'>
-            <div className='rx-chat-title-1'>{model?.name || 'No model'}</div>
-            {/* The privacy promise lives permanently in the chrome, in the
-                quietest possible place. A banner would cheapen it. */}
+          {/* ⚠️ THE TITLE IS THE MODEL SWITCHER. Tony: "while inside a chat,
+              there should be a way to switch models on the fly." Putting it
+              behind the ⋯ menu would hide the one control people reach for
+              most; a tappable title with a chevron is what every chat app of
+              this shape does, and it needs no new chrome. It is only a control
+              when there is something to switch TO. */}
+          <div
+            className={'rx-chat-title' + (downloadedModels.length > 1 ? ' is-switch' : '')}
+            {...(downloadedModels.length > 1
+              ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-haspopup': 'menu',
+                  'aria-label': `Model: ${model?.name || 'none'}. Change model.`,
+                  onClick: () => setPickModel(true)
+                }
+              : {})}
+          >
+            <div className='rx-chat-title-1'>
+              {model?.name || 'No model'}
+              {downloadedModels.length > 1 && (
+                <svg className='rx-chat-title-chev' viewBox='0 0 10 6' width='9' height='6' aria-hidden='true'>
+                  <path d='M1 1l4 4 4-4' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' strokeLinejoin='round' />
+                </svg>
+              )}
+            </div>
+            {/* ⚠️ THIS LINE IS A CLAIM, SO IT HAS TO BE TRUE. It said "On
+                device" unconditionally — under the name of an OpenRouter model,
+                on a request that had already left the phone. The privacy
+                promise is the most damaging thing in the app to get wrong, and
+                it was hard-coded. It now names where the answer actually comes
+                from. */}
             <div className={'rx-chat-title-2' + (rate ? ' is-mono' : '')}>
-              {rate ? rate + ' tok/s' : 'On device'}
+              {rate ? rate + ' tok/s' : (model?.cloud ? (model.maker || 'Cloud') : 'On device')}
             </div>
           </div>
           <button className={'rx-chat-more' + (menuBtn.pressed ? ' is-pressed' : '')} {...menuBtn.handlers} aria-label='More'>
@@ -602,7 +763,7 @@ export default function MobileChat ({
 
           {empty && (
             <div className='rx-chat-empty'>
-              <Gauge size={64} state='resident' />
+              <BrandMark size={64} />
               <div className='rx-chat-empty-name'>{model?.name || 'No model'}</div>
               <div className='rx-chat-empty-sub'>Running on this iPhone. Nothing leaves the device.</div>
               <div className='rx-chat-suggestions'>
@@ -627,7 +788,7 @@ export default function MobileChat ({
                 {segments(m.text).map((s, j) => (
                   s.type === 'code'
                     ? <CodeBlock key={j} code={s.text} />
-                    : <p key={j} className='rx-chat-body'>{s.text.trim()}</p>
+                    : <p key={j} className='rx-chat-body'>{richText(s.text.trim(), `m${m.id}-${j}`)}</p>
                 ))}
                 {m.error && <p className='rx-chat-error'>{m.error}</p>}
               </AssistantTurn>
@@ -693,6 +854,21 @@ export default function MobileChat ({
           </button>
         </div>
 
+        {pickModel && (
+          <div className='rx-chat-menulayer' onTouchStart={() => setPickModel(false)} onClick={() => setPickModel(false)}>
+            <div className='rx-chat-menu rx-chat-models' role='menu' onTouchStart={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+              {downloadedModels.map(m => (
+                <MenuRow
+                  key={m.id}
+                  label={m.name}
+                  glyph={m.id === model?.id ? <TickGlyph /> : <span style={{ width: 16 }} />}
+                  onPick={() => { setPickModel(false); if (m.id !== model?.id) onSwitchModel?.(m.id) }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {menu && (
           <div className='rx-chat-menulayer' onTouchStart={() => setMenu(false)} onClick={() => setMenu(false)}>
             <div className='rx-chat-menu' role='menu' onTouchStart={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
@@ -738,7 +914,8 @@ const CSS = `
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
   touch-action: manipulation;
 }
-@media (prefers-color-scheme: dark) { .rx-chat { --rx-mat: rgba(30,30,30,0.72); } }
+/* keyed off the app's mode, NOT the phone's — see data-rx-dark in theme.js */
+.is-native[data-rx-dark='true'] .rx-chat { --rx-mat: rgba(30,30,30,0.72); }
 /* :where() so the reset carries zero specificity and any single class below
    beats it — otherwise \`.rx-chat button\` quietly out-ranks \`.rx-chat-back\`
    and every tinted control comes out black. */
@@ -748,8 +925,10 @@ const CSS = `
    that ring for every control on this screen — including the composer, where
    losing the caret's focus outline is worst. :focus-visible never matches a
    tap, so there is nothing to hide from a finger. */
-.rx-chat button:focus-visible,
-.rx-chat textarea:focus-visible {
+/* Buttons only — NOT the composer. A textarea matches :focus-visible on a plain
+   tap (spec: any keyboard-editable element does), so ringing it drew a blue web
+   outline around the composer every time someone went to type. */
+.rx-chat button:focus-visible {
   outline: 3px solid var(--rx-tint);
   outline-offset: 2px;
   border-radius: 8px;
@@ -820,7 +999,16 @@ const CSS = `
 .rx-chat-byline { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--rx-label-2); }
 .rx-chat-marker { display: block; width: 22px; height: 22px; flex: none; }
 .rx-chat-byname { font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; font-weight: 600; color: var(--rx-label-2); }
+.rx-chat-inlinecode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--rx-fill-3);
+}
 .rx-chat-body {
+  /* richText emits real newlines so headings and list lines keep their shape */
+  white-space: pre-wrap;
   font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; line-height: 1.53; /* 400 words needs air a bubble does not give */
   color: var(--rx-label); margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;

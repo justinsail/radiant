@@ -4,22 +4,36 @@
  *
  * Information architecture IS the argument here: the gauge owns the top of the
  * screen in every state, the catalog is one ordinary inset grouped list, and
- * "Connect to a Mac" is a single plain row two sections down. On-device is the
+ * On-device is the
  * product; the Mac is one tap away and weighs nothing.
  *
  * ⚠️ FOUR THINGS ON THIS SCREEN HAVE BEEN ROUND-TRIPPED. Read before changing:
  *
- * 1. THE ROW IS NAME OVER BLURB, AND THERE IS NO SIZE IN THE ROW AT ALL.
- *    The size was welded onto the front of the blurb once ("0.7 GB · Fastest…",
- *    the App Store idiom); every blurb then wrapped, the rows measured 84.9pt
- *    against Settings' 44, and the privacy footer fell below the fold. It then
- *    sat under the download glyph in a trailing column — where it stole enough
- *    width that three of the five blurbs truncated mid-word ("and r…", "on p…",
- *    "with h…") and, being a variable-width string under a fixed-width glyph,
- *    left the row's right margin ragged down the list. Both are gone: the
- *    trailing column is the arrow.down.circle alone, which is the iCloud idiom
- *    Apple ships with no label, and the weight is stated in the sheet the row
- *    opens. The blurb now has the width to wrap to two lines instead.
+ * 1. THE ROW IS NAME OVER BLURB, AND THE SIZE LEADS THE BLURB.
+ *    It has moved three times; do not move it a fourth without measuring.
+ *    It sat under the download glyph in a trailing column once — where it stole
+ *    enough width that three of five blurbs truncated mid-word ("and r…",
+ *    "on p…", "with h…") and, being a variable-width string under a
+ *    fixed-width glyph, left the row's right margin ragged down the list. That
+ *    is gone for good: the trailing column is the arrow.down.circle alone,
+ *    which is the iCloud idiom Apple ships with no label.
+ *
+ *    It was then taken out of the row ENTIRELY, on the grounds that leading the
+ *    blurb made every blurb wrap and rows measure 84.9pt. Tony, browsing the
+ *    catalog: "models have no sizes. no way to tell whats small." He was right,
+ *    and the 84.9pt finding no longer held: measured against all 44 real rows
+ *    at 393pt, 33 of 36 catalog blurbs ALREADY wrap to two lines on their own,
+ *    the tallest row is 81pt with the size and 81pt without it, and exactly
+ *    three rows gain a line. The weight is worth three lines.
+ *
+ *    ⚠️ IT DOES NOT GO ON THE NAME LINE. That looks like the free space and is
+ *    not: the headline is 309pt, and "Nemotron 3 Nano 4B" + "2.2 GB · Runs
+ *    well" wraps, with three more names clearing the edge by under 30pt.
+ *
+ *    ⚠️ MEASURE IN THE HARNESS, NOT THE STUB. The five-model stub carried
+ *    SHORTENED blurbs ("Meta's." for Llama 3.2 3B) and made this layout look
+ *    fine when the real strings behaved differently. harness/bridge.js now
+ *    parses LocalModels.swift, so what renders there is what renders on glass.
  *
  * 2. THERE IS NO LEADING GAUGE ON A CATALOG ROW. Five of them taught the mark
  *    in the first two seconds — in theory. Measured, the three-ring spiral has
@@ -45,13 +59,29 @@
  *    draws no track — an empty 4pt rail reads as a stuck download — and states
  *    the free space instead.
  */
-import React from 'react'
+import React, { useState } from 'react'
 import Gauge from './Gauge.jsx'
+import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
 import StorageLine from './StorageLine.jsx'
 import usePress from './usePress.js'
+import { FIT_LABEL, FITS_NO, ramNeededGB } from './fit.js'
+import MakerSection from './MakerSection.jsx'
+import DeviceSpecs from './DeviceSpecs.jsx'
+import { byMaker } from './makers.js'
 import { GB } from './useLocalModels.js'
 
 const fmtGB = (gb) => `${Number(gb || 0).toFixed(1)} GB`
+// What to print while a download runs. A percent when the total is known; the
+// megabytes when it is not — never "0%" for ten minutes, which is what a
+// fraction-only relay produced.
+export const progressText = (p) => {
+  if (!p) return null
+  if (typeof p.pct === 'number') return `${Math.round(p.pct * 100)}%`
+  if (p.done > 0) return p.done >= 1e9
+    ? `${(p.done / 1e9).toFixed(1)} GB`
+    : `${Math.round(p.done / 1e6)} MB`
+  return null
+}
 
 // The one model the sheet also pre-highlights. Falls back to the smallest entry
 // so a catalog change can never leave the empty hero with nothing to open.
@@ -113,7 +143,7 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
           12.15% of the viewBox from the edge (r 35.2 + half of stroke 5.3, on a
           100-unit box), so the box is pulled left by that fraction of 96 and the
           ink lands on the same 20pt margin as the title and the cards. */}
-      <Gauge size={96} state={resident ? 'resident' : 'absent'} className="rx-hero-gauge" />
+      <BrandMark size={96} className="rx-hero-gauge" />
       <div className="rx-hero-label">
         <div className="rx-title-2">{resident ? model.name : 'No model yet'}</div>
         <div className={'rx-hero-state rx-footnote' + (resident ? ' rx-tabular' : '')}>
@@ -129,23 +159,62 @@ function Hero ({ model, onOpen, onChoose, canChoose }) {
 
 /* ── one catalog row ──────────────────────────────────────────────────────── */
 
-function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAccessory }) {
-  const pct = typeof progress === 'number' ? Math.round(progress * 100) : null
+/**
+ * A model you already have: name, size, and a tap that starts talking to it.
+ *
+ * Deliberately NOT the same component as ModelRow. That one is about acquiring
+ * a model — its trailing control is a download arrow and its subtitle is a
+ * sales line. This one is about using one, so the subtitle is the size on disk
+ * and the trailing control is a disclosure into managing it.
+ */
+function InstalledRow ({ model, active, onOpen, onInfo }) {
+  const row = usePress(() => onOpen?.(), {
+    label: `Chat with ${model.name}${active ? ', current model' : ''}`
+  })
+  const manage = usePress((e) => { e.stopPropagation?.(); onInfo?.() }, {
+    label: `Manage ${model.name}`
+  })
+  return (
+    <div className={'rx-row rx-row-2line rx-pressable' + row.className} {...row.handlers}>
+      <span className="rx-row-lead"><BrandMark size={29} /></span>
+      <div className="rx-row-text">
+        <div className="rx-headline">
+          {model.name}
+          {active && <span className="rx-installed-now">Current</span>}
+        </div>
+        <div className="rx-row-blurb">{fmtGB(model.sizeGB)} on this iPhone</div>
+      </div>
+      <span className={'rx-row-remove' + manage.className} {...manage.handlers}>Manage</span>
+    </div>
+  )
+}
+
+function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, onAccessory }) {
+  // ⚠️ THE VERDICT LABELS, IT DOES NOT FORBID — see the same note in
+  // ModelPicker. Memory is an estimate and downloading is a disk operation;
+  // only disk space blocks a download.
+  const tooBig = fit === FITS_NO && !model.downloaded
+  const shown = progressText(progress)
+  const pct = progress && typeof progress.pct === 'number' ? Math.round(progress.pct * 100) : null
   const row = usePress(() => onTap?.(model), {
     label: `${model.name}, ${fmtGB(model.sizeGB)}` + (
       model.downloaded ? ', on this iPhone'
         : state === 'downloading' ? `, downloading${pct === null ? '' : `, ${pct} percent`}`
-          : unavailable ? ', not enough room' : ''
+          : unavailable ? ', not enough room'
+            : fit ? `, ${FIT_LABEL[fit].toLowerCase()} on this iPhone` : ''
     )
   })
+  const downloading = state === 'downloading'
   const acc = usePress((e) => { e.stopPropagation?.(); onAccessory?.(model) }, {
     haptic: 'MEDIUM',
     // the trailing control is a glyph; without this it is announced as
     // "button" five times down the screen
-    label: model.downloaded ? `Chat with ${model.name}` : `Download ${model.name}`
+    label: model.downloaded
+      ? `Chat with ${model.name}`
+      : downloading
+        ? `Stop downloading ${model.name}${shown === null ? '' : `, ${shown} done`}`
+        : `Download ${model.name}`
   })
-
-  const downloading = state === 'downloading'
 
   // The trailing column is ONE fixed-width glyph and nothing else, so every
   // row's right edge agrees. The one moment the gauge appears in a row is
@@ -154,34 +223,83 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
   const glyph = model.downloaded
     ? <span className="rx-tinted"><Checkmark /></span>
     : downloading
-      ? <Gauge size={26} state="working" progress={typeof progress === 'number' ? progress : null} />
+      // The turning arc is also the stop button, with a square inside it — the
+      // iCloud idiom, where the progress indicator IS the cancel target. A
+      // separate ✕ elsewhere in the row would break the single-glyph trailing
+      // column every other row keeps.
+      // ⚠️ ONE THING TURNS, AND IT IS THE ONE ON THE LEFT. Tony: "for the model
+      // download we only need to spinning swirl logo at the left. the button on
+      // the right (stop button) doesnt need animation or a circle around it
+      // while downloading." Two spinning marks on one row is the same
+      // information twice, and the eye cannot settle on either. The trailing
+      // control goes back to being a plain control: a stop square, nothing
+      // orbiting it.
+      ? <span className="rx-stop-plain" aria-hidden="true" />
       : <span className={state === 'failed' ? 'rx-destructive' : undefined}><ArrowDownCircle /></span>
 
   return (
     <div
       className={'rx-row rx-row-2line' + row.className}
       {...row.handlers}
-      data-unavailable={unavailable ? 'true' : undefined}
+      data-unavailable={unavailable || tooBig ? 'true' : undefined}
+      style={{ '--rx-sep-inset': downloading ? '57px' : '16px' }}
     >
+      {/* While it downloads, the logo turns beside the name — Tony: "i want the
+          blue logo to rotate next to the model name to show its downloading."
+          It appears only then, so an idle list keeps its clean single column.
+          ⚠️ TURNING ONLY — NO PROGRESS RING. It used to carry an arc that grew
+          around the swirl. Tony, once the byte counter was working: "you can
+          just have the blue swirl at the left rotate during downloads. we dont
+          need the outer blue ring that grows with progress." He is right that
+          it was saying the same thing twice: the blurb on this very row already
+          reads "Downloading… 0.4 GB". At 29pt the arc was a 1.5pt stroke
+          restating a number set in full beside it. */}
+      {downloading && (
+        <span className="rx-row-lead">
+          <BrandSpinner size={29} />
+        </span>
+      )}
       <div className="rx-row-text">
-        <div className="rx-headline">{model.name}</div>
+        <div className="rx-headline">
+          {model.name}
+          {/* The verdict sits with the name, because it decides whether the row
+              is worth reading. aria-hidden: the row's own label already says
+              it, and hearing it twice on every row is noise.
+              ⚠️ THE SIZE DOES NOT GO ON THIS LINE. It looks like there is room
+              — measured, there is not. The headline is 309pt wide, not the row,
+              and "Nemotron 3 Nano 4B" + "2.2 GB · Runs well" wraps to two
+              lines; three more names clear the edge by under 30pt. The size
+              rides at the front of the blurb instead, which is what the picker
+              has always done. */}
+          {fit && !model.downloaded && state !== 'downloading' && state !== 'failed' && (
+            <span className={`rx-fit is-${fit}`} aria-hidden="true">{FIT_LABEL[fit]}</span>
+          )}
+        </div>
         <div className="rx-row-blurb">
           {state === 'failed'
             ? 'That download did not finish. Tap to try again.'
             : unavailable
               ? <span className="rx-warm">Needs {fmtGB(shortBy / GB)} more room</span>
-              : downloading
+              : tooBig
+                ? `Needs about ${ramNeededGB(model.sizeGB).toFixed(1)} GB of memory`
+                : downloading
                 // Not the size — see the .rx-accessory note in mobile.css, that
                 // string is always present and always costs the blurb its
                 // width. This one exists only while the download runs, and it
                 // replaces a blurb nobody is reading at that moment: a
                 // determinate arc still does not answer "how much longer".
                 ? <span className="rx-tabular" aria-hidden="true">
-                    {typeof progress === 'number'
-                      ? `Downloading… ${Math.round(progress * 100)}%`
-                      : 'Downloading…'}
+                    {shown ? `Downloading… ${shown}` : 'Downloading…'}
                   </span>
-                : model.blurb}
+                // ⚠️ THE SIZE LIVES HERE. Tony, scanning the catalog: "models
+                // have no sizes. no way to tell whats small." The weight used
+                // to appear only once a model was downloaded — the one moment
+                // you no longer need it. This is the picker's own line, to the
+                // character, so the two model screens finally agree.
+                : <>
+                    <span className="rx-rowsize">{fmtGB(model.sizeGB)}</span>
+                    {' · '}{model.blurb}
+                  </>}
         </div>
       </div>
       <div
@@ -196,21 +314,58 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, onTap, onAcce
 
 /* ── the screen ───────────────────────────────────────────────────────────── */
 
+/**
+ * One polite live region for the whole screen. Download start, progress,
+ * completion and failure all changed the screen silently — a VoiceOver user got
+ * no signal that a gigabyte-scale download had finished or failed. Polite, and
+ * only at coarse milestones: announcing every percent would talk over the user
+ * for ten minutes.
+ */
+function Announcer ({ models, jobs, progress, failures }) {
+  const say = React.useMemo(() => {
+    const failed = Object.keys(failures || {})[0]
+    if (failed) {
+      const m = models.find(x => x.id === failed)
+      return `${m?.name || 'Download'} failed. ${failures[failed]}`
+    }
+    const running = Object.keys(jobs || {}).find(id => jobs[id] === 'downloading')
+    if (!running) return ''
+    const m = models.find(x => x.id === running)
+    const p = progress?.[running]
+    const pct = p && typeof p.pct === 'number' ? Math.round(p.pct * 100) : null
+    // every 25%, not every 1%
+    if (pct === null) return `Downloading ${m?.name || 'model'}`
+    return `Downloading ${m?.name || 'model'}, ${Math.floor(pct / 25) * 25} percent`
+  }, [models, jobs, progress, failures])
+
+  return (
+    <div className="rx-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+      {say}
+    </div>
+  )
+}
+
 export default function ModelsScreen ({
   local = {},
   models = [],
   activeModel,
   onOpenChat,
   onGetModel,
-  onConnectMac
 }) {
   const {
     jobs = {}, failures = {}, progress = {}, disk, downloaded = [], usedBytes = 0,
-    bytesOf, fits, shortfall, download
+    bytesOf, fits, shortfall, download, cancel
   } = local
-  const connect = usePress(() => onConnectMac?.(), { label: 'Connect to a Mac' })
 
   const canFit = (m) => (typeof fits === 'function' ? fits(m) : true)
+  const fitOfModel = (m) => (typeof local.fitOf === 'function' ? local.fitOf(m) : null)
+  const ramAvailable = local.ramAvailable || null
+  const [openMakers, setOpenMakers] = useState(() => new Set())
+  const toggleMaker = (name) => setOpenMakers(prev => {
+    const next = new Set(prev)
+    if (next.has(name)) next.delete(name); else next.add(name)
+    return next
+  })
   const shortBy = (m) => (typeof shortfall === 'function' ? shortfall(m) : 0)
 
   const stateOf = (m) => (
@@ -234,29 +389,86 @@ export default function ModelsScreen ({
         onChoose={() => onGetModel?.(pick?.id)}
       />
 
-      <div className="rx-section">
-        <div className="rx-section-header">Available</div>
-        <div className="rx-group">
-          {models.map(m => {
-            const blocked = !m.downloaded && !canFit(m)
-            return (
-              <ModelRow
+      {/* ⚠️ WHAT IS ALREADY HERE COMES FIRST. Tony: "shouldnt the model download
+          page show all the models installed and be able to start a chat from
+          each. its awkward to start a chat from a new model." It was: the only
+          route into a conversation with a model you already had was to find it
+          inside its maker's shelf, among forty-three you do not have, and tap a
+          tick. Downloaded models are the ones you own — they get their own
+          section, at the top, and tapping one starts talking to it. */}
+      {downloaded.length > 0 && (
+        <div className="rx-section">
+          <div className="rx-section-header">On this iPhone</div>
+          <div className="rx-group">
+            {models.filter(m => m.downloaded).map(m => (
+              <InstalledRow
                 key={m.id}
                 model={m}
-                state={stateOf(m)}
-                progress={progress[m.id]}
-                unavailable={blocked}
-                shortBy={shortBy(m)}
-                onTap={() => (blocked ? null : onGetModel?.(m.id))}
-                onAccessory={() => {
-                  if (blocked) return
-                  if (m.downloaded) onOpenChat?.(m.id)
-                  else download?.(m.id)
-                }}
+                active={m.id === activeModel?.id}
+                onOpen={() => onOpenChat?.(m.id)}
+                onInfo={() => onGetModel?.(m.id)}
               />
-            )
-          })}
-          {models.length === 0 && (
+            ))}
+          </div>
+          <div className="rx-section-footer">
+            Tap one to start a conversation with it. Tap Manage to remove it.
+          </div>
+        </div>
+      )}
+
+      <div className="rx-section">
+        <Announcer models={models} jobs={jobs} progress={progress} failures={failures} />
+        {/* One shelf per maker, all closed. Tony: "group the models by provider
+            with widgets to close the section. not a long messy list like you
+            have now." Forty-four rows in one column is unreadable; fourteen
+            headers is a contents page. Same idiom as the Mac's Settings →
+            Models, where each repo sits behind a triangle. */}
+        <DeviceSpecs freeBytes={disk?.free} />
+
+        {byMaker(models).map(({ maker, models: rows }) => {
+          const open = openMakers.has(maker)
+          const runnable = ramAvailable ? rows.filter(m => fitOfModel(m) !== FITS_NO).length : null
+          return (
+            <MakerSection
+              key={maker}
+              maker={maker}
+              count={rows.length}
+              runnable={runnable}
+              open={open}
+              onToggle={() => toggleMaker(maker)}
+            >
+              {open && (
+                <div className="rx-group">
+                  {rows.map(m => {
+                    const blocked = !m.downloaded && !canFit(m)
+                    const fit = fitOfModel(m)
+                    const stopped = blocked
+                    return (
+                      <ModelRow
+                        key={m.id}
+                        model={m}
+                        state={stateOf(m)}
+                        progress={progress[m.id]}
+                        unavailable={blocked}
+                        shortBy={shortBy(m)}
+                        fit={fit}
+                        onTap={() => (stopped ? null : onGetModel?.(m.id))}
+                        onAccessory={() => {
+                          if (stopped) return
+                          if (m.downloaded) onOpenChat?.(m.id)
+                          else if (stateOf(m) === 'downloading') cancel?.(m.id)
+                          else download?.(m.id)
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </MakerSection>
+          )
+        })}
+        {models.length === 0 && (
+          <div className="rx-group">
             <div className="rx-row">
               <div className="rx-row-text">
                 <div className="rx-row-blurb">
@@ -264,21 +476,14 @@ export default function ModelsScreen ({
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
         {/* the privacy claim, in the quietest text on the screen. A banner would
             cheapen it, and this one happens to be literally true. */}
         <div className="rx-section-footer">
-          Models run on this iPhone. Nothing you type leaves it.
-        </div>
-      </div>
-
-      <div className="rx-section">
-        <div className="rx-group">
-          <div className={'rx-row' + connect.className} {...connect.handlers}>
-            <div className="rx-row-text"><div className="rx-body">Connect to a Mac</div></div>
-            <Chevron />
-          </div>
+          A model you download runs on this iPhone, and nothing you send it leaves
+          the device. A provider you add in Settings is a network service, and what
+          you send there goes to them.
         </div>
       </div>
 

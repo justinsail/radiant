@@ -153,6 +153,20 @@ async function httpErr (res) {
   }
   if (res.status === 401) return new Error(`401: Authentication failed — check the API key (or re-sign-in) for this provider in Settings → Providers.`)
   if (res.status === 402 || /insufficient|quota|billing|credit/i.test(raw)) return new Error(`${res.status}: ${msg} — this usually means the account is out of credit/quota.`)
+  // ⚠️ OPENROUTER ANSWERS 404 FOR TWO UNRELATED THINGS AND NAMES NEITHER. Its
+  // own wording — "No endpoints available matching your guardrail restrictions
+  // and data policy" — never says the account is the reason, so it reads like a
+  // dead model. It isn't: free and experimental models are served only by
+  // providers that require prompt logging, so an account that denies logging
+  // has nothing left to route to. The other 404 really is an unknown model id.
+  if (res.status === 404 && /openrouter\.ai/.test(res.url || '')) {
+    if (/data policy|guardrail|privacy/i.test(raw)) {
+      return new Error(`404: Every provider for this model wants to log your prompts, and your OpenRouter privacy settings don't allow that — so there is no endpoint left to send this to. Free and experimental models are nearly always like this. Allow it at https://openrouter.ai/settings/privacy, or pick a paid model to keep your prompts private.`)
+    }
+    if (/no endpoints/i.test(raw)) {
+      return new Error(`404: OpenRouter has no provider serving this model right now — the id may be retired or misspelled. Pick a different model.`)
+    }
+  }
   return new Error(`${res.status}: ${msg || 'request failed'}`)
 }
 

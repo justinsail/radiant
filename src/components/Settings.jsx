@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { verdict, FIT_LABEL, FITS_WELL, FITS_TIGHT, FITS_NO, COMFORTABLE } from '../fit.js'
 import { api, startDownload, getDownloads, cancelDownload, streamQuantize, getServer, setServer, testServer } from '../api.js'
 import { THEMES, MODES, FONTS, UI_SCALES, applyTheme, hexToOklch, accentHex } from '../theme.js'
 import { MOTIONS } from './MotionBackground.jsx'
@@ -195,13 +196,23 @@ function ProvidersPane ({ config, onConfigChange }) {
 
 // ---------- Models (local, via Ollama) ----------
 
+/**
+ * ⚠️ THE WORDS AND THRESHOLDS ARE IN src/fit.js, SHARED WITH THE PHONE.
+ * Tony: "we should standardize the naming conventions." This file used to
+ * define its own — "runs well / tight fit / too big" against the phone's
+ * "Runs well / Runs tight / Won't run" — same judgement, two vocabularies.
+ * Only the CSS class names stay local, because they are this stylesheet's.
+ */
+const FIT_CLASS = { [FITS_WELL]: 'fit-ok', [FITS_TIGHT]: 'fit-tight', [FITS_NO]: 'fit-no' }
 function fitClass (ramGB, systemRam) {
-  if (!systemRam) return ''
-  if (ramGB <= systemRam * 0.75) return 'fit-ok'
-  if (ramGB <= systemRam * 0.95) return 'fit-tight'
-  return 'fit-no'
+  const v = verdict(ramGB, systemRam)
+  return v ? FIT_CLASS[v] : ''
 }
-const FIT_LABEL = { 'fit-ok': 'runs well', 'fit-tight': 'tight fit', 'fit-no': 'too big' }
+const FIT_TEXT = {
+  'fit-ok': FIT_LABEL[FITS_WELL],
+  'fit-tight': FIT_LABEL[FITS_TIGHT],
+  'fit-no': FIT_LABEL[FITS_NO]
+}
 
 function ramNeededGB (fileSizeGB) {
   return Math.round(fileSizeGB * 1.15 + 1.5)
@@ -240,19 +251,32 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam, 
         const noDisk = diskFree != null && qt.sizeGB > diskFree - 2 // keep ~2 GB headroom
         const pull = pulls[model]
         const pct = pull && pull.total ? Math.round((pull.completed / pull.total) * 100) : null
+        // Every byte is here but the model is not usable yet — see the note below.
+        const importing = Boolean(pull) && pct === 100 && !pull.done && !pull.error
         return (
           <div key={qt.label} className='variant-row'>
             <span className='v-tag mono'>{qt.label.toLowerCase()}{qt.sharded ? ` · ${qt.files.length} parts` : ''}</span>
             <span className='v-meta'>{qt.sizeGB} GB download · ~{ram} GB RAM</span>
-            <span className={'fit-badge ' + fit}>{FIT_LABEL[fit] || ''}</span>
+            <span className={'fit-badge ' + fit}>{FIT_TEXT[fit] || ''}</span>
             {noDisk && <span className='fit-badge fit-no' title={`Only ${diskFree} GB free on disk`}>not enough disk</span>}
             <span className='v-action'>
               {installedCheck(model)
                 ? <span className='key-ok'>✓ installed</span>
                 : pull
                   ? <span className='pull-progress'>
-                      <span className='pull-bar'><span style={{ width: (pct ?? 5) + '%' }} /></span>
-                      {pct != null ? pct + '%' : (pull.status || 'starting…')}
+                      <span className={'pull-bar' + (importing ? ' importing' : '')}><span style={{ width: (pct ?? 5) + '%' }} /></span>
+                      {/* ⚠️ 100% IS NOT DONE, AND THIS USED TO CLAIM IT WAS.
+                          The bytes finishing is the halfway point: `ollama create`
+                          then copies and hashes the whole file into Ollama's own
+                          store, which for a 14.6 GB model is minutes. The server
+                          says so — it sets status to "importing into Ollama…" —
+                          but this line read `pct != null ? pct + '%' : status`,
+                          and pct is never null once the total is known, so the
+                          status was computed, sent, and thrown away. Tony sat on
+                          "100%" with the model nowhere in the list: "i just
+                          downloaded a version of qwen iq4 and it says 100% and i
+                          dont see it anywhere." It was importing the whole time. */}
+                      {importing ? (pull.status || 'importing…') : (pct != null ? pct + '%' : (pull.status || 'starting…'))}
                       <button className='pull-stop' title='Stop download' onClick={() => onCancel(model)}>✕</button>
                     </span>
                   : <button className='small-btn' onClick={() => onPull({ repo: repo.id, files: qt.files, model })} disabled={fit === 'fit-no' || noDisk} title={noDisk ? `Not enough free disk (${diskFree} GB free, needs ${qt.sizeGB} GB)` : ''}>Download</button>}
@@ -327,7 +351,7 @@ function QuantizeBlock ({ systemRam, onDone }) {
       </div>
       <div className='quant-est'>
         Result: <span className='mono'>{targetName}</span>
-        {estGB != null && <> · about {estGB} GB{systemRam && <> · <span className={estGB <= systemRam * 0.75 ? 'key-ok' : 'fit-badge fit-tight'}>{estGB <= systemRam * 0.75 ? 'runs well here' : 'tight fit'}</span></>}</>}
+        {estGB != null && <> · about {estGB} GB{systemRam && <> · <span className={estGB <= systemRam * COMFORTABLE ? 'key-ok' : 'fit-badge fit-tight'}>{estGB <= systemRam * COMFORTABLE ? FIT_LABEL[FITS_WELL] : FIT_LABEL[FITS_TIGHT]}</span></>}</>}
       </div>
       <button className='small-btn primary' onClick={run} disabled={running || !source}>
         {running ? 'Quantizing…' : 'Quantize'}
@@ -421,9 +445,9 @@ function ModelsPane ({ onModelsChanged }) {
             {system.diskFreeGB != null && <> · <span className={system.diskFreeGB < 20 ? 'fit-badge fit-tight' : ''}>{system.diskFreeGB} GB free on disk</span></>}
           </div>
           <div className='spec-note'>
-            Badges show what fits: <span className='fit-badge fit-ok'>runs well</span> under {Math.round(system.ramGB * 0.75)} GB,
-            <span className='fit-badge fit-tight'> tight fit</span> near the limit,
-            <span className='fit-badge fit-no'> too big</span> for this Mac.
+            Badges show what fits: <span className='fit-badge fit-ok'>{FIT_LABEL[FITS_WELL]}</span> under {Math.round(system.ramGB * COMFORTABLE)} GB,
+            <span className='fit-badge fit-tight'> {FIT_LABEL[FITS_TIGHT]}</span> near the limit,
+            <span className='fit-badge fit-no'> {FIT_LABEL[FITS_NO]}</span> on this Mac.
           </div>
         </div>
       )}
@@ -1273,6 +1297,8 @@ function AboutPane ({ config, onSettings }) {
 
 function DevicesPane () {
   const [share, setShare] = useState(null)
+  // The token is a credential; it starts hidden. See the note beside it.
+  const [showToken, setShowToken] = useState(false)
   const server = getServer()
   const [base, setBase] = useState(server.base || '')
   const [token, setToken] = useState(server.token || '')
@@ -1298,30 +1324,87 @@ function DevicesPane () {
     <div className='set-section'>
       <h3>Devices &amp; sharing</h3>
 
+      {/*
+        ⚠️ THIS PANEL IS ABOUT MACS NOW. The iPhone app never implemented
+        connecting to a Mac — the screen stored an address and nothing in the
+        phone UI ever read it — so that feature was removed. This panel still
+        said "Use this Mac from your phone" and walked the user through opening
+        Radiant on their iPhone and tapping Connect to a Mac, a screen that no
+        longer exists. Tony found it after the removal, which is the same
+        half-a-fix pattern that has cost him all day: the feature went and its
+        advertising stayed.
+
+        Sharing itself is real and verified — another Mac connects to this one
+        and uses its models, agents and sessions.
+      */}
       <div className='set-block'>
-        <div className='set-block-title'>Share this Mac's server</div>
-        <p className='hint' style={{ marginTop: 2 }}>Let your other Macs and your phone use this machine's models, agents, and sessions. Best on an always-on Mac; reach it over Tailscale. Changing this needs a Radiant relaunch.</p>
-        <label className='agent-skill-chk'><input type='checkbox' checked={Boolean(share?.desired)} onChange={toggleShare} /> Share on my network</label>
-        {share && share.desired !== share.enabled && <div className='error-note' style={{ marginTop: 6 }}>Quit and reopen Radiant to {share.desired ? 'start' : 'stop'} sharing.</div>}
-        {share?.desired && share?.token && (
-          <div style={{ marginTop: 10 }}>
-            <div className='connect-field'>Access token
-              <div className='row'><code className='mono share-token'>{share.token}</code><button className='small-btn' onClick={() => copy(share.token)}>Copy</button></div>
-            </div>
-            <div className='connect-field' style={{ marginTop: 8 }}>Other devices connect to:
-              {(share.addresses || []).length
-                ? share.addresses.map(a => (
-                    <div key={a.address} className='row' style={{ marginTop: 4 }}>
-                      <code className='mono'>{a.address}:{share.port}</code>
-                      <span className='fit-badge' style={{ opacity: 0.8 }}>{a.label}</span>
-                      <button className='small-btn' onClick={() => copy(`${a.address}:${share.port}`)}>Copy</button>
-                      <button className='small-btn' title='Link with the token built in — open it once on the phone and it stays signed in' onClick={() => copy(`http://${a.address}:${share.port}/?token=${encodeURIComponent(share.token)}`)}>Copy phone link</button>
-                    </div>))
-                : <div className='v-meta'>No network address found — is Tailscale running?</div>}
-              <div className='hint' style={{ marginTop: 8 }}>“Copy phone link” carries the token, so opening it on your phone signs that device in for good — then Add to Home Screen. The token is dropped from the address bar right after, so it won’t sit in history.</div>
-            </div>
+        <div className='set-block-title'>Share this Mac with your other Macs</div>
+        <p className='hint' style={{ marginTop: 2 }}>
+          Run the models here and use them from your other Macs. Best on a Mac
+          that stays awake.
+        </p>
+        <label className='agent-skill-chk'>
+          <input type='checkbox' checked={Boolean(share?.desired)} onChange={toggleShare} /> Share with my other Macs
+        </label>
+        {share && share.desired !== share.enabled && (
+          <div className='error-note' style={{ marginTop: 6 }}>
+            Quit and reopen Radiant to {share.desired ? 'start' : 'stop'} sharing.
           </div>
         )}
+
+        {share?.desired && share?.enabled && share?.token && (() => {
+          const wifi = (share.addresses || []).find(a => a.wifi)
+          const anywhere = share.phone?.ready ? share.phone.url : null
+          // Same network is the common case and needs nothing installed; the
+          // Tailscale address is what a Mac somewhere else needs.
+          const best = anywhere
+            ? { url: anywhere, where: 'Works from anywhere, over Tailscale.' }
+            : wifi
+              ? { url: `${wifi.address}:${share.port}`, where: 'Works when both Macs are on this network.' }
+              : null
+          if (!best) {
+            return (
+              <div className='hint' style={{ marginTop: 12 }}>
+                No network address yet — is this Mac connected to a network?
+              </div>
+            )
+          }
+          return (
+            <div style={{ marginTop: 14 }}>
+              <p className='hint' style={{ marginTop: 0 }}>
+                On the other Mac, open Radiant &rarr; Settings &rarr; Devices and
+                enter these under <b>Connect this app to another Radiant</b>.
+              </p>
+              <div className='connect-field' style={{ marginTop: 10 }}>Address
+                <div className='row'>
+                  <code className='mono'>{best.url}</code>
+                  <button className='small-btn' onClick={() => copy(best.url)}>Copy</button>
+                </div>
+              </div>
+              <div className='connect-field' style={{ marginTop: 8 }}>Access token
+                <div className='row'>
+                  {/* ⚠️ A SECRET. It grants access to every model, agent and
+                      session here, and it used to sit in plain text on a
+                      settings screen anyone walking past could read. */}
+                  <code className='mono share-token'>{showToken ? share.token : '•'.repeat(24)}</code>
+                  <button className='small-btn' onClick={() => setShowToken(v => !v)}>{showToken ? 'Hide' : 'Show'}</button>
+                  <button className='small-btn' onClick={() => copy(share.token)}>Copy</button>
+                </div>
+              </div>
+              <div className='hint' style={{ marginTop: 8 }}>{best.where}</div>
+
+              {!anywhere && (
+                <div className='hint' style={{ marginTop: 10, lineHeight: 1.5 }}>
+                  <b>To reach this Mac from somewhere else, both Macs need Tailscale</b>
+                  {' '}— a free private network between your own machines, so this Mac is
+                  reachable without being exposed to the internet. Install it on both,
+                  sign in with the same account, and Radiant sets up the rest.{' '}
+                  <a href='https://tailscale.com/download' target='_blank' rel='noreferrer'>tailscale.com/download</a>
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       <div className='set-block' style={{ marginTop: 16 }}>
@@ -1350,6 +1433,7 @@ const GUIDE = [
   {
     title: 'Chat & agents',
     items: [
+      ['Projects', 'Group your chats into projects in the Chats sidebar. Give a project a folder and every new chat started inside it opens in that folder, so you stop re-pointing each session at the same place. Use the + on a project to start a chat in it, the pencil to rename, and the small menu on any chat row to move it between projects. Deleting a project never deletes its chats — they move to “No project”.'],
       ['Agents', 'Named personas with their own model, personality, and skills. Pick one from the welcome screen; the Agents sidebar view groups your sessions by agent. Edit them in Settings → Agents.'],
       ['Agent library', 'Over 140 ready-made expert agents across two dozen categories — browse, filter, and add one in a click, then tweak its model, name, and skills before saving.'],
       ['Duplicate, export & import', 'Clone any agent into an editable copy, export your custom agents as a shareable file, and import a pack — so a curated set can be handed to a whole team.'],
@@ -1375,7 +1459,8 @@ const GUIDE = [
       ['Multiple accounts', 'Keep more than one account or key per provider and switch the active one; the sidebar meters follow whichever is active.'],
       ['Any OpenAI-compatible provider', 'Add anything else with a name + base URL.'],
       ['Local models', 'Run models from Ollama or LM Studio with no key. Search Hugging Face and download GGUFs straight from Settings → Models, with a disk-space check before you pull. The first reply after switching to a local model shows a "loading into memory" note while its weights load; it stays warm after that.'],
-      ['Compare', 'Run one prompt against two models side by side (command palette → Compare).']
+      ['Compare', 'Run one prompt against two models side by side (command palette → Compare).'],
+      ['Errors you can act on', 'When a provider turns a request down, Radiant explains it in plain language instead of passing along raw API text. If OpenRouter refuses a model because every provider serving it wants to log your prompts, it says so and points you at the privacy setting to change — free and experimental models are usually the ones affected. A model id OpenRouter no longer serves says that instead of a bare 404, and a restricted key, a signed-out account, or an empty balance each name themselves.']
     ]
   },
   {
@@ -1397,8 +1482,7 @@ const GUIDE = [
   {
     title: 'Your devices',
     items: [
-      ['One server, all your devices', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share on my network) and connect your other Macs and phone to it — they share the same agents, models, and sessions.'],
-      ['On your phone', 'On the host Mac hit Settings → Devices → “Copy phone link”, open it once in Safari on the phone, then Add to Home Screen — it installs like an app, with a mobile-tuned layout. The link carries the access token, so you never type an address or a token, and the token is dropped from the URL immediately so it doesn’t linger in history.'],
+      ['One server, all your Macs', 'Run Radiant’s server on an always-on Mac (Settings → Devices → Share with my other Macs) and connect your other Macs to it — they share the same agents, models, and sessions. It gives you an address and a token; enter them on the other Mac under “Connect this app to another Radiant”.'],
       ['Behind a proxy, the token still applies', 'Radiant skips the access token for the app talking to its own server on this Mac. If you put a reverse proxy in front — Tailscale Serve, nginx — those requests come from the proxy, so they must present the token like any other device. Nothing reaches your files or shell without it.'],
       ['Signed in for good', 'Once a device is signed in it stays signed in — the token is held in a secure cookie rather than page storage, which iOS can clear out from under a Home Screen app. If you do land on the connect screen, it only asks for the token: the address is wherever you opened it from.']
     ]

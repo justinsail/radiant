@@ -34,6 +34,7 @@ function DesktopApp () {
   const [config, setConfig] = useState(null)
   const [models, setModels] = useState([])
   const [sessions, setSessions] = useState([])
+  const [projects, setProjects] = useState([])
   const [session, setSession] = useState(null) // full active session {id,...,messages}
   const [live, setLive] = useState(null) // in-flight assistant message view {parts, thinking, streaming}
   const [approval, setApproval] = useState(null) // {id, name, args}
@@ -57,6 +58,27 @@ function DesktopApp () {
   const streamingSessionRef = useRef(null)
 
   const refreshSessions = useCallback(() => api.listSessions().then(setSessions).catch(() => {}), [])
+  const refreshProjects = useCallback(() => api.listProjects().then(setProjects).catch(() => {}), [])
+
+  // Project handlers. Each one refreshes BOTH lists: deleting a project rewrites
+  // the projectId on every session that referenced it, so a sessions list left
+  // unrefreshed would keep drawing chats under a shelf that no longer exists.
+  const newProject = useCallback(async (name) => {
+    await api.createProject({ name }).catch(() => {})
+    refreshProjects(); refreshSessions()
+  }, [refreshProjects, refreshSessions])
+  const renameProject = useCallback(async (id, name) => {
+    await api.patchProject(id, { name }).catch(() => {})
+    refreshProjects()
+  }, [refreshProjects])
+  const deleteProject = useCallback(async (id) => {
+    await api.deleteProject(id).catch(() => {})
+    refreshProjects(); refreshSessions()
+  }, [refreshProjects, refreshSessions])
+  const moveSession = useCallback(async (id, projectId) => {
+    await api.patchSession(id, { projectId }).catch(() => {})
+    refreshSessions()
+  }, [refreshSessions])
   const refreshModels = useCallback(() => api.getModels().then(setModels).catch(() => {}), [])
 
   useEffect(() => {
@@ -68,8 +90,9 @@ function DesktopApp () {
       }
     }).catch(e => setError('Cannot reach the Radiant server: ' + e.message))
     refreshSessions()
+    refreshProjects()
     refreshModels()
-  }, [refreshSessions, refreshModels])
+  }, [refreshSessions, refreshProjects, refreshModels])
 
   const saveSettings = async patch => {
     const cfg = await api.saveSettings(patch)
@@ -102,9 +125,14 @@ function DesktopApp () {
     if (streamingSessionRef.current !== id) { setLive(null); setApproval(null) }
   }
 
-  const newSession = async (agentId) => {
+  // ⚠️ TAKES EITHER SHAPE. Every existing caller passes a bare agentId string;
+  // the project shelves pass { projectId }. Accepting both keeps one function
+  // instead of a second near-identical one that would drift.
+  const newSession = async (arg) => {
+    const opts = (arg && typeof arg === 'object') ? arg : (arg ? { agentId: arg } : {})
+    const agentId = opts.agentId || null
     const agent = agentId ? (config.agents || []).find(a => a.id === agentId) : null
-    const body = agentId ? { agentId } : {}
+    const body = { ...(agentId ? { agentId } : {}), ...(opts.projectId ? { projectId: opts.projectId } : {}) }
     // if the agent has no fixed model, seed with the first available model
     if (!(agent && agent.model)) {
       const best = models[0]
@@ -297,6 +325,11 @@ function DesktopApp () {
         working={Boolean(live?.streaming)}
         onOpen={id => { openSession(id); setNavOpen(false) }}
         onNew={(...a) => { newSession(...a); setNavOpen(false) }}
+        projects={projects}
+        onNewProject={newProject}
+        onRenameProject={renameProject}
+        onDeleteProject={deleteProject}
+        onMoveSession={moveSession}
         onNewGroup={() => { setGroupPickerOpen(true); setNavOpen(false) }}
         onCloseNav={() => setNavOpen(false)}
         onDelete={removeSession}
@@ -346,6 +379,11 @@ function DesktopApp () {
         onAnswer={answer => { if (question) { api.answerQuestion(question.id, answer).catch(() => {}); setQuestion(null) } }}
         onSetCwd={cwd => patchSession({ cwd })}
         onNew={newSession}
+        projects={projects}
+        onNewProject={newProject}
+        onRenameProject={renameProject}
+        onDeleteProject={deleteProject}
+        onMoveSession={moveSession}
         onRefreshModels={refreshModels}
       />
       {rightOpen && (

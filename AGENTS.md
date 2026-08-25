@@ -128,6 +128,30 @@ landed by checking the dylib, not the stub:
 strings -a "$APP/App.debug.dylib" | grep -c downloadProgress
 ```
 
+### Before you touch the download path
+
+```bash
+./scripts/test-download-math.sh
+```
+
+Download progress broke FOUR times in production — flatlining at 2%, starting at
+100%, showing no number at all, and reporting a stopped download as a finished
+model. Every one was pure arithmetic or a folder name. None of it needed MLX, a
+simulator, or a phone. But it lived inside a plugin that cannot even initialise
+in the Simulator, so the only way to run it was to install a build on Tony's
+phone and ask him to watch — which is how he ended up being the test harness for
+two lines of division.
+
+That logic now lives in `apps/ios/…/plugins/DownloadMath.swift`, which is pure:
+values in, values out, no filesystem, no network, no UIKit. `LocalModels.swift`
+calls it and holds no copy. Each shipped bug has a named case in
+`scripts/test-download-math.swift`.
+
+Run it before and after any change to downloading, and add a case the moment
+something breaks again — before fixing it. If a change to the download path
+cannot be expressed as a failing case there, that is a signal the logic is in the
+wrong place, not that the test is unnecessary.
+
 **MLX cannot run in the iOS Simulator — the app aborts.** Anything that touches
 the model engine (download, generate) dies in `mlx::core::metal::Device::Device()`
 with SIGABRT the moment it initialises Metal; the simulator has no GPU MLX will
@@ -171,3 +195,15 @@ progress loops crawl — neither is an app bug.
   anything tappable and pass `label` for an icon-only control. Do not
   reintroduce `outline: none` on `:focus-visible` — it never matches a tap, and
   a phone can have a keyboard, Full Keyboard Access or Switch Control.
+
+## Rating work — the star system
+
+`.claude/skills/star-system/` is vendored from
+https://github.com/templetongroup/star-system. Run it when Tony says "rate this"
+or "run the star system" after a deliverable, and follow it exactly: ask for the
+1–5 rating, never assign one yourself, never argue with it, ask fewer questions
+the higher it is, log the round in `ratings.md`, and loop until it reaches 4+.
+
+`ratings.md` at the repo root is the record. Read its **Gold Standards** section
+before building anything in an area that already has one — that is the bar for
+that area, set by Tony, and new work is measured against it.

@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as GaugeModule from './Gauge.jsx'
+import BrandSpinner, { BrandMark } from './BrandSpinner.jsx'
+import { fitOf, FIT_LABEL, FITS_NO, ramNeededGB } from './fit.js'
+import MakerSection from './MakerSection.jsx'
+import DeviceSpecs from './DeviceSpecs.jsx'
+import { byMaker } from './makers.js'
 
 // Picking a model is the first thing a new user does, so this screen has one
 // job: make the obvious choice obvious. A recommended model gets the hero —
@@ -97,8 +102,8 @@ const CSS = `
   -webkit-tap-highlight-color:transparent; touch-action:manipulation;
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
-@media (prefers-color-scheme:dark){
-  .rx-mp{
+/* keyed off the app's mode, NOT the phone's — see data-rx-dark in theme.js */
+.is-native[data-rx-dark='true'] .rx-mp{
     --mp-bg:var(--rx-bg-grouped,#000000);
     --mp-cell:var(--rx-cell,#1C1C1E);
     --mp-sep:var(--rx-separator,rgba(84,84,88,0.65));
@@ -116,7 +121,7 @@ const CSS = `
     --mp-red:var(--rx-red-text,#FF453A);
     --mp-green:var(--rx-green,#30D158);
   }
-}
+
 
 /* the scroller bounces (a list that cannot rubber-band feels dead) but never
    shows a bar — a visible scrollbar is a webview tell */
@@ -143,9 +148,15 @@ const CSS = `
 .rx-mp-hero-note.is-amber{color:var(--mp-amber)}
 .rx-mp-hero-note.is-red{color:var(--mp-red)}
 
+/* The label is centred in the BUTTON, not in the button minus the spinner.
+   Laying the pair out as a centred flex group pushes the word right by half the
+   spinner plus the gap — which reads as a typo in the layout, and did. The
+   spinner is taken out of flow and pinned to the leading inset instead, so
+   "Stop" and "Stop · 47%" both sit on the button's true centre. */
 .rx-mp-cta{
-  -webkit-appearance:none; appearance:none; border:0; display:flex; align-items:center;
-  justify-content:center; gap:8px; width:100%; min-height:50px; margin:20px 0 0;
+  -webkit-appearance:none; appearance:none; border:0; position:relative;
+  display:flex; align-items:center;
+  justify-content:center; width:100%; min-height:50px; margin:20px 0 0;
   border-radius:var(--mp-r-button); background:var(--mp-tint); color:var(--mp-on-tint);
   font-size:calc(17px*var(--mp-dt)); font-weight:600;
   transition:transform var(--mp-dur-press) var(--mp-press), background-color 200ms linear;
@@ -154,7 +165,10 @@ const CSS = `
 /* a disabled control is never a faded tint — it is a neutral fill with a
    quiet glyph, the way Apple does it */
 .rx-mp-cta[disabled]{background:var(--mp-fill-3); color:var(--mp-label-3); transform:none}
-.rx-mp-cta-gauge{color:var(--mp-amber); display:block; height:22px; flex:0 0 auto}
+.rx-mp-cta-gauge{
+  color:var(--mp-on-tint); display:block; height:22px; flex:0 0 auto;
+  position:absolute; left:18px; top:50%; transform:translateY(-50%);
+}
 
 .rx-mp-secondary{
   -webkit-appearance:none; appearance:none; border:0; background:none; display:block;
@@ -164,6 +178,60 @@ const CSS = `
 .rx-mp-secondary.is-pressed{opacity:.4; transition:opacity var(--mp-dur-down) var(--mp-down)}
 
 .rx-mp-sechead{font-size:calc(13px*var(--mp-dt)); font-weight:400; color:var(--mp-label-2); margin:20px 0 6px; padding:0 4px}
+/* ---- a maker's shelf: header, and the fit verdict on each row ---------- */
+/* The header is a cell in its own right, not a caption: it is tappable, so it
+   has to read as a control. Same radius and ground as the rows it opens. */
+.rx-mp-makerhead{
+  display:flex; align-items:center; gap:10px; width:100%;
+  margin:8px 0 0; padding:12px 16px;
+  background:var(--mp-cell); border:0; border-radius:var(--mp-r-cell);
+  font:inherit; color:var(--mp-label); text-align:left;
+  -webkit-tap-highlight-color:transparent; cursor:pointer;
+}
+.rx-mp-makerhead.is-pressed{background:var(--mp-fill-3)}
+/* Square off the bottom when open so the header and its list read as one
+   card rather than two stacked ones. */
+.rx-mp-makerhead.is-open{border-bottom-left-radius:0; border-bottom-right-radius:0}
+.rx-mp-makerhead.is-open + div .rx-mp-group{
+  margin-top:0; border-top-left-radius:0; border-top-right-radius:0;
+}
+.rx-mp-maker-chev{
+  display:flex; color:var(--mp-label-3); flex:none;
+  transition:transform .18s ease, color .18s ease;
+}
+.rx-mp-makerhead.is-open .rx-mp-maker-chev{transform:rotate(90deg); color:var(--mp-tint)}
+.rx-mp-maker-name{font-size:calc(17px*var(--mp-dt)); font-weight:600; flex:1 1 auto; min-width:0}
+.rx-mp-maker-meta{
+  font-size:calc(13px*var(--mp-dt)); color:var(--mp-label-2);
+  flex:none; font-variant-numeric:tabular-nums;
+}
+.rx-mp-maker-none{color:var(--mp-label-3)}
+
+/* The verdict. Traffic lights, at Tony's call: green runs, amber is tight, red
+   will not. A weighted word rather than a filled pill — forty-four filled pills
+   down a scroll is a color chart, and the ones that matter stop standing out.
+
+   ⚠️ THE SHARED TOKENS, NOT LITERALS. Each was chosen for measured contrast in
+   both themes; see mobile.css. These fall back to the same literals the rest of
+   this stylesheet does, so the screen is still correct if it renders alone.
+
+   Color is never the only signal: a row that cannot run is also dimmed, says
+   how much memory it needs, and is not tappable. */
+.rx-mp-fit{
+  margin-left:8px; font-size:calc(12px*var(--mp-dt)); font-weight:600;
+  letter-spacing:0.01em; white-space:nowrap;
+}
+.rx-mp-fit.is-well{color:var(--mp-green)}
+.rx-mp-fit.is-tight{color:var(--mp-amber)}
+.rx-mp-fit.is-no{color:var(--mp-red)}
+/* A row that cannot run is dimmed as a whole, so the eye skips it on the way
+   down rather than reading the name and then discovering the verdict. */
+.rx-mp-row.is-toobig .rx-mp-row-name{color:var(--mp-label-2)}
+.rx-mp-row.is-toobig .rx-mp-row-acc{opacity:0.35}
+@media (prefers-reduced-motion:reduce){
+  .rx-mp-maker-chev{transition:none}
+}
+
 .rx-mp-secfoot{font-size:calc(12px*var(--mp-dt)); line-height:1.33; color:var(--mp-label-2); margin:6px 0 0; padding:0 4px}
 
 .rx-mp-group{list-style:none; margin:0; padding:0; background:var(--mp-cell); border-radius:var(--mp-r-cell); overflow:hidden}
@@ -344,18 +412,22 @@ function usePress (onCommit, disabled, label) {
  * The model picker.
  *
  * @param {(model) => void}  onChoose      a model is on the device and the user wants to use it
- * @param {() => void}      [onConnectMac] renders the secondary Mac escape hatch when supplied
  * @param {string}          [heading]      "Choose a model" reads right in the first-run cover and in the sheet
  * @param {React.Component} [Gauge]        override for the shared iris, for tests
  */
 export default function ModelPicker ({
-  onChoose, onConnectMac, heading = 'Choose a model', featureId, Gauge = SharedGauge
+  onChoose, heading = 'Choose a model', featureId, Gauge = SharedGauge
 }) {
   const [models, setModels] = useState(null)   // null = still asking the plugin
   const [error, setError] = useState(null)     // list() blew up
   const [jobs, setJobs] = useState({})         // id -> { state:'downloading'|'failed', message }
   const [justDone, setJustDone] = useState(null)
   const [freeBytes, setFreeBytes] = useState(null) // null = Device unavailable, so no shortfall claims
+  // Bytes this app may still allocate. null until the phone answers — a fit
+  // badge drawn before then would be a guess wearing a measurement's clothes.
+  const [memBytes, setMemBytes] = useState(null)
+  // Which maker sections are open. Closed is the default; see byMaker.
+  const [openMakers, setOpenMakers] = useState(() => new Set())
 
   const rootRef = useRef(null)
   const scrollRef = useRef(null)
@@ -415,7 +487,20 @@ export default function ModelPicker ({
     } catch { setFreeBytes(null) }
   }, [])
 
+  // Memory is a separate question from disk, and a separate call. Disk decides
+  // whether the download can land; memory decides whether the model can then be
+  // loaded — a phone can easily have room for a file it cannot run.
+  const refreshMemory = useCallback(async () => {
+    const lm = LM()
+    if (!lm?.diskInfo) return
+    try {
+      const d = await lm.diskInfo()
+      setMemBytes(typeof d?.ramAvailable === 'number' && d.ramAvailable > 0 ? d.ramAvailable : null)
+    } catch { setMemBytes(null) }
+  }, [])
+
   useEffect(() => { refreshDisk() }, [refreshDisk])
+  useEffect(() => { refreshMemory() }, [refreshMemory])
 
   /* -- plugin events ------------------------------------------------------ */
   useEffect(() => {
@@ -426,6 +511,23 @@ export default function ModelPicker ({
       // downloadStarted also arrives for a download we did not initiate (a
       // retry from the sheet, say), so the reducer is idempotent.
       downloadStarted: ({ id }) => setJobs(j => ({ ...j, [id]: { state: 'downloading' } })),
+      // This sheet stays open over the download it started, so it — not the
+      // list behind it — is where the percentage and the stop control have to
+      // live. It carried neither until 2026-08-24.
+      downloadProgress: ({ id, progress, completedBytes, totalBytes }) => {
+        const pct = typeof progress === 'number' && isFinite(progress) && progress >= 0
+          ? Math.min(Math.max(progress, 0), 1)
+          : null
+        setJobs(j => (j[id]?.state === 'downloading'
+          ? { ...j, [id]: { ...j[id], progress: pct, done: Number(completedBytes) || 0, total: Number(totalBytes) || 0 } }
+          : j))
+      },
+      // Stopping is a choice, not a failure: clear it and say nothing.
+      downloadCancelled: ({ id }) => {
+        setJobs(j => { const n = { ...j }; delete n[id]; return n })
+        if (pendingRef.current === id) pendingRef.current = null
+        refreshDisk()
+      },
       downloadDone: ({ id }) => {
         setJobs(j => { const n = { ...j }; delete n[id]; return n })
         setModels(ms => (ms || []).map(m => (m.id === id ? { ...m, downloaded: true } : m)))
@@ -500,14 +602,30 @@ export default function ModelPicker ({
     }
   }, [])
 
+  const cancelDownload = useCallback(async id => {
+    const lm = LM()
+    if (!lm?.cancelDownload || !id) return
+    hapt.light()
+    // Clear optimistically: cancelling a multi-GB pull is the one moment the
+    // user is already annoyed, and waiting for the native round trip to redraw
+    // reads as the tap not landing. downloadCancelled then confirms it.
+    setJobs(j => { const n = { ...j }; delete n[id]; return n })
+    if (pendingRef.current === id) pendingRef.current = null
+    try { await lm.cancelDownload({ id }) } catch { /* the event still reconciles */ }
+  }, [])
+
   const commit = useCallback(model => {
     hapt.light()
     if (model.downloaded) { onChoose?.(model); return }
-    // Exactly one gauge animates at a time, and two multi-GB pulls at once
-    // would only make both slower — so a second tap while one runs is a no-op.
+    // Tapping the running download stops it. This used to be a disabled button,
+    // which is how 2.3 GB became uncancellable from the very screen that
+    // started it — the sheet stays open over its own download.
+    if (downloadingId === model.id) { cancelDownload(model.id); return }
+    // Two multi-GB pulls at once would only make both slower, so a tap on a
+    // DIFFERENT model while one runs stays a no-op.
     if (downloadingId) return
     startDownload(model)
-  }, [downloadingId, onChoose, startDownload])
+  }, [downloadingId, onChoose, startDownload, cancelDownload])
 
   /* -- derived ------------------------------------------------------------ */
   const list = models || []
@@ -518,6 +636,19 @@ export default function ModelPicker ({
   const hero = (featureId && list.find(m => m.id === featureId)) ||
     list.find(m => m.id === RECOMMENDED_ID) || list[0] || null
   const rest = hero ? list.filter(m => m.id !== hero.id) : list
+
+  const fitFor = useCallback(model => fitOf(model.sizeGB, memBytes), [memBytes])
+
+  const toggleMaker = useCallback(name => {
+    hapt.light()
+    setOpenMakers(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name); else next.add(name)
+      return next
+    })
+  }, [])
+
+  const groups = useMemo(() => byMaker(rest), [rest])
 
   const shortfallFor = useCallback(model => {
     if (freeBytes == null) return 0
@@ -566,35 +697,58 @@ export default function ModelPicker ({
             />
           )}
 
-          {rest.length > 0 && (
-            <>
-              <h2 className="rx-mp-sechead">All models</h2>
-              <ul className="rx-mp-group">
-                {rest.map(m => (
-                  <Row
-                    key={m.id}
-                    model={m}
-                    Gauge={Gauge}
-                    job={jobs[m.id]}
-                    done={justDone === m.id}
-                    busyElsewhere={!!downloadingId && downloadingId !== m.id}
-                    shortfall={shortfallFor(m)}
-                    onCommit={() => commit(m)}
-                  />
-                ))}
-              </ul>
-            </>
-          )}
+          {/* What this phone is, and therefore why the verdicts below read as
+              they do. Above the list because it is the frame for everything in
+              it, not a detail underneath. */}
+          <DeviceSpecs freeBytes={freeBytes} />
+
+          {groups.map(({ maker, models: rows }) => {
+            const open = openMakers.has(maker)
+            // What the header can promise without being opened: how many of
+            // this maker's models this particular iPhone can actually run.
+            const runnable = memBytes ? rows.filter(m => fitFor(m) !== FITS_NO).length : null
+            return (
+              <MakerSection
+                key={maker}
+                maker={maker}
+                count={rows.length}
+                runnable={runnable}
+                open={open}
+                onToggle={() => toggleMaker(maker)}
+                prefix="rx-mp"
+              >
+                {open && (
+                  <ul className="rx-mp-group">
+                    {rows.map(m => (
+                      <Row
+                        key={m.id}
+                        model={m}
+                        Gauge={Gauge}
+                        job={jobs[m.id]}
+                        done={justDone === m.id}
+                        busyElsewhere={!!downloadingId && downloadingId !== m.id}
+                        shortfall={shortfallFor(m)}
+                        fit={fitFor(m)}
+                        onCommit={() => commit(m)}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </MakerSection>
+            )
+          })}
 
           {list.length > 0 && (
             <p className="rx-mp-secfoot">
-              Models run on this iPhone. Nothing you type leaves it.
+              A model you download runs on this iPhone, and nothing you send it
+              leaves the device.
+              {memBytes
+                ? ' Each one is labeled against the memory this iPhone can give a single app.'
+                : ''}
             </p>
           )}
 
-          {onConnectMac && (
-            <SecondaryButton onCommit={onConnectMac}>Connect to a Mac instead</SecondaryButton>
-          )}
+
         </div>
       </div>
     </div>
@@ -611,11 +765,20 @@ const gaugeColor = state => (
       : 'var(--mp-label-3)'
 )
 
-function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
+function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit, onCancel }) {
   const downloading = job?.state === 'downloading'
   const failed = job?.state === 'failed'
   const blocked = shortfall > 0 && !model.downloaded && !downloading
-  const disabled = downloading || busyElsewhere || blocked
+  const shown = job?.state === 'downloading'
+    ? (typeof job.progress === 'number'
+        ? `${Math.round(job.progress * 100)}%`
+        : job.done > 0
+          ? (job.done >= 1e9 ? `${(job.done / 1e9).toFixed(1)} GB` : `${Math.round(job.done / 1e6)} MB`)
+          : null)
+    : null
+  // Mid-download this button is NOT disabled — it is the way out. Disabling it
+  // was how 2.3 GB became uncancellable from the screen that started it.
+  const disabled = busyElsewhere || blocked
 
   const gaugeState = downloading ? 'working'
     : failed ? 'failed'
@@ -631,7 +794,7 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
   const showGauge = downloading || failed || done
 
   let label
-  if (downloading) label = 'Downloading…'
+  if (downloading) label = shown === null ? 'Stop' : `Stop · ${shown}`
   else if (blocked) label = 'Not enough room'
   else if (model.downloaded) label = 'Start chatting'
   else if (failed) label = 'Try again'
@@ -660,7 +823,9 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
           className={`rx-mp-hero-gauge${done ? ' rx-mp-pop' : ''}`}
           style={{ color: gaugeColor(gaugeState) }}
         >
-          <Gauge state={gaugeState} size={120} />
+          {downloading
+            ? <BrandSpinner size={120} progress={typeof job?.progress === 'number' ? job.progress : null} />
+            : <BrandMark size={120} />}
         </span>
       )}
       <div className="rx-mp-hero-name">{model.name}</div>
@@ -673,7 +838,7 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
         {...handlers}
       >
         {downloading && (
-          <span className="rx-mp-cta-gauge"><Gauge state="working" size={22} /></span>
+          <span className="rx-mp-cta-gauge"><BrandSpinner size={22} /></span>
         )}
         {label}
       </button>
@@ -693,10 +858,17 @@ function Hero ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) 
   )
 }
 
-function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
+function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, fit, onCommit }) {
   const downloading = job?.state === 'downloading'
   const failed = job?.state === 'failed'
   const blocked = shortfall > 0 && !model.downloaded && !downloading
+  // ⚠️ THE VERDICT LABELS, IT DOES NOT FORBID. This used to disable the button,
+  // and Tony caught it: "why can i install ministral on Locally but not with
+  // Radiant?" Two mistakes in one. Downloading is a DISK operation and has
+  // nothing to do with memory; and the verdict behind the block was an estimate,
+  // so Radiant was refusing on a guess where every other app lets you install
+  // and find out. Disk space still blocks — that one is measured and certain.
+  const tooBig = fit === FITS_NO && !model.downloaded
   const disabled = downloading || busyElsewhere || blocked
 
   const [pressed, handlers] = usePress(
@@ -705,7 +877,8 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
       model.downloaded ? ', on this iPhone'
         : downloading ? ', downloading'
           : failed ? ', that download did not finish'
-            : blocked ? ', not enough room' : ''
+            : blocked ? ', not enough room'
+              : fit ? `, ${FIT_LABEL[fit].toLowerCase()} on this iPhone` : ''
     )
   )
 
@@ -718,12 +891,13 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
   if (failed) { sub = job.message; subClass = ' is-red' }
   else if (downloading) { sub = 'Downloading…'; subClass = ' is-amber' }
   else if (blocked) { sub = `Needs ${fmtGB(shortfall)} more room`; subClass = ' is-amber' }
+  else if (tooBig) { sub = `Needs about ${ramNeededGB(model.sizeGB).toFixed(1)} GB of memory` }
 
   // The iCloud-download idiom needs no label: an arrow in a circle becomes a
   // spinning iris becomes a tick, and everyone already knows that story.
   let accessory
   if (downloading) {
-    accessory = <span className="rx-mp-row-glyph is-amber"><Gauge state="working" size={28} /></span>
+    accessory = <span className="rx-mp-row-glyph"><BrandSpinner size={28} /></span>
   } else if (failed) {
     accessory = <span className="rx-mp-row-retry">Try again</span>
   } else if (model.downloaded) {
@@ -740,21 +914,30 @@ function Row ({ model, Gauge, job, done, busyElsewhere, shortfall, onCommit }) {
   // nothing, because every row was in the same state. It appears only when it
   // has something to report.
   const lead = model.downloaded || downloading || failed
-  const showSize = !failed && !downloading && !blocked
+  const showSize = !failed && !downloading && !blocked && !tooBig
 
   return (
     <li
-      className={`rx-mp-row${pressed ? ' is-pressed' : ''}${blocked ? ' is-blocked' : ''}`}
+      className={`rx-mp-row${pressed ? ' is-pressed' : ''}${blocked ? ' is-blocked' : ''}${tooBig ? ' is-toobig' : ''}`}
       style={{ '--mp-sep-inset': lead ? '57px' : '16px' }}
       {...handlers}
     >
       {lead && (
         <span className="rx-mp-row-lead" style={{ color: gaugeColor(gaugeState) }}>
-          <Gauge state={gaugeState} size={29} />
+          <BrandMark size={29} />
         </span>
       )}
       <span className="rx-mp-row-text">
-        <span className="rx-mp-row-name">{model.name}</span>
+        <span className="rx-mp-row-name">
+          {model.name}
+          {/* The verdict rides with the NAME, not down in the subtitle, because
+              it is the thing that decides whether the row is worth reading at
+              all. aria-hidden: the pressable's own label already says it, and
+              hearing it twice per row across forty-four rows is noise. */}
+          {fit && !model.downloaded && !downloading && !failed && (
+            <span className={`rx-mp-fit is-${fit}`} aria-hidden="true">{FIT_LABEL[fit]}</span>
+          )}
+        </span>
         <span className={`rx-mp-row-sub${subClass}`}>
           {showSize && <><span className="rx-mp-size">{model.sizeGB.toFixed(1)} GB</span>{' · '}</>}
           {sub}

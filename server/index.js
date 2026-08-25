@@ -5,6 +5,8 @@ import crypto from 'crypto'
 import os from 'os'
 import path from 'path'
 import fs from 'fs'
+import { execFileSync } from 'node:child_process'
+import { promises as dnsp } from 'node:dns'
 import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
@@ -105,18 +107,117 @@ function tokenOk (req) {
   if (!SHARE_TOKEN) return false
   return presentedToken(req) === SHARE_TOKEN
 }
+/**
+ * The https address a phone can use to reach this Mac from anywhere.
+ *
+ * ⚠️ DERIVED AND VERIFIED — NOT ASKED OF A CLI. The first version shelled out to
+ * the `tailscale` binary at three guessed paths. On Tony's dev-mbp that failed
+ * silently: the machine demonstrably had Serve running (its https address
+ * answered 401 in 45ms) and the panel still offered a Wi-Fi address, because the
+ * binary was not where I guessed or could not be executed from the packaged app.
+ * A detector that reports "no" when the answer is "yes" is worse than none — it
+ * sent him to an address that cannot work from a phone.
+ *
+ * Two steps, neither of which needs a binary:
+ *  1. REVERSE-DNS the tailnet address. MagicDNS publishes PTR records, so
+ *     100.64.118.54 resolves to dev-mbp.tail1207dc.ts.net with a plain lookup.
+ *  2. ACTUALLY FETCH IT. Deriving the name proves nothing about whether Serve is
+ *     in front of it — so the URL is only offered once it has answered. 401 is
+ *     the expected answer here and counts: it means Radiant is behind it and
+ *     wants a token.
+ */
+let remoteUrl = null          // last verified https address, or null
+let remoteCheckedAt = 0
+
+function tailnetAddress () {
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' || a.internal) continue
+      if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)) return a.address
+    }
+  }
+  return null
+}
+
+async function refreshRemoteUrl () {
+  remoteCheckedAt = Date.now()
+  const ip = tailnetAddress()
+  if (!ip) { remoteUrl = null; return null }
+  let name
+  try { [name] = await dnsp.reverse(ip) } catch { remoteUrl = null; return null }
+  if (!name) { remoteUrl = null; return null }
+  const url = `https://${String(name).replace(/\.$/, '')}`
+  try {
+    const r = await fetch(url + '/api/config', { signal: AbortSignal.timeout(5000) })
+    // 401 is success for this purpose: something is serving Radiant over TLS.
+    remoteUrl = (r.status === 401 || r.ok) ? url : null
+  } catch { remoteUrl = null }
+  return remoteUrl
+}
+
+/**
+ * Ask Tailscale to put the https front door up, when its CLI is available.
+ *
+ * ⚠️ BEST EFFORT ONLY, AND NOTHING DEPENDS ON IT. If the binary is missing or
+ * unrunnable this quietly does nothing, and refreshRemoteUrl() still finds the
+ * address when Serve was configured some other way — which is exactly the case
+ * that was broken before.
+ *
+ * ⚠️ SERVE, NEVER FUNNEL. Serve publishes to the user's own tailnet, which is
+ * what "share with my devices" asks for. Funnel would publish to the open
+ * internet. One word apart; only one of them is consented to.
+ */
+function enableTailscaleServe (port) {
+  const bins = [
+    '/Applications/Tailscale.app/Contents/MacOS/Tailscale',
+    '/usr/local/bin/tailscale',
+    '/opt/homebrew/bin/tailscale'
+  ]
+  const bin = bins.find(b => { try { fs.accessSync(b); return true } catch { return false } })
+  if (!bin) return
+  try {
+    execFileSync(bin, ['serve', '--bg', String(port)], { timeout: 15000, stdio: 'ignore' })
+  } catch { /* already configured, or not permitted — refreshRemoteUrl decides */ }
+}
+
+/**
+ * Can a phone reach this Mac, and if not, what does the PERSON need to do?
+ *
+ * Every `reason` here is written to be shown verbatim to someone who has never
+ * heard of Tailscale Serve, because they should not have to.
+ */
+function phoneStatus () {
+  if (remoteUrl) return { ready: true, url: remoteUrl, kind: 'anywhere' }
+  if (!tailnetAddress()) return { ready: false, reason: 'no-tailscale' }
+  return { ready: false, reason: remoteCheckedAt ? 'no-serve' : 'setting-up' }
+}
+
 // LAN / Tailscale addresses this host is reachable at
 function hostAddresses () {
   const out = []
+  if (remoteUrl) out.push({ address: remoteUrl, label: 'Tailscale', url: remoteUrl, phone: true })
   const ifaces = os.networkInterfaces()
   for (const name of Object.keys(ifaces)) {
     for (const a of ifaces[name] || []) {
       if (a.family !== 'IPv4' || a.internal) continue
       const tailscale = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(a.address)
-      out.push({ address: a.address, label: tailscale ? 'Tailscale' : name })
+      // ⚠️ A WI-FI ADDRESS IS PHONE-USABLE; A TAILSCALE IP IS NOT.
+      // iOS allows plain http to RFC1918 addresses (NSAllowsLocalNetworking),
+      // which is how LM Studio and Locally do this and is the everyday case:
+      // both devices on the same network, no third-party app at all.
+      // 100.64/10 only LOOKS private — it is RFC6598 shared space and ATS
+      // treats it as public, so a Tailscale user needs the Serve URL above.
+      const local = /^(10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address)
+      out.push({
+        address: a.address,
+        label: tailscale ? 'Tailscale' : 'Wi-Fi',
+        phone: local && !tailscale,
+        wifi: local && !tailscale
+      })
     }
   }
-  out.sort((x, y) => (x.label === 'Tailscale' ? -1 : 0) - (y.label === 'Tailscale' ? -1 : 0))
+  // Wi-Fi before Tailscale-only IPs: it is the one most people can use today.
+  out.sort((x, y) => (y.phone ? 1 : 0) - (x.phone ? 1 : 0))
   return out
 }
 
@@ -174,7 +275,8 @@ app.get('/api/share', (req, res) => {
     desired: Boolean(config.settings.share?.enabled),
     token: SHARE_TOKEN,
     port: PORT,
-    addresses: hostAddresses()
+    addresses: hostAddresses(),
+    phone: phoneStatus()
   })
 })
 
@@ -185,7 +287,11 @@ app.post('/api/share', (req, res) => {
   const token = cur.token || crypto.randomBytes(24).toString('base64url')
   config.settings.share = { enabled, token }
   saveConfig(config)
-  res.json({ desired: enabled, enabled: SHARE_ENABLED, token, needsRelaunch: enabled !== SHARE_ENABLED, port: PORT, addresses: hostAddresses() })
+  // Turning sharing on turns the https front door on too. The user asked to
+  // share with their devices; wiring up the only transport an iPhone accepts is
+  // part of doing that, not a separate chore to hand back to them.
+  if (enabled) { try { enableTailscaleServe(PORT) } catch {} ; refreshRemoteUrl().catch(() => {}) }
+  res.json({ desired: enabled, enabled: SHARE_ENABLED, token, needsRelaunch: enabled !== SHARE_ENABLED, port: PORT, addresses: hostAddresses(), phone: phoneStatus() })
 })
 
 app.post('/api/providers/:id/key', (req, res) => {
@@ -353,6 +459,63 @@ app.patch('/api/agents/:id', (req, res) => {
   }
   saveConfig(config)
   res.json(publicConfig(config))
+})
+
+// ── projects ────────────────────────────────────────────────────────────────
+// A named piece of work with a folder attached. Sessions reference one by id.
+//
+// ⚠️ DELETING A PROJECT MUST NEVER DELETE ITS SESSIONS. A folder in a sidebar
+// looks disposable; the conversations inside it are not. Delete clears the
+// pointer on every session that referenced it and leaves the work in place,
+// where it reappears under "No project".
+app.get('/api/projects', (req, res) => res.json(config.projects || []))
+
+app.post('/api/projects', (req, res) => {
+  const name = String(req.body.name || '').trim()
+  if (!name) return res.status(400).json({ error: 'name required' })
+  config.projects = config.projects || []
+  const project = {
+    id: 'pr-' + crypto.randomBytes(4).toString('hex'),
+    name,
+    // A project may exist before anyone has decided where its files live.
+    cwd: req.body.cwd || null,
+    hue: req.body.hue ?? null,
+    // Optional defaults a new session in this project inherits.
+    model: req.body.model || null,
+    provider: req.body.provider || null,
+    agentId: req.body.agentId || null,
+    createdAt: new Date().toISOString()
+  }
+  config.projects.push(project)
+  saveConfig(config)
+  res.json(project)
+})
+
+app.patch('/api/projects/:id', (req, res) => {
+  const p = (config.projects || []).find(x => x.id === req.params.id)
+  if (!p) return res.status(404).json({ error: 'not found' })
+  for (const k of ['name', 'cwd', 'hue', 'model', 'provider', 'agentId']) {
+    if (k in req.body) p[k] = req.body[k]
+  }
+  saveConfig(config)
+  res.json(p)
+})
+
+app.delete('/api/projects/:id', (req, res) => {
+  const id = req.params.id
+  config.projects = (config.projects || []).filter(x => x.id !== id)
+  saveConfig(config)
+  // Unassign, do not delete. See the warning above.
+  let freed = 0
+  for (const row of listSessions()) {
+    if (row.projectId !== id) continue
+    const full = loadSession(row.id)
+    if (!full) continue
+    full.projectId = null
+    saveSession(full)
+    freed++
+  }
+  res.json({ ok: true, sessionsFreed: freed })
 })
 
 app.delete('/api/agents/:id', (req, res) => {
@@ -1142,7 +1305,12 @@ app.get('/api/sessions', (req, res) => res.json(listSessions().map(s => ({ ...s,
 app.get('/api/active', (req, res) => res.json({ active: [...activeTurns.keys()], count: activeTurns.size }))
 
 app.post('/api/sessions', (req, res) => {
-  const agent = req.body.agentId ? (config.agents || []).find(a => a.id === req.body.agentId) : null
+  const project = req.body.projectId ? (config.projects || []).find(p => p.id === req.body.projectId) : null
+  // The project's agent is a DEFAULT, not an override: an explicit agentId on
+  // the request still wins, so "new chat with this agent" keeps working inside
+  // a project that names a different one.
+  const agentId = req.body.agentId || (project && project.agentId) || null
+  const agent = agentId ? (config.agents || []).find(a => a.id === agentId) : null
   const participants = Array.isArray(req.body.participants) ? req.body.participants.filter(id => (config.agents || []).some(a => a.id === id)) : null
   const isGroup = Boolean(participants && participants.length >= 2)
   const session = {
@@ -1152,9 +1320,13 @@ app.post('/api/sessions', (req, res) => {
     group: isGroup,
     participants: isGroup ? participants : undefined,
     // agent picks the model/tools unless the request overrides them
-    provider: req.body.provider || (agent && agent.provider) || null,
-    model: req.body.model || (agent && agent.model) || config.settings.defaultModel,
-    cwd: req.body.cwd || config.settings.defaultCwd || os.homedir(),
+    projectId: project ? project.id : null,
+    // Precedence, most specific first: what the request asked for, then the
+    // agent, then the project, then the global default.
+    provider: req.body.provider || (agent && agent.provider) || (project && project.provider) || null,
+    model: req.body.model || (agent && agent.model) || (project && project.model) || config.settings.defaultModel,
+    // A project's folder beats the global default — that is most of the point.
+    cwd: req.body.cwd || (project && project.cwd) || config.settings.defaultCwd || os.homedir(),
     useTools: req.body.useTools !== undefined ? req.body.useTools !== false : (agent ? agent.useTools !== false : true),
     computerControl: req.body.computerControl !== undefined ? Boolean(req.body.computerControl) : Boolean(agent && agent.computerControl),
     createdAt: new Date().toISOString(),
@@ -1175,7 +1347,7 @@ app.get('/api/sessions/:id', (req, res) => {
 app.patch('/api/sessions/:id', (req, res) => {
   const s = loadSession(req.params.id)
   if (!s) return res.status(404).json({ error: 'not found' })
-  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'pinned', 'planMode']) {
+  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'projectId', 'pinned', 'planMode']) {
     if (k in req.body) s[k] = req.body[k]
   }
   if ('title' in req.body) s.autoTitle = false // manual rename pins the title
@@ -1621,4 +1793,19 @@ export const ready = new Promise((resolve, reject) => {
   })
   server.listen(PORT, BIND_HOST, () => resolve(server.address().port))
 })
+// ⚠️ SET UP THE AWAY-FROM-HOME ADDRESS AT BOOT, not only when the checkbox is
+// flipped. Tony's bottom line: "i would like people using their iphone away from
+// their home to be able to connect to radiant running on their mac and use the
+// models within it." That needs an https address reachable off the local
+// network, and Tailscale Serve is what provides it — but wiring it only to the
+// toggle meant everyone who had ALREADY enabled sharing never got one, which is
+// exactly the state Tony was in when nothing worked from outside the house.
+if (SHARE_ENABLED) {
+  // Try to raise the front door, then find out the truth either way.
+  try { enableTailscaleServe(PORT) } catch { /* never block startup */ }
+  refreshRemoteUrl()
+    .then(u => { if (u) console.log(`radiant reachable from anywhere at ${u}`) })
+    .catch(() => {})
+}
+
 ready.then(port => console.log(`radiant server listening on http://${BIND_HOST}:${port}${SHARE_ENABLED ? ' (shared — token required for remote clients)' : ''}`))

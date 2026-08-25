@@ -7,60 +7,78 @@
  * pinned composer cannot live inside somebody else's scroll view.
  *
  * What is left for this file is what the shell, not the transcript, has an
- * opinion about: where the conversation is persisted, and what Back means.
+ * opinion about: WHICH conversation this is, where it is persisted, and what
+ * Back means.
+ *
+ * ⚠️ IT USED TO KEEP EXACTLY ONE. A single `rx.chat.transcript` key, overwritten
+ * by whatever you were last saying, with no id, no title and no way back to
+ * anything earlier. Nothing was lost between launches — but there was no
+ * history, so "your chats" could not exist and the app had nowhere to be a home.
+ * Conversations are keyed by id now, in chats.js. The old single transcript is
+ * migrated on first run rather than dropped.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import MobileChat from './MobileChat.jsx'
+import { loadChat, saveChat, deleteChat, newChatId, listChats } from './chats.js'
 
-// The shell's launch-into-chat check scans for a key matching
-// /^(rx|radiant)\..*(chat|conversation|transcript)/ — this is that key.
-const KEY = 'rx.chat.transcript'
+const LEGACY_KEY = 'rx.chat.transcript'
 
-function load () {
+/** The one conversation the old build kept, brought across once. */
+function migrateLegacy () {
   try {
-    const raw = localStorage.getItem(KEY)
-    const v = raw ? JSON.parse(raw) : null
-    return Array.isArray(v) ? v : []
-  } catch { return [] }
+    const raw = localStorage.getItem(LEGACY_KEY)
+    if (!raw) return null
+    const msgs = JSON.parse(raw)
+    if (!Array.isArray(msgs) || !msgs.length) { localStorage.removeItem(LEGACY_KEY); return null }
+    const id = newChatId()
+    saveChat({ id, messages: msgs, modelId: null, modelName: null })
+    localStorage.removeItem(LEGACY_KEY)
+    return id
+  } catch { return null }
 }
 
-function save (messages) {
-  try {
-    if (!messages.length) localStorage.removeItem(KEY)
-    else localStorage.setItem(KEY, JSON.stringify(messages.slice(-40)))
-  } catch { /* private mode: the conversation just does not outlive the run */ }
-}
+export default function ChatScreen ({ nav, model, onModelInfo, chatId, downloadedModels, onSwitchModel }) {
+  // A chat route always resolves to an id: the one it was opened with, the most
+  // recent, a migrated legacy transcript, or a fresh one.
+  const [id] = useState(() => {
+    if (chatId) return chatId
+    const migrated = migrateLegacy()
+    if (migrated) return migrated
+    return listChats()[0]?.id || newChatId()
+  })
 
-export default function ChatScreen ({ nav, model, onModelInfo }) {
-  const [initial] = useState(load)
+  const [initial] = useState(() => loadChat(id)?.messages || [])
   const [nonce, setNonce] = useState(0)
 
-  const onMessagesChange = useCallback((messages) => { save(messages) }, [])
+  const onMessagesChange = useCallback((messages) => {
+    saveChat({ id, messages, modelId: model?.id || null, modelName: model?.name || null })
+  }, [id, model])
 
   const onDeleteConversation = useCallback(() => {
-    save([])
+    deleteChat(id)
     setNonce(n => n + 1)
-  }, [])
+  }, [id])
 
   // The shell's ellipsis menu is a fallback for the bar it does not draw here;
-  // MobileChat draws its own. Honor the events anyway so both paths agree.
+  // both "delete" and "new" mean "start again from empty".
   useEffect(() => {
-    const onAction = (e) => {
+    const onMenu = (e) => {
       if (e?.detail?.action === 'delete' || e?.detail?.action === 'new') onDeleteConversation()
     }
-    window.addEventListener('rx:chat-action', onAction)
-    return () => window.removeEventListener('rx:chat-action', onAction)
+    window.addEventListener('rx:chat-menu', onMenu)
+    return () => window.removeEventListener('rx:chat-menu', onMenu)
   }, [onDeleteConversation])
 
-  const back = useCallback(() => nav?.pop?.(), [nav])
-  const info = useMemo(() => () => onModelInfo?.(model), [onModelInfo, model])
+  const back = useMemo(() => () => nav?.pop?.(), [nav])
 
   return (
     <MobileChat
       key={nonce}
       model={model}
       onBack={back}
-      onModelInfo={info}
+      onModelInfo={onModelInfo}
+      downloadedModels={downloadedModels}
+      onSwitchModel={onSwitchModel}
       initialMessages={nonce === 0 ? initial : []}
       onMessagesChange={onMessagesChange}
       onDeleteConversation={onDeleteConversation}

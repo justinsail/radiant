@@ -427,10 +427,25 @@ code, pre, .mono { font-family: var(--font-mono); }
 .bot-head-icon { display: inline-flex; }
 .bot-head-name { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
 .bot-head-count { font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); }
-.bot-new { border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); width: 20px; height: 20px; border-radius: 6px; font-size: 14px; line-height: 1; display: grid; place-items: center; }
+/* The glyph is an SVG now, so no font metric can push it off centre; the flex
+   centring below is exact because the child has real dimensions. */
+.bot-new { border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-muted); width: 20px; height: 20px; border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; }
+.bot-new svg { display: block; }
 .bot-new:hover { border-color: var(--accent-dim); color: var(--accent); }
 .bot-group .session-item { margin-left: 8px; }
-
+/* An open project with nothing in it yet. Without this the shelf collapses to
+   its header and reads as broken rather than empty. */
+.bot-empty { padding: 4px 12px 6px 26px; font-size: 11px; color: var(--text-faint); }
+/* The move-to-project control. It sits in .session-actions, which only reveals
+   itself on hover, so it costs the title nothing at rest. Narrow on purpose:
+   the sidebar is 248px by default and the chat's name matters more than the
+   project's, which is already the header above it. */
+.session-project {
+  max-width: 74px; font-size: 10px; padding: 1px 2px;
+  background: var(--bg-raised); color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 5px;
+}
+.session-project:hover { border-color: var(--accent-dim); color: var(--accent); }
 .new-session {
   margin: 2px 12px 10px;
   padding: 8px 12px;
@@ -1344,7 +1359,10 @@ button.hf-head:hover { background: var(--bg-hover); }
 }
 .fit-ok { color: var(--ok); background: color-mix(in oklab, var(--ok) 14%, transparent); }
 .fit-tight { color: oklch(0.75 0.13 85); background: oklch(0.75 0.13 85 / 0.14); }
-.fit-no { color: var(--text-faint); background: var(--bg-hover); }
+/* Red, matching the phone. Tony: "too big should be in red text like ios."
+   It was grey-on-grey here, which read as disabled rather than as a limit —
+   and it is the one verdict that actually stops you. */
+.fit-no { color: var(--danger); background: color-mix(in oklab, var(--danger) 14%, transparent); }
 .v-action { display: flex; align-items: center; gap: 8px; min-width: 120px; justify-content: flex-end; }
 .pull-progress { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
 .pull-bar {
@@ -1352,6 +1370,13 @@ button.hf-head:hover { background: var(--bg-hover); }
   background: var(--bg-hover); overflow: hidden; display: inline-block;
 }
 .pull-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
+/* The import step: the bar is full but the work is not finished, so a static
+   full bar would read as "done and stuck". A slow shimmer says "still working"
+   without pretending to know how far along `ollama create` is — it reports no
+   progress, and a fake number would be worse than none. */
+.pull-bar.importing > span { animation: pull-import 1.6s ease-in-out infinite; }
+@keyframes pull-import { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+@media (prefers-reduced-motion: reduce) { .pull-bar.importing > span { animation: none } }
 .pull-stop { border: none; background: none; color: var(--text-faint); font-size: 12px; padding: 0 2px; line-height: 1; }
 .pull-stop:hover { color: var(--danger); }
 
