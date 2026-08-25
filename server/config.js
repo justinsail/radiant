@@ -17,6 +17,67 @@ const skillsCandidates = [
 ]
 export const SKILLS_ROOT = skillsCandidates.find(p => { try { return fs.existsSync(p) } catch { return false } }) || skillsCandidates[0]
 
+// ---- external skill libraries (fork patch) ---------------------------------
+// RADIANT_SKILLS_DIRS is a colon-separated list of directories, each holding
+// <name>/SKILL.md folders in the same format as the bundled skills/ dir. Every
+// folder found becomes a disabled skill entry carrying an ABSOLUTE dirPath, so
+// libraries can live anywhere (here: the Obsidian vault's Reference/AI/Skills).
+// Unset -> nothing scanned and behavior is identical to upstream.
+function parseSkillFrontmatter (md) {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md)
+  if (!m) return {}
+  const out = {}
+  // Only top-level scalar keys matter here (name, description). Nested blocks
+  // like `metadata:` are skipped by requiring a non-space first column.
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line)
+    if (!kv) continue
+    let v = kv[2].trim()
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1)
+    if (v) out[kv[1]] = v
+  }
+  return out
+}
+
+function slugId (root, name) {
+  const h = crypto.createHash('sha1').update(root + '\u0000' + name).digest('hex').slice(0, 8)
+  return 'ext-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + h
+}
+
+export function scanExternalSkills () {
+  const roots = String(process.env.RADIANT_SKILLS_DIRS || '').split(':').map(s => s.trim()).filter(Boolean)
+  const out = []
+  for (const root of roots) {
+    let entries
+    try { entries = fs.readdirSync(root, { withFileTypes: true }) } catch { continue }
+    for (const e of entries) {
+      // withFileTypes reports a symlink as a symlink, not a directory, so a
+      // library of symlinked skill folders would otherwise scan as empty.
+      if (!e.isDirectory() && !e.isSymbolicLink()) continue
+      const dirPath = path.join(root, e.name)
+      const skillMd = path.join(dirPath, 'SKILL.md')
+      let md
+      try {
+        if (!fs.statSync(dirPath).isDirectory()) continue
+        md = fs.readFileSync(skillMd, 'utf8')
+      } catch { continue }
+      const fm = parseSkillFrontmatter(md)
+      const name = fm.name || e.name
+      const description = fm.description || ''
+      out.push({
+        id: slugId(root, e.name),
+        name,
+        description: description.length > 300 ? description.slice(0, 297) + '...' : description,
+        dirPath,
+        content: `When the user's request matches this skill, read SKILL.md in this skill's folder and follow it. Anything it references (scripts, templates, references) lives alongside it. For other tasks, ignore this skill.`,
+        enabled: false,
+        external: true
+      })
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
+
 const DEFAULT_CONFIG = {
   providers: [
     { id: 'anthropic', name: 'Anthropic', type: 'anthropic', baseUrl: 'https://api.anthropic.com', auth: 'key', removable: false },
@@ -135,6 +196,12 @@ export function loadConfig () {
       for (const def of DEFAULT_CONFIG.skills) {
         if (def.dir && !have.has(def.id) && !cfg.removedSkills.includes(def.id)) cfg.skills.push(structuredClone(def))
       }
+      // fork patch: external libraries (RADIANT_SKILLS_DIRS) join the same way.
+      // Re-scanned every load, so adding a skill folder in the vault shows up on
+      // restart; a skill deleted in the UI stays gone via removedSkills.
+      for (const def of scanExternalSkills()) {
+        if (!have.has(def.id) && !cfg.removedSkills.includes(def.id)) cfg.skills.push(def)
+      }
     }
     if (saved.agents) {
       // built-in agents now follow the accent color (hue: null); null out any that
@@ -169,6 +236,13 @@ export function loadConfig () {
     }
     cfg.settings = { ...cfg.settings, ...(saved.settings || {}) }
   } catch { /* first run */ }
+  // fork patch: on a first run there is no saved config, so the merge branch
+  // above never ran — seed external skills here instead. Guarded by id so the
+  // two paths can never double-add.
+  {
+    const have = new Set(cfg.skills.map(s => s.id))
+    for (const def of scanExternalSkills()) if (!have.has(def.id)) cfg.skills.push(def)
+  }
   migrateAccounts(cfg)
   return cfg
 }

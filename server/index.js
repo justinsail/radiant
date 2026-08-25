@@ -1133,7 +1133,13 @@ app.post('/api/download/cancel', (req, res) => {
 })
 
 // ---------- sessions ----------
-app.get('/api/sessions', (req, res) => res.json(listSessions()))
+// fork patch: decorate each session with whether a turn is streaming right now.
+// activeTurns is in-memory and was not observable from outside, so an external
+// dashboard could list sessions but never tell which were actually working.
+app.get('/api/sessions', (req, res) => res.json(listSessions().map(s => ({ ...s, active: activeTurns.has(s.id) }))))
+
+// fork patch: just the live set, for pollers that do not want every session.
+app.get('/api/active', (req, res) => res.json({ active: [...activeTurns.keys()], count: activeTurns.size }))
 
 app.post('/api/sessions', (req, res) => {
   const agent = req.body.agentId ? (config.agents || []).find(a => a.id === req.body.agentId) : null
