@@ -66,7 +66,7 @@ CHOOSE FROM 44 MODELS
 Models from Google, Meta, Mistral, Microsoft, IBM, Alibaba, NVIDIA, DeepSeek,
 Liquid AI, Hugging Face and more — grouped by who made them, from 0.2 GB up.
 
-Every model is labelled for YOUR iPhone before you download it: Runs well, Runs
+Every model is labeled for YOUR iPhone before you download it: Runs well, Runs
 tight, or Won't run. That verdict is measured against the memory iOS actually
 grants an app on your specific device, not a guess from the spec sheet — so you
 know before you spend the download.
@@ -75,7 +75,7 @@ BUILT FOR THE PHONE
 
 · Conversations are kept and named, so you can pick one up later
 · Switch models mid-conversation without losing what you were saying
-· Twelve colour themes, four appearance modes, and your own text size
+· Twelve color themes, four appearance modes, and your own text size
 · Full Dynamic Type and VoiceOver support
 
 BRING YOUR OWN KEY, OPTIONALLY
@@ -177,7 +177,7 @@ TO TEST: tap "Choose a model", open any maker section, and pick Qwen 3 1.7B
 finish downloading before a conversation is possible; there is no cloud
 fallback.
 
-Models are labelled "Runs well", "Runs tight" or "Won't run" against the memory
+Models are labeled "Runs well", "Runs tight" or "Won't run" against the memory
 iOS grants this app on the specific device. On a review device with less memory,
 fewer models will be available — this is intentional and honest, not an error.
 
