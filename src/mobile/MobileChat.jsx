@@ -309,10 +309,23 @@ export default function MobileChat ({
   }, [messages, onMessagesChange])
 
   // ── scrolling ─────────────────────────────────────────────────────────────
+  // ⚠️ AUTOSCROLL MUST NOT OUTVOTE THE FINGER. stick() moves the scroller,
+  // which fires onScroll, which measures "am I near the bottom" — and because
+  // stick() just put us there, the answer is yes, so follow stays on. During a
+  // fast stream that loop re-arms every frame: the user scrolls up, the next
+  // token yanks them back, and the screen reads as frozen. Tony: "i cant scroll
+  // up to read it... screen is frozen."
+  //
+  // The flag tells onScroll to ignore scrolls WE caused, so only the user's own
+  // scrolling decides whether to keep following.
+  const sticking = useRef(false)
   const stick = useCallback((smooth = false) => {
     const el = scrollRef.current
     if (!el) return
+    sticking.current = true
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+    // Two frames: one for the scroll to land, one for its event to fire.
+    requestAnimationFrame(() => requestAnimationFrame(() => { sticking.current = false }))
   }, [])
 
   // ── layout metrics ────────────────────────────────────────────────────────
@@ -408,6 +421,8 @@ export default function MobileChat ({
     // 40pt of slack: auto-follow while you are effectively at the bottom, and
     // stop the instant you scroll up. Yanking someone back down mid-read is the
     // most-hated behavior in every chat app ever shipped.
+    // A scroll we caused says nothing about what the user wants.
+    if (sticking.current) return
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     follow.current = near
     setShowJump(prev => (near ? false : prev || Boolean(run.current)))
@@ -416,11 +431,21 @@ export default function MobileChat ({
   // Drag down over the transcript dismisses the keyboard. A webview cannot
   // track the system keyboard 1:1 with the finger, so this commits to the
   // dismissal on a clear downward drag and lets iOS animate it.
+  // ⚠️ THIS WAS THE SAME GESTURE AS SCROLLING UP. Reading back through the
+  // transcript means dragging your finger DOWN, and this dismissed the keyboard
+  // after 16px of exactly that — so the one thing you do to read history fought
+  // the one thing that closes the keyboard.
+  //
+  // It now only fires when the transcript CANNOT scroll any further up, which
+  // is the moment a downward drag has no other meaning. Same idea as UIKit's
+  // interactive dismissal, and 48px so a stray flick does not trigger it.
   const dragStart = useRef(0)
   const onTranscriptTouchStart = e => { dragStart.current = e.touches[0].clientY }
   const onTranscriptTouchMove = e => {
     if (document.activeElement !== taRef.current) return
-    if (e.touches[0].clientY - dragStart.current > 16) taRef.current.blur()
+    const el = scrollRef.current
+    if (el && el.scrollTop > 0) return          // still scrollable — this is a scroll
+    if (e.touches[0].clientY - dragStart.current > 48) taRef.current.blur()
   }
 
   // ── the composer ──────────────────────────────────────────────────────────
