@@ -19,14 +19,13 @@ import { BrandMark } from './BrandSpinner.jsx'
 import wordUrl from '../assets/brand/radiant-wordmark.png'
 import ttUrl from '../assets/brand/templeton-tech-mark.png'
 
-export default function FirstRun ({ onChooseModel, onConnectMac, onStartChat, hasModel }) {
+export default function FirstRun ({ onChooseModel, onStartChat, hasModel }) {
   // Start Chat leads, but only when there is something to chat WITH. With an
   // empty phone it would open a conversation with nothing behind it, so it
   // steps aside and Choose Model takes the primary slot — the screen offers the
   // action that can actually be completed.
   const start = usePress(() => onStartChat?.(), { label: 'Start chat', disabled: !hasModel })
   const choose = usePress(() => onChooseModel?.(), { label: 'Choose model' })
-  const mac = usePress(() => onConnectMac?.(), { label: 'Connect to a Mac instead' })
 
   return (
     <div className="rx-cover rx-intro">
@@ -88,13 +87,6 @@ export default function FirstRun ({ onChooseModel, onConnectMac, onStartChat, ha
           {...choose.handlers}
         >
           Choose model
-        </button>
-        <button
-          type="button"
-          className={'rx-intro-alt' + mac.className}
-          {...mac.handlers}
-        >
-          Connect to a Mac instead
         </button>
       </div>
 

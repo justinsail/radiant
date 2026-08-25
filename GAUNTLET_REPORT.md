@@ -1,6 +1,6 @@
 # Radiant for iPhone — App Store Submission Gauntlet
 
-**Pass 5** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
+**Pass 6** · 24 August 2026 · `com.templetongroup.radiant` · version 1.0 (build 2)
 
 ---
 
@@ -267,6 +267,14 @@ provider directly — Apple does not treat that as IAP-eligible content.
 - No user-generated content shared between users, so no reporting, blocking or
   moderation obligation. No objectionable content, health claims, or gambling.
 - No private APIs, no swizzling, no dynamically loaded code, no hot-code push.
+
+**RESOLVED — the 2.1 risk that was hiding in plain sight.** "Connect to a Mac"
+was an entry point onto nothing: the screen stored an address and **no code in
+the phone UI ever read it**. `getServer()` had exactly two readers — the screen
+itself, and a first-run check. A reviewer following that door would have landed
+back where they started with no effect, which is guideline 2.1, incomplete
+functionality. Removed entirely from the phone, and from the Radiant page and
+privacy policy which described it.
 
 **Risk 8.1 — guideline 4.0/4.2, "thin wrapper".** Radiant's UI is a WKWebView, and
 reviewers scrutinise web-shell apps. The defence is strong and worth stating in

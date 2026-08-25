@@ -17,7 +17,7 @@
  * ── CONTRACT WITH THE SIBLING SCREENS ───────────────────────────────────────
  * Every screen receives:
  *   nav        { push, pop, replace, presentSheet, dismissSheet, openChat,
- *                connectMac, depth }
+ *                depth }
  *   local      the whole useLocalModels() value, so a screen can use whatever
  *              shape that hook ended up with without the shell re-deriving it
  *   models     local.models normalized to an array
@@ -43,7 +43,6 @@ import React, {
 
 import * as ModelsScreenMod from './ModelsScreen.jsx'
 import * as ChatScreenMod from './ChatScreen.jsx'
-import * as ConnectMacMod from './ConnectMac.jsx'
 import * as GetModelSheetMod from './GetModelSheet.jsx'
 import * as FirstRunMod from './FirstRun.jsx'
 import SettingsScreen from './SettingsScreen.jsx'
@@ -76,7 +75,6 @@ const Missing = (name) => function MissingScreen () {
 
 const ModelsScreen = pick(ModelsScreenMod, 'ModelsScreen') || Missing('ModelsScreen')
 const ChatScreen = pick(ChatScreenMod, 'ChatScreen') || Missing('ChatScreen')
-const ConnectMac = pick(ConnectMacMod, 'ConnectMac', 'ConnectMacScreen') || Missing('ConnectMac')
 const GetModelSheet = pick(GetModelSheetMod, 'GetModelSheet') || null
 const FirstRun = pick(FirstRunMod, 'FirstRun') || null
 // a hook has to be resolved once, at module scope — resolving it per render
@@ -360,7 +358,6 @@ const SCREENS = {
   // its composer and its transcript scroller are one layout, and splitting the
   // bar off would put a pinned composer inside somebody else's scroll view.
   chat: { title: '', large: false, scroll: false, bg: 'plain', bare: true },
-  connect: { title: 'Connect to a Mac', large: false, scroll: true, bg: 'grouped' },
   settings: { title: 'Settings', large: true, scroll: true, bg: 'grouped' },
   readme: { title: 'Read me', large: false, scroll: true, bg: 'grouped' },
   providers: { title: 'Providers', large: false, scroll: true, bg: 'grouped' }
@@ -1031,11 +1028,10 @@ export default function MobileShell () {
   // The Mac path is real and one tap away, and its demotion — one plain row two
   // sections down on Models, plus the gear — IS the argument that on-device is
   // the product. It never gets a card, an icon treatment or equal billing.
-  const connectMac = useCallback(() => push('connect', {}), [push])
 
   const nav = useMemo(() => ({
-    push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, depth: stack.length
-  }), [push, pop, replace, presentSheet, dismissSheet, openChat, connectMac, stack.length])
+    push, pop, replace, presentSheet, dismissSheet, openChat, depth: stack.length
+  }), [push, pop, replace, presentSheet, dismissSheet, openChat, stack.length])
 
   const menuPress = usePress(() => setMenuOpen('chat'))
   // The gear used to open a three-item menu, which is why Tony reported the
@@ -1099,11 +1095,8 @@ export default function MobileShell () {
             onStartChat={() => openChat(activeModel?.id, { fresh: true })}
             onOpenChat={(chatId) => push('chat', { chatId })}
             onChooseModel={() => push('models', {})}
-            onConnectMac={connectMac}
           />
         )
-      case 'connect':
-        return <ConnectMac {...common} onConnected={pop} />
       case 'readme':
         return <ReadMeScreen {...common} />
       case 'providers':
@@ -1114,7 +1107,6 @@ export default function MobileShell () {
             {...common}
             appearance={appearance}
             onAppearance={setAppearance}
-            onConnectMac={connectMac}
             onReadMe={() => push('readme', {})}
             onProviders={() => push('providers', {})}
             onGetModels={() => push('models', {})}
@@ -1130,7 +1122,6 @@ export default function MobileShell () {
             activeModel={activeModel}
             onOpenChat={openChat}
             onGetModel={presentSheet}
-            onConnectMac={connectMac}
           />
         )
     }
@@ -1166,7 +1157,6 @@ export default function MobileShell () {
   // the Mac path (which also has its own row, because that row IS the argument
   // that on-device is the product) and reclaiming the disk in one move.
   const modelsMenu = [
-    { key: 'mac', label: 'Connect to a Mac', run: () => connectMac() },
     ...(local.downloaded?.length
       ? [{
           key: 'purge',
@@ -1291,7 +1281,6 @@ export default function MobileShell () {
             local={local}
             models={models}
             onChooseModel={() => { finishFirstRun(); presentSheet(null) }}
-            onConnectMac={() => { finishFirstRun(); connectMac() }}
             onStartChat={() => { finishFirstRun(); openChat(activeModel?.id || downloaded[0]?.id) }}
             hasModel={downloaded.length > 0}
           />

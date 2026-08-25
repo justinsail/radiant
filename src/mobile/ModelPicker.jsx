@@ -412,12 +412,11 @@ function usePress (onCommit, disabled, label) {
  * The model picker.
  *
  * @param {(model) => void}  onChoose      a model is on the device and the user wants to use it
- * @param {() => void}      [onConnectMac] renders the secondary Mac escape hatch when supplied
  * @param {string}          [heading]      "Choose a model" reads right in the first-run cover and in the sheet
  * @param {React.Component} [Gauge]        override for the shared iris, for tests
  */
 export default function ModelPicker ({
-  onChoose, onConnectMac, heading = 'Choose a model', featureId, Gauge = SharedGauge
+  onChoose, heading = 'Choose a model', featureId, Gauge = SharedGauge
 }) {
   const [models, setModels] = useState(null)   // null = still asking the plugin
   const [error, setError] = useState(null)     // list() blew up
@@ -748,9 +747,7 @@ export default function ModelPicker ({
             </p>
           )}
 
-          {onConnectMac && (
-            <SecondaryButton onCommit={onConnectMac}>Connect to a Mac instead</SecondaryButton>
-          )}
+
         </div>
       </div>
     </div>

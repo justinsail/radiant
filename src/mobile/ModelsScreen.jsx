@@ -4,7 +4,7 @@
  *
  * Information architecture IS the argument here: the gauge owns the top of the
  * screen in every state, the catalog is one ordinary inset grouped list, and
- * "Connect to a Mac" is a single plain row two sections down. On-device is the
+ * On-device is the
  * product; the Mac is one tap away and weighs nothing.
  *
  * ⚠️ FOUR THINGS ON THIS SCREEN HAVE BEEN ROUND-TRIPPED. Read before changing:
@@ -316,13 +316,11 @@ export default function ModelsScreen ({
   activeModel,
   onOpenChat,
   onGetModel,
-  onConnectMac
 }) {
   const {
     jobs = {}, failures = {}, progress = {}, disk, downloaded = [], usedBytes = 0,
     bytesOf, fits, shortfall, download, cancel
   } = local
-  const connect = usePress(() => onConnectMac?.(), { label: 'Connect to a Mac' })
 
   const canFit = (m) => (typeof fits === 'function' ? fits(m) : true)
   const fitOfModel = (m) => (typeof local.fitOf === 'function' ? local.fitOf(m) : null)
@@ -449,15 +447,6 @@ export default function ModelsScreen ({
             cheapen it, and this one happens to be literally true. */}
         <div className="rx-section-footer">
           Models run on this iPhone. Nothing you type leaves it.
-        </div>
-      </div>
-
-      <div className="rx-section">
-        <div className="rx-group">
-          <div className={'rx-row' + connect.className} {...connect.handlers}>
-            <div className="rx-row-text"><div className="rx-body">Connect to a Mac</div></div>
-            <Chevron />
-          </div>
         </div>
       </div>
 

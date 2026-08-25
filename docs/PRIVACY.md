@@ -14,19 +14,15 @@ not a policy of restraint — the app has no code that could send us anything.
 - **Your settings** — theme, text size, which model is current.
 - **Your API keys**, if you add any, in the iOS Keychain. They are never
   returned to the app's web layer and are never shown again after you enter them.
-- **The access token for your Mac**, if you connect one, also in the Keychain.
 
 ## When data does leave the device
 
-Two cases, both of which only happen because you set them up:
+One case, and only because you set it up:
 
 1. **A cloud provider you configured.** If you add an API key for Anthropic,
    OpenAI, OpenRouter, xAI, Nous, DeepSeek, Kimi, GLM, Groq, or Mistral, the
    messages you send to that model go to **that company**, under their privacy
    policy and their terms — not to us. We never see the request.
-2. **Your own Mac.** If you connect to Radiant running on your Mac, traffic
-   goes directly between your two devices over your own network. It does not
-   pass through us.
 
 A model you have downloaded runs entirely on the phone and works with no network
 connection at all.

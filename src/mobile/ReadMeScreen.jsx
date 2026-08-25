@@ -66,12 +66,6 @@ const SECTIONS = [
     ]
   },
   {
-    title: 'Your Mac',
-    body: [
-      'If you run Radiant on a Mac, this app can connect to it and use the models, agents and sessions there instead of the one on your phone. You will need the access token from the Mac, under Settings → Devices & sharing, and both devices on the same Tailscale network.'
-    ]
-  },
-  {
     title: 'How it looks',
     body: [
       'Settings → Appearance chooses Dark, Medium, Light, or System — Medium is dark without the true black, and System follows your phone. Radiant opens dark unless you change it.',

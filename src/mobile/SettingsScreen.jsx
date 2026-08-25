@@ -73,7 +73,7 @@ function Swatch ({ theme, selected, onPick }) {
 }
 
 export default function SettingsScreen ({
-  appearance, onAppearance, local = {}, models = [], onConnectMac, onReadMe, onProviders,
+  appearance, onAppearance, local = {}, models = [], onReadMe, onProviders,
   onGetModels, version
 }) {
   const [busy, setBusy] = useState(false)
@@ -201,14 +201,6 @@ export default function SettingsScreen ({
       <p className="rx-section-footer">
         Bring your own key for Anthropic, OpenAI, OpenRouter and others. Kept in
         the iPhone&rsquo;s Keychain.
-      </p>
-
-      <h2 className="rx-section-header">Your Mac</h2>
-      <div className="rx-group">
-        <Row label="Connect to a Mac" onTap={onConnectMac} />
-      </div>
-      <p className="rx-section-footer">
-        Reach the models, agents and sessions on your Mac from this phone.
       </p>
 
       <h2 className="rx-section-header">About</h2>

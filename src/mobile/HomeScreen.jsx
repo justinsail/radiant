@@ -49,7 +49,7 @@ function ChatRow ({ chat, onOpen, onRemove }) {
 }
 
 export default function HomeScreen ({
-  activeModel, models = [], isTop, onStartChat, onOpenChat, onChooseModel, onConnectMac
+  activeModel, models = [], isTop, onStartChat, onOpenChat, onChooseModel
 }) {
   const [chats, setChats] = useState(() => listChats())
   const refresh = useCallback(() => setChats(listChats()), [])
@@ -81,7 +81,6 @@ export default function HomeScreen ({
     disabled: !activeModel
   })
   const choose = usePress(() => onChooseModel?.(), { label: 'Models' })
-  const mac = usePress(() => onConnectMac?.(), { label: 'Connect to a Mac' })
 
   const downloaded = models.filter(m => m?.downloaded)
 
@@ -143,16 +142,6 @@ export default function HomeScreen ({
           </div>
         </>
       )}
-
-      <h2 className="rx-section-header">Your Mac</h2>
-      <div className="rx-group">
-        <div className={'rx-row rx-pressable' + mac.className} {...mac.handlers}>
-          <div className="rx-row-text"><div className="rx-headline">Connect to a Mac</div></div>
-        </div>
-      </div>
-      <p className="rx-section-footer">
-        Reach the models, agents and sessions on your Mac from this phone.
-      </p>
 
       {/* The byline the first-run screen carries, kept at the foot of Home —
           once the intro stops appearing, Home is the only screen anyone sees

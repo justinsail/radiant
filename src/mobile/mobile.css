@@ -563,7 +563,7 @@
   .is-native .rx-composer,
   /* The scroller's bottom spacer is hard-coded to this strip's DEFAULT height, so
    at accessibility sizes the strip grows to three wrapped lines (~167pt) and
-   permanently slices the "Connect to a Mac" row in half — unreachable, however
+   permanently slices the last row in half — unreachable, however
    far you scroll. Above the AX breakpoint it stops being an overlay and joins
    the flow, where nothing can hide under it. */
 .is-native[data-ax='true'] .rx-storage {
