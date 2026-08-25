@@ -318,14 +318,19 @@ export default function MobileChat ({
   //
   // The flag tells onScroll to ignore scrolls WE caused, so only the user's own
   // scrolling decides whether to keep following.
-  const sticking = useRef(false)
+  // ⚠️ MY FIRST FIX FOR THIS WAS ALSO WRONG, and the runtime gauntlet caught it.
+  // Ignoring scroll events for two frames after a stick() meant a REAL scroll
+  // landing in that window was thrown away too — so during a fast stream the
+  // user could still be dragged back. A time window cannot tell who scrolled.
+  //
+  // Intent is observable, so observe it: a finger or a wheel on the transcript
+  // means the user is driving, and from then on only their position decides
+  // whether to keep following.
+  const userDriving = useRef(false)
   const stick = useCallback((smooth = false) => {
     const el = scrollRef.current
-    if (!el) return
-    sticking.current = true
+    if (!el || userDriving.current) return
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
-    // Two frames: one for the scroll to land, one for its event to fire.
-    requestAnimationFrame(() => requestAnimationFrame(() => { sticking.current = false }))
   }, [])
 
   // ── layout metrics ────────────────────────────────────────────────────────
@@ -421,10 +426,10 @@ export default function MobileChat ({
     // 40pt of slack: auto-follow while you are effectively at the bottom, and
     // stop the instant you scroll up. Yanking someone back down mid-read is the
     // most-hated behavior in every chat app ever shipped.
-    // A scroll we caused says nothing about what the user wants.
-    if (sticking.current) return
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     follow.current = near
+    // Back at the bottom by their own hand: hand control back to autoscroll.
+    if (near) userDriving.current = false
     setShowJump(prev => (near ? false : prev || Boolean(run.current)))
   }, [])
 
@@ -440,7 +445,10 @@ export default function MobileChat ({
   // is the moment a downward drag has no other meaning. Same idea as UIKit's
   // interactive dismissal, and 48px so a stray flick does not trigger it.
   const dragStart = useRef(0)
-  const onTranscriptTouchStart = e => { dragStart.current = e.touches[0].clientY }
+  const onTranscriptTouchStart = e => {
+    dragStart.current = e.touches[0].clientY
+    userDriving.current = true   // a finger on the transcript outranks autoscroll
+  }
   const onTranscriptTouchMove = e => {
     if (document.activeElement !== taRef.current) return
     const el = scrollRef.current

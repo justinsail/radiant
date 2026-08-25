@@ -442,6 +442,12 @@ function NavBar ({ config, chrome, title, subtitle, backTitle, onBack, trailing,
         {onBack && (
           <button
             type="button" className="rx-shell-barbtn" {...back}
+            /* ⚠️ WITHOUT THIS VOICEOVER SAYS ONLY "button". The label text
+               beside the chevron can be empty — it is elided at narrow widths
+               and absent on some routes — so the button's name cannot depend on
+               it. Caught by the runtime gauntlet, which reads what is actually
+               rendered rather than what the source implies. */
+            aria-label={backTitle ? `Back to ${backTitle}` : "Back"}
             style={{
               position: 'absolute', left: 0, top: 0, bottom: 0,
               display: 'flex', alignItems: 'center', gap: 4,
