@@ -131,6 +131,43 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
     [sessions, projects]
   )
 
+  // ⚠️ NEVER window.prompt() IN THIS APP. It is a no-op in Electron — the
+  // packaged build simply ignores it — so a button wired to prompt() does
+  // nothing at all, silently, while working perfectly in a browser. That is
+  // exactly how the New project button shipped dead in 0.6.112: it was verified
+  // in Chrome. electron/main.cjs has said so since the workspace chip needed a
+  // native folder picker for the same reason.
+  //
+  // Inline input instead: works in Electron, in a browser, and on the phone,
+  // and needs no IPC. Enter commits, Escape cancels, blur commits so clicking
+  // away does not silently discard what was typed.
+  const [editing, setEditing] = useState(null)   // { kind, id, value }
+  const commitEdit = () => {
+    const e = editing
+    setEditing(null)
+    const v = (e?.value || '').trim()
+    if (!v) return
+    if (e.kind === 'new-project') onNewProject?.(v)
+    else if (e.kind === 'project') onRenameProject?.(e.id, v)
+    else if (e.kind === 'session') onRename?.(e.id, v)
+  }
+  const InlineEdit = ({ placeholder }) => (
+    <input
+      className='inline-edit'
+      autoFocus
+      placeholder={placeholder}
+      defaultValue={editing?.value || ''}
+      onClick={e => e.stopPropagation()}
+      onChange={e => { editing.value = e.target.value }}
+      onKeyDown={e => {
+        e.stopPropagation()
+        if (e.key === 'Enter') commitEdit()
+        if (e.key === 'Escape') setEditing(null)
+      }}
+      onBlur={commitEdit}
+    />
+  )
+
   const SessionRow = ({ s, showAgent = true }) => {
     const ag = agentOf(s.agentId)
     return (
@@ -141,7 +178,9 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
       >
         <div className='session-title'>
           {showAgent && ag && <span className='session-agent' style={isImported(ag) ? undefined : { color: `oklch(0.7 0.15 ${ag.hue ?? 'var(--accent-h)'})` }}><AgentGlyph agent={ag} size={13} /></span>}
-          <span className='session-title-text'>{s.title}</span>
+          {editing?.kind === 'session' && editing.id === s.id
+            ? <InlineEdit placeholder='Chat name…' />
+            : <span className='session-title-text'>{s.title}</span>}
         </div>
         <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
         <div className='session-actions'>
@@ -163,7 +202,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
             </select>
           )}
           <button title={s.pinned ? 'Unpin' : 'Pin to top'} onClick={e => { e.stopPropagation(); onPin(s.id, !s.pinned) }}>{s.pinned ? '★' : '☆'}</button>
-          <button title='Rename' onClick={e => { e.stopPropagation(); const t = window.prompt('Rename session:', s.title); if (t && t.trim()) onRename(s.id, t.trim()) }}>✎</button>
+          <button title='Rename' onClick={e => { e.stopPropagation(); setEditing({ kind: 'session', id: s.id, value: s.title }) }}>✎</button>
           <button title='Delete' onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${s.title}"?`)) onDelete(s.id) }}>✕</button>
         </div>
       </div>
@@ -187,7 +226,9 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
       )}
       <button className='new-session' onClick={() => onNew()}>+ New session</button>
       {view === 'chats' && onNewProject && (
-        <button className='new-group-btn' onClick={() => { const n = window.prompt('Project name:'); if (n && n.trim()) onNewProject(n.trim()) }}>📁 New project</button>
+        editing?.kind === 'new-project'
+          ? <div className='new-group-btn as-input'><InlineEdit placeholder='Project name…' /></div>
+          : <button className='new-group-btn' onClick={() => setEditing({ kind: 'new-project', value: '' })}>📁 New project</button>
       )}
       {view === 'bots' && agents.length >= 2 && onNewGroup && (
         <button className='new-group-btn' onClick={() => onNewGroup()}>👥 New group chat</button>
@@ -220,7 +261,9 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                     <button className='bot-head-toggle' onClick={() => toggleGroup(project.id)} title={isCollapsed ? 'Show chats' : 'Hide chats'}>
                       <span className='bot-head-caret'>{rows.length ? (isCollapsed ? '▸' : '▾') : ''}</span>
                       <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${project.hue ?? 'var(--accent-h)'})` }}><Icon.folder size={14} /></span>
-                      <span className='bot-head-name'>{project.name}</span>
+                      {editing?.kind === 'project' && editing.id === project.id
+                        ? <InlineEdit placeholder='Project name…' />
+                        : <span className='bot-head-name'>{project.name}</span>}
                       <span className='bot-head-count'>{rows.length}</span>
                     </button>
                     {onNew && (
@@ -229,7 +272,7 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                     )}
                     {onRenameProject && (
                       <button className='bot-new' title={`Rename ${project.name}`}
-                        onClick={() => { const t = window.prompt('Rename project:', project.name); if (t && t.trim()) onRenameProject(project.id, t.trim()) }}>✎</button>
+                        onClick={() => setEditing({ kind: 'project', id: project.id, value: project.name })}>✎</button>
                     )}
                     {onDeleteProject && (
                       <button className='bot-new' title={`Delete ${project.name}`}

@@ -436,6 +436,19 @@ code, pre, .mono { font-family: var(--font-mono); }
 /* An open project with nothing in it yet. Without this the shelf collapses to
    its header and reads as broken rather than empty. */
 .bot-empty { padding: 4px 12px 6px 26px; font-size: 11px; color: var(--text-faint); }
+/* Inline rename/create field. Sized to sit in the row it replaces so nothing
+   jumps when it appears. */
+.inline-edit {
+  flex: 1; min-width: 0; font: inherit; font-size: 12px;
+  padding: 2px 6px; border-radius: 6px;
+  background: var(--bg-raised); color: var(--text);
+  border: 1px solid var(--accent-dim);
+}
+.inline-edit:focus { outline: none; border-color: var(--accent); }
+.new-group-btn.as-input { display: flex; align-items: center; }
+.design-ask { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.design-ask .inline-edit { flex: 1; font-size: 13px; }
+.design-ask-hint { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
 /* The move-to-project control. It sits in .session-actions, which only reveals
    itself on hover, so it costs the title nothing at rest. Narrow on purpose:
    the sidebar is 248px by default and the chat's name matters more than the
