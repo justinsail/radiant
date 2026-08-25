@@ -26,13 +26,6 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Radiant connects to Radiant running on your Mac over your Wi-Fi network, so this iPhone can use the models, agents and sessions on that Mac.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>RadiantLaunch</string>
 	<key>UIMainStoryboardFile</key>
