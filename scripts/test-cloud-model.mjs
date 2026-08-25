@@ -46,7 +46,14 @@ is('and loadChosen agrees', loadChosen(), null)
 
 // The shell must prefer the cloud model, because the CHAT does.
 const shell = readFileSync('src/mobile/MobileShell.jsx', 'utf8')
-is('the shell prefers the cloud model', /cloudModel \|\| models\.find/.test(shell), true)
+// ⚠️ ASSERT THE PRECEDENCE, NOT THE COLLECTION. This used to match the literal
+// `cloudModel || models.find`, so it failed the day the local lookup was fixed
+// to search `downloaded` instead of the whole catalogue — a real bug fix broke
+// a test that only ever cared that the CLOUD model wins. Pin the intent.
+// The rendered half of this claim is covered in test-ui.mjs: "Home names the
+// cloud model, not a local one".
+is('the shell prefers the cloud model',
+  /const activeModel = useMemo\(\s*\(\) => cloudModel \|\|/.test(shell), true)
 is('switching to a local model clears the cloud choice', shell.includes('saveChosen(null)'), true)
 is('the switcher includes the cloud model', shell.includes('switchable'), true)
 

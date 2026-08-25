@@ -765,9 +765,17 @@ export default function MobileShell () {
   const [cloudModel, setCloudModel] = useState(() => chosenAsModel())
   useEffect(() => onChosenChanged(() => setCloudModel(chosenAsModel())), [])
 
+  // ⚠️ SEARCH `downloaded`, NOT `models`. This read the whole 44-model catalogue,
+  // so a model the user had REMOVED still matched by id — it is still in the
+  // catalogue, just with downloaded:false. Tony removed every model and Home
+  // went on saying "Current model: Qwen 3 1.7B", New chat stayed enabled, and
+  // the chat it opened was titled Qwen: a conversation pointed at weights that
+  // were no longer on the phone. Falling through to downloaded[0], or to null,
+  // is the honest answer — Home already handles null by offering the model list
+  // and disabling New chat.
   const activeModel = useMemo(
-    () => cloudModel || models.find(m => m.id === activeModelId) || downloaded[0] || null,
-    [cloudModel, models, activeModelId, downloaded]
+    () => cloudModel || downloaded.find(m => m.id === activeModelId) || downloaded[0] || null,
+    [cloudModel, activeModelId, downloaded]
   )
 
   // What the switcher offers: everything on the phone, plus the cloud model
@@ -1097,7 +1105,10 @@ export default function MobileShell () {
         return (
           <ChatScreen
             {...common}
-            modelId={activeModel?.id || activeModelId}
+            // ⚠️ NO `|| activeModelId` FALLBACK. That is the same bug one layer
+            // down: with nothing downloaded, activeModel is null and this
+            // handed Chat the id of a model that had been removed.
+            modelId={activeModel?.id || null}
             model={activeModel}
             downloadedModels={switchable}
             onModelInfo={() => presentSheet(activeModel?.id)}

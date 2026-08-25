@@ -255,6 +255,64 @@ await page.waitForTimeout(600)
     /\.innerHTML\s*(=|\+=)/.test(src), false)
 }
 
+// ⚠️ A REMOVED MODEL MUST STOP BEING THE CURRENT MODEL. Tony removed every
+// model and Home went on saying "Current model: Qwen 3 1.7B", with New chat
+// still enabled and the chat it opened still titled Qwen — a conversation
+// pointed at weights that were no longer on the phone. The shell resolved the
+// active model against the whole 44-model CATALOGUE instead of what is
+// downloaded, and a removed model is still in the catalogue with
+// downloaded:false.
+//
+// ⚠️ THIS RUNS ON ITS OWN PAGE, and it must. `rx.activeModel` has to be set
+// BEFORE first paint (addInitScript, not an eval-then-reload — a reload rebuilds
+// the harness catalogue and puts the models back). The first version of this
+// check set nothing, so activeModelId was null, the broken lookup was never
+// reached, and it passed against the BUG as happily as against the fix.
+{
+  const p2 = await browser.newPage({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 3 })
+  await p2.addInitScript(() => localStorage.setItem('rx.activeModel', 'qwen3-1.7b'))
+  await p2.goto(BASE, { waitUntil: 'networkidle' })
+  await p2.waitForTimeout(900)
+  // Real pointer presses: these controls listen for pointer events, not clicks.
+  const press = async (sel) => {
+    const el = p2.locator(sel).first()
+    if (!(await el.count())) return false
+    const b = await el.boundingBox(); if (!b) return false
+    await p2.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+    await p2.mouse.down(); await p2.waitForTimeout(60); await p2.mouse.up()
+    await p2.waitForTimeout(550); return true
+  }
+  const homeText = () => p2.evaluate(() => {
+    const h = [...document.querySelectorAll('*')].find(e =>
+      /^Good (morning|afternoon|evening)/.test(e.textContent || '') && e.children.length < 40)
+    return (document.querySelector('.rx-home') || h?.closest('div') || document.body).innerText
+  })
+  const newChatState = () => p2.evaluate(() => {
+    const b = [...document.querySelectorAll('button,[role=button]')]
+      .find(x => /^New chat/i.test((x.innerText || '').trim()))
+    return b ? ((b.disabled || b.getAttribute('aria-disabled') === 'true') ? 'disabled' : 'enabled') : 'absent'
+  })
+
+  // The guard only means something if the model IS current to begin with.
+  ok('the removed model starts out as the current model',
+    /Current model: Qwen 3 1\.7B/.test(await homeText()))
+
+  await press('text="Models"')
+  for (let i = 0; i < 6; i++) {
+    if (!(await p2.locator('text="Manage"').count())) break
+    await press('text="Manage"')
+    if (!(await press('text="Remove model"'))) break
+  }
+  is('every model really was removed',
+    await p2.evaluate(() => window.__harness.state.models.filter(m => m.downloaded).length), 0)
+
+  const home = await homeText()
+  is('home stops naming a model that is no longer on the phone',
+    /Qwen 3 1\.7B|Llama 3\.2 3B/.test(home), false)
+  is('new chat is disabled once nothing is downloaded', await newChatState(), 'disabled')
+  await p2.close()
+}
+
 console.log(results.join('\n'))
 console.log(`${pass}/${pass + fail} passed  ·  the app was RUN, not read`)
 await browser.close()
