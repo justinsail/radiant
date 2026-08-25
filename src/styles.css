@@ -433,7 +433,6 @@ code, pre, .mono { font-family: var(--font-mono); }
 .bot-new svg { display: block; }
 .bot-new:hover { border-color: var(--accent-dim); color: var(--accent); }
 .bot-group .session-item { margin-left: 8px; }
-
 .new-session {
   margin: 2px 12px 10px;
   padding: 8px 12px;
@@ -1358,6 +1357,13 @@ button.hf-head:hover { background: var(--bg-hover); }
   background: var(--bg-hover); overflow: hidden; display: inline-block;
 }
 .pull-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 0.3s; }
+/* The import step: the bar is full but the work is not finished, so a static
+   full bar would read as "done and stuck". A slow shimmer says "still working"
+   without pretending to know how far along `ollama create` is — it reports no
+   progress, and a fake number would be worse than none. */
+.pull-bar.importing > span { animation: pull-import 1.6s ease-in-out infinite; }
+@keyframes pull-import { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+@media (prefers-reduced-motion: reduce) { .pull-bar.importing > span { animation: none } }
 .pull-stop { border: none; background: none; color: var(--text-faint); font-size: 12px; padding: 0 2px; line-height: 1; }
 .pull-stop:hover { color: var(--danger); }
 

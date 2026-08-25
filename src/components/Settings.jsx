@@ -251,6 +251,8 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam, 
         const noDisk = diskFree != null && qt.sizeGB > diskFree - 2 // keep ~2 GB headroom
         const pull = pulls[model]
         const pct = pull && pull.total ? Math.round((pull.completed / pull.total) * 100) : null
+        // Every byte is here but the model is not usable yet — see the note below.
+        const importing = Boolean(pull) && pct === 100 && !pull.done && !pull.error
         return (
           <div key={qt.label} className='variant-row'>
             <span className='v-tag mono'>{qt.label.toLowerCase()}{qt.sharded ? ` · ${qt.files.length} parts` : ''}</span>
@@ -262,8 +264,19 @@ function HFRepoRow ({ repo, installedCheck, pulls, onPull, onCancel, systemRam, 
                 ? <span className='key-ok'>✓ installed</span>
                 : pull
                   ? <span className='pull-progress'>
-                      <span className='pull-bar'><span style={{ width: (pct ?? 5) + '%' }} /></span>
-                      {pct != null ? pct + '%' : (pull.status || 'starting…')}
+                      <span className={'pull-bar' + (importing ? ' importing' : '')}><span style={{ width: (pct ?? 5) + '%' }} /></span>
+                      {/* ⚠️ 100% IS NOT DONE, AND THIS USED TO CLAIM IT WAS.
+                          The bytes finishing is the halfway point: `ollama create`
+                          then copies and hashes the whole file into Ollama's own
+                          store, which for a 14.6 GB model is minutes. The server
+                          says so — it sets status to "importing into Ollama…" —
+                          but this line read `pct != null ? pct + '%' : status`,
+                          and pct is never null once the total is known, so the
+                          status was computed, sent, and thrown away. Tony sat on
+                          "100%" with the model nowhere in the list: "i just
+                          downloaded a version of qwen iq4 and it says 100% and i
+                          dont see it anywhere." It was importing the whole time. */}
+                      {importing ? (pull.status || 'importing…') : (pct != null ? pct + '%' : (pull.status || 'starting…'))}
                       <button className='pull-stop' title='Stop download' onClick={() => onCancel(model)}>✕</button>
                     </span>
                   : <button className='small-btn' onClick={() => onPull({ repo: repo.id, files: qt.files, model })} disabled={fit === 'fit-no' || noDisk} title={noDisk ? `Not enough free disk (${diskFree} GB free, needs ${qt.sizeGB} GB)` : ''}>Download</button>}
