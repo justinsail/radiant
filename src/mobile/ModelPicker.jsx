@@ -740,7 +740,8 @@ export default function ModelPicker ({
 
           {list.length > 0 && (
             <p className="rx-mp-secfoot">
-              Models run on this iPhone. Nothing you type leaves it.
+              A model you download runs on this iPhone, and nothing you send it
+              leaves the device.
               {memBytes
                 ? ' Each one is labeled against the memory this iPhone can give a single app.'
                 : ''}

@@ -446,7 +446,9 @@ export default function ModelsScreen ({
         {/* the privacy claim, in the quietest text on the screen. A banner would
             cheapen it, and this one happens to be literally true. */}
         <div className="rx-section-footer">
-          Models run on this iPhone. Nothing you type leaves it.
+          A model you download runs on this iPhone, and nothing you send it leaves
+          the device. A provider you add in Settings is a network service, and what
+          you send there goes to them.
         </div>
       </div>
 

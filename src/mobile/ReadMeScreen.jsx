@@ -19,7 +19,7 @@ const SECTIONS = [
     title: 'A model on your iPhone',
     body: [
       'Radiant downloads an open AI model onto this phone and runs it here. There is no account, and once a model has finished downloading it works with no signal at all — on a plane, underground, anywhere.',
-      'Nothing you type goes anywhere. The conversation happens on the device.'
+      'A model running on the phone answers without a network, and nothing you send it leaves the device. If you add a cloud provider in Settings, chats you send to THAT model go to that company — the name under every chat title tells you which of the two is answering.'
     ]
   },
   {

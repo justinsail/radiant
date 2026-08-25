@@ -1054,9 +1054,13 @@ export default function MobileShell () {
   const layers = popping ? [...stack, popping] : stack
   const topKey = stack[stack.length - 1]?.key
 
-  // Chat's bar carries the privacy promise permanently, in the quietest place
-  // in the app: a two-line title, model name over "On device". ChatScreen
-  // replaces the subtitle with a tok/s readout while it is generating.
+  // Chat's bar carries WHERE THE ANSWER COMES FROM, in the quietest place in
+  // the app: a two-line title, model name over its origin. ChatScreen replaces
+  // the subtitle with a tok/s readout while it is generating.
+  //
+  // ⚠️ IT USED TO SAY "On device" WHATEVER WAS ANSWERING — including a cloud
+  // model reached over the network with the user's own key. A privacy claim
+  // that is hard-coded is a privacy claim that will eventually be false.
   const titleFor = (entry) => {
     const chrome = chromeMap[entry.key] || {}
     if (chrome.title != null) return chrome.title
@@ -1066,7 +1070,8 @@ export default function MobileShell () {
   const subtitleFor = (entry) => {
     const chrome = chromeMap[entry.key] || {}
     if (chrome.subtitle != null) return chrome.subtitle
-    return entry.route === 'chat' ? 'On device' : null
+    if (entry.route !== 'chat') return null
+    return activeModel?.cloud ? (activeModel.maker || 'Cloud') : 'On device'
   }
 
   const renderScreen = (entry) => {

@@ -50,5 +50,19 @@ is('the shell prefers the cloud model', /cloudModel \|\| models\.find/.test(shel
 is('switching to a local model clears the cloud choice', shell.includes('saveChosen(null)'), true)
 is('the switcher includes the cloud model', shell.includes('switchable'), true)
 
+// ⚠️ A PRIVACY CLAIM MUST NEVER BE HARD-CODED. The chat title's second line
+// said "On device" unconditionally — printed under the name of an OpenRouter
+// model, on a request that had already left the phone. Tony: "thats a lie."
+// It is the single most damaging string in the app to get wrong, so both places
+// that render it must branch on where the answer actually comes from.
+const chat = readFileSync('src/mobile/MobileChat.jsx', 'utf8')
+const shellSrc = readFileSync('src/mobile/MobileShell.jsx', 'utf8')
+is('the chat subtitle branches on cloud vs device',
+  /model\?\.cloud \? \(model\.maker[\s\S]{0,40}'On device'/.test(chat), true)
+is('the shell subtitle branches on cloud vs device',
+  /activeModel\?\.cloud \? \(activeModel\.maker[\s\S]{0,40}'On device'/.test(shellSrc), true)
+is('neither hard-codes "On device" as the only answer',
+  /: 'On device'\s*$/m.test(chat.replace(/model\?\.cloud[^\n]*/g, '')), false)
+
 console.log(`${pass}/${pass + fail} passed  ·  the named model is the answering model`)
 process.exit(fail ? 1 : 0)

@@ -71,7 +71,7 @@ export default function FirstRun ({ onChooseModel, onStartChat, hasModel }) {
         </p>
         <p className="rx-intro-sub">
           Download one and talk to it anywhere. It keeps working with no signal,
-          and nothing you type leaves this device.
+          and nothing you send it leaves this device.
         </p>
       </div>
 

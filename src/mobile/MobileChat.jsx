@@ -231,7 +231,7 @@ function AssistantTurn ({ model, children, marker }) {
     <div className='rx-chat-turn rx-chat-turn-model'>
       <div className='rx-chat-byline'>
         <span className='rx-chat-marker'><BrandSpinner size={22} /></span>
-        <span className='rx-chat-byname'>{model?.name || 'On device'}</span>
+        <span className='rx-chat-byname'>{model?.name || 'No model'}</span>
       </div>
       {children}
     </div>
@@ -655,10 +655,14 @@ export default function MobileChat ({
                 </svg>
               )}
             </div>
-            {/* The privacy promise lives permanently in the chrome, in the
-                quietest possible place. A banner would cheapen it. */}
+            {/* ⚠️ THIS LINE IS A CLAIM, SO IT HAS TO BE TRUE. It said "On
+                device" unconditionally — under the name of an OpenRouter model,
+                on a request that had already left the phone. The privacy
+                promise is the most damaging thing in the app to get wrong, and
+                it was hard-coded. It now names where the answer actually comes
+                from. */}
             <div className={'rx-chat-title-2' + (rate ? ' is-mono' : '')}>
-              {rate ? rate + ' tok/s' : 'On device'}
+              {rate ? rate + ' tok/s' : (model?.cloud ? (model.maker || 'Cloud') : 'On device')}
             </div>
           </div>
           <button className={'rx-chat-more' + (menuBtn.pressed ? ' is-pressed' : '')} {...menuBtn.handlers} aria-label='More'>
