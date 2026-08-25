@@ -102,6 +102,56 @@ export function saveChosen (chosen) {
     if (chosen) localStorage.setItem(CHOSEN, JSON.stringify(chosen))
     else localStorage.removeItem(CHOSEN)
   } catch { /* private mode */ }
+  // Every screen that names the current model has to hear about this. Without
+  // it, Home and the chat title keep showing a local model while the cloud one
+  // is what actually answers.
+  try { window.dispatchEvent(new CustomEvent('rx:cloud-model-changed')) } catch { /* SSR */ }
+}
+
+/** Subscribe to cloud-model changes. Returns an unsubscribe. */
+export function onChosenChanged (fn) {
+  window.addEventListener('rx:cloud-model-changed', fn)
+  return () => window.removeEventListener('rx:cloud-model-changed', fn)
+}
+
+/**
+ * The chosen cloud model, shaped like a local model so every screen can show it.
+ *
+ * ⚠️ THE APP WAS LYING ABOUT WHO ANSWERS. MobileChat reads loadChosen() and, if
+ * a cloud model is set, sends there INSTEAD of the on-device model — silently.
+ * Meanwhile Home said "Current model: Qwen 3 1.7B" and the chat title said the
+ * same, because both only knew about downloaded models. Tony picked an
+ * OpenRouter model and asked "now what? how do I start a chat with that model?"
+ * — the answer was that every chat was already going to it, and nothing on
+ * screen said so. A model list that shows the wrong name is worse than one that
+ * shows nothing.
+ */
+export function chosenAsModel () {
+  const c = loadChosen()
+  if (!c) return null
+  const p = providerById(c.providerId)
+  return {
+    id: `cloud:${c.providerId}:${c.model}`,
+    name: shortModelName(c.model),
+    maker: p?.name || c.providerId,
+    blurb: `Runs on ${p?.name || c.providerId}, using your API key.`,
+    cloud: true,
+    providerId: c.providerId,
+    model: c.model,
+    downloaded: true,
+    sizeGB: 0
+  }
+}
+
+/**
+ * "anthropic/claude-opus-4.5" -> "claude-opus-4.5".
+ *
+ * The provider is shown separately, so repeating it in the name wastes the
+ * width a phone does not have.
+ */
+export function shortModelName (id) {
+  const s = String(id || '')
+  return s.includes('/') ? s.slice(s.lastIndexOf('/') + 1) : s
 }
 
 export const providerById = id => PROVIDERS.find(p => p.id === id) || null

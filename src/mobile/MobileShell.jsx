@@ -54,7 +54,7 @@ import { loadAppearance, applyAppearance } from './theme.js'
 import * as useLocalModelsMod from './useLocalModels.js'
 import * as hapticsMod from './haptics.js'
 
-import { getServer } from '../api.js'
+import { chosenAsModel, onChosenChanged, saveChosen } from './providers.js'
 
 // ── module resolution ───────────────────────────────────────────────────────
 
@@ -753,9 +753,22 @@ export default function MobileShell () {
   const [activeModelId, setActiveModelId] = useState(() => {
     try { return localStorage.getItem(ACTIVE_MODEL_KEY) || null } catch { return null }
   })
+  // ⚠️ A CHOSEN CLOUD MODEL IS THE ACTIVE MODEL. MobileChat already sends to it
+  // instead of the on-device one; before this, every screen still named a local
+  // model, so the app told the user one thing and did another.
+  const [cloudModel, setCloudModel] = useState(() => chosenAsModel())
+  useEffect(() => onChosenChanged(() => setCloudModel(chosenAsModel())), [])
+
   const activeModel = useMemo(
-    () => models.find(m => m.id === activeModelId) || downloaded[0] || null,
-    [models, activeModelId, downloaded]
+    () => cloudModel || models.find(m => m.id === activeModelId) || downloaded[0] || null,
+    [cloudModel, models, activeModelId, downloaded]
+  )
+
+  // What the switcher offers: everything on the phone, plus the cloud model
+  // when one is set, so there is always a way back to on-device.
+  const switchable = useMemo(
+    () => (cloudModel ? [cloudModel, ...downloaded] : downloaded),
+    [cloudModel, downloaded]
   )
 
   const [stack, setStack] = useState(() => {
@@ -822,13 +835,11 @@ export default function MobileShell () {
   const [firstRunDone, setFirstRunDone] = useState(() => {
     try { return localStorage.getItem(FIRSTRUN_KEY) === '1' } catch { return true }
   })
-  const hasServer = useMemo(() => {
-    try { const s = getServer(); return !!(s.base || s.token) } catch { return false }
-  }, [])
+  const hasServer = false
   // wait for the catalog before judging: flashing the cover for one frame on
   // every cold launch would be worse than never showing it
   const catalogKnown = models.length > 0 || local.ready === true || local.loaded === true
-  const showFirstRun = !!FirstRun && !firstRunDone && catalogKnown && downloaded.length === 0 && !hasServer
+  const showFirstRun = !!FirstRun && !firstRunDone && catalogKnown && downloaded.length === 0 && !cloudModel
 
   const finishFirstRun = useCallback(() => {
     setFirstRunDone(true)
@@ -1077,11 +1088,17 @@ export default function MobileShell () {
             {...common}
             modelId={activeModel?.id || activeModelId}
             model={activeModel}
-            downloadedModels={downloaded}
+            downloadedModels={switchable}
             onModelInfo={() => presentSheet(activeModel?.id)}
             onSwitchModel={(id) => {
               // Switching mid-conversation KEEPS the conversation: the messages
               // belong to the chat, not to the model that answered them.
+              // ⚠️ CHOOSING A LOCAL MODEL MUST CLEAR THE CLOUD ONE. The chat
+              // checks the cloud choice FIRST, so leaving it set would send to
+              // the cloud while the title named a local model — the exact lie
+              // this change exists to end.
+              if (String(id).startsWith('cloud:')) return
+              saveChosen(null)
               setActiveModelId(id)
               try { localStorage.setItem(ACTIVE_MODEL_KEY, id) } catch { /* private mode */ }
             }}
@@ -1100,7 +1117,7 @@ export default function MobileShell () {
       case 'readme':
         return <ReadMeScreen {...common} />
       case 'providers':
-        return <ProvidersScreen {...common} />
+        return <ProvidersScreen {...common} onStartChat={() => openChat(null, { fresh: true })} />
       case 'settings':
         return (
           <SettingsScreen

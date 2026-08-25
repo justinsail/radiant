@@ -2371,3 +2371,22 @@
   font-weight: 400;
   color: var(--rx-tint);
 }
+
+/* The provider model list: a search field over a short list, because a provider
+   that returns four hundred models is not a list you scroll. */
+.is-native .rx-provider-modelbox { padding: 0 16px 12px; }
+.is-native .rx-provider-filter { margin-bottom: 10px; }
+
+/* What the current cloud choice is, and the way on from it. Sits above the
+   provider list because it is the answer to "what did that tap do". */
+.is-native .rx-chosen-banner {
+  display: flex; align-items: center; gap: 12px;
+  margin: 4px var(--rx-sp-20) 0; padding: 14px 16px;
+  background: var(--rx-cell); border-radius: 12px;
+}
+.is-native .rx-chosen-text { flex: 1 1 auto; min-width: 0; }
+.is-native .rx-chosen-go {
+  flex: 0 0 auto; border: 0; border-radius: 10px;
+  padding: 9px 14px; font: -apple-system-subheadline; font-weight: 600;
+  background: var(--rx-tint); color: var(--rx-on-tint, #050911);
+}
