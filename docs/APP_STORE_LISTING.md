@@ -141,6 +141,51 @@ Apple does not count either as collection by the developer.
 
 ---
 
+## Submission status — 2026-08-24
+
+**Build 1.0 (2) uploaded to App Store Connect at 22:59.** App ID 6804891721,
+bundle `com.templetongroup.radiant`, arm64, iPhone only (device family 1).
+
+Done and verified by reload:
+
+| Item | State |
+|---|---|
+| Name / subtitle | Radiant - Local AI Chat / "Open AI models, on your iPhone" (30 chars, at the cap) |
+| Category | Productivity, secondary Developer Tools |
+| Description, keywords, URLs, copyright, review notes | filled |
+| Screenshots | 4 on the 6.9" slot, RGB, no alpha |
+| Sign-in required | unchecked — the app has no login |
+| App Privacy | Data Not Collected |
+| Privacy policy | https://www.templetongroup.dev/showcase/radiant/privacy.html |
+| Content rights | yes, third-party content with rights (the 44 open-weight models) |
+| Age rating | 13+ — see below |
+| Price / availability | free, all 175 countries |
+| DSA trader | declared as a trader; NY Certificate of Assumed Name uploaded; **In Review** |
+| Export compliance | no prompt — `ITSAppUsesNonExemptEncryption` is false in Info.plist (HTTPS only) |
+
+**Left for Tony:** select build 1.0 (2) once processing finishes, then
+**Add for Review**.
+
+### ⚠️ The seller name is "Anthony Ricciardi", not Templeton Technologies
+
+The Apple Developer account is an **Individual** enrollment, so App Store
+Connect renders Name and Type read-only — this cannot be fixed in ASC. Tony
+wants Templeton Technologies. The path is a D-U-N-S number for TEMPLETON
+TECHNOLOGIES, INC. (a real NY domestic business corporation, DOS ID 7877951)
+plus an individual-to-organization conversion request to Apple Developer
+Support. **Converting later updates the seller name on apps already shipped —
+no resubmission**, which is why the release did not wait for it.
+
+### ⚠️ What has never been tested
+
+MLX cannot initialize in the iOS Simulator, so until 2026-08-24 the
+model-loading and generation path had never run in a Release build. It was
+installed to Tony's iPhone 17 Pro Max via devicectl and exercised by hand
+before the upload. There is still no automated coverage of it — the 31 runtime
+assertions drive the phone UI in Chrome against a stubbed bridge.
+
+---
+
 ## Age rating
 
 **Submitted 2026-08-24. Result: 13+** in 172 countries, 12+ in Vietnam and
