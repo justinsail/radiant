@@ -1133,7 +1133,15 @@ app.post('/api/download/cancel', (req, res) => {
 })
 
 // ---------- sessions ----------
-app.get('/api/sessions', (req, res) => res.json(listSessions()))
+// `active` reports whether a turn is streaming for this session right now.
+// activeTurns is in-memory, so until this landed nothing outside the process
+// could tell a working session from an idle one — a status board could list
+// every session but not which of them were actually running.
+app.get('/api/sessions', (req, res) => res.json(listSessions().map(s => ({ ...s, active: activeTurns.has(s.id) }))))
+
+// Just the live set, for pollers that want a cheap answer rather than every
+// session on disk. Reading it costs nothing, so it is safe on a short interval.
+app.get('/api/active', (req, res) => res.json({ active: [...activeTurns.keys()], count: activeTurns.size }))
 
 app.post('/api/sessions', (req, res) => {
   const agent = req.body.agentId ? (config.agents || []).find(a => a.id === req.body.agentId) : null
