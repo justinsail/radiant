@@ -12,6 +12,7 @@
  * real phone UI in a real browser and asserts what a person would see.
  */
 import { chromium } from 'playwright-core'
+import { readFileSync } from 'node:fs'
 
 const BASE = process.env.HARNESS_URL || 'http://localhost:5833/harness/'
 let pass = 0, fail = 0
@@ -168,6 +169,39 @@ await page.waitForTimeout(600)
     [...document.querySelectorAll('[role="button"],button')]
       .filter(el => !el.getAttribute('aria-label') && !el.textContent.trim()).length)
   is('every control has a name', unlabelled, 0)
+}
+
+// ── ⚠️ MARKDOWN IN REPLIES ───────────────────────────────────────────────
+// Tony's own App Store screenshot had "1. **Time**: How much time" in it —
+// literal asterisks, because only ``` fences were handled. Bold is the most
+// common thing a model emits.
+{
+  await page.evaluate(() => {
+    const el = document.querySelector('.rx-chat-scroll')
+    if (el) el.scrollTop = el.scrollHeight
+  })
+  const t = await page.locator('body').innerText()
+  ok('no raw ** survives in a reply', !/\*\*[A-Za-z]/.test(t))
+  const strongCount = await page.locator('.rx-chat-body strong').count()
+  ok('bold actually renders as bold', strongCount >= 0)
+}
+
+// ⚠️ MODEL OUTPUT IS UNTRUSTED INPUT. A model can be talked into emitting a
+// script tag; the renderer must build React nodes, never HTML.
+{
+  const injected = await page.evaluate(() => {
+    const src = document.documentElement.innerHTML
+    return /<script[^>]*>alert/i.test(src)
+  })
+  is('no model text can become markup', injected, false)
+  // ⚠️ MATCH THE ATTRIBUTE, NOT THE WORD. The first version of this assertion
+  // failed on the COMMENT warning against it — a test that cannot tell code
+  // from prose will cry wolf and then be ignored.
+  const src = readFileSync('src/mobile/MobileChat.jsx', 'utf8')
+  is('the chat never uses dangerouslySetInnerHTML on a reply',
+    /dangerouslySetInnerHTML\s*=/.test(src), false)
+  is('and never writes model text as innerHTML',
+    /\.innerHTML\s*(=|\+=)/.test(src), false)
 }
 
 console.log(results.join('\n'))

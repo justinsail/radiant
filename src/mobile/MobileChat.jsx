@@ -67,6 +67,55 @@ function segments (text) {
   return out.filter(s => s.text.trim().length)
 }
 
+/**
+ * The inline markdown a model actually emits, rendered.
+ *
+ * ⚠️ IT WAS SHOWING THE ASTERISKS. Tony's own App Store screenshot has
+ * "1. **Time**: How much time do you have" in it — literal stars, because
+ * segments() only ever handled ``` fences and everything else fell through as
+ * plain text. Bold is the single most common thing a model emits, and every
+ * reply that used it looked unfinished.
+ *
+ * ⚠️ NEVER dangerouslySetInnerHTML HERE. This text comes from a language model,
+ * which means it is untrusted input that can contain anything — a model can be
+ * talked into emitting a <script> tag or an onerror attribute. React elements
+ * are built instead, so nothing it produces can ever become markup.
+ *
+ * Deliberately small: bold, italic, inline code. Headings and lists already read
+ * correctly as plain text on a phone, and a full markdown engine is weight this
+ * screen does not need.
+ */
+const INLINE = /(\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`|\*[^*\n]+\*|_[^_\n]+_)/g
+
+function inline (text, keyBase) {
+  const parts = String(text).split(INLINE)
+  return parts.map((part, i) => {
+    if (!part) return null
+    const k = `${keyBase}-${i}`
+    if (/^\*\*[^*\n]+\*\*$/.test(part) || /^__[^_\n]+__$/.test(part)) {
+      return <strong key={k}>{part.slice(2, -2)}</strong>
+    }
+    if (/^`[^`\n]+`$/.test(part)) {
+      return <code className='rx-chat-inlinecode' key={k}>{part.slice(1, -1)}</code>
+    }
+    if (/^\*[^*\n]+\*$/.test(part) || /^_[^_\n]+_$/.test(part)) {
+      return <em key={k}>{part.slice(1, -1)}</em>
+    }
+    return part
+  })
+}
+
+/** A text block, line by line, so headings and list markers keep their shape. */
+function richText (text, keyBase) {
+  return String(text).split('\n').map((line, i) => {
+    // "### Heading" reads as a heading without a heading element: the marker is
+    // noise, the emphasis is the point.
+    const h = line.match(/^\s{0,3}(#{1,6})\s+(.*)$/)
+    const body = h ? <strong>{inline(h[2], `${keyBase}-h${i}`)}</strong> : inline(line, `${keyBase}-l${i}`)
+    return <span key={`${keyBase}-r${i}`}>{body}{'\n'}</span>
+  })
+}
+
 async function copyText (s) {
   try {
     await navigator.clipboard.writeText(s)
@@ -739,7 +788,7 @@ export default function MobileChat ({
                 {segments(m.text).map((s, j) => (
                   s.type === 'code'
                     ? <CodeBlock key={j} code={s.text} />
-                    : <p key={j} className='rx-chat-body'>{s.text.trim()}</p>
+                    : <p key={j} className='rx-chat-body'>{richText(s.text.trim(), `m${m.id}-${j}`)}</p>
                 ))}
                 {m.error && <p className='rx-chat-error'>{m.error}</p>}
               </AssistantTurn>
@@ -950,7 +999,16 @@ const CSS = `
 .rx-chat-byline { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--rx-label-2); }
 .rx-chat-marker { display: block; width: 22px; height: 22px; flex: none; }
 .rx-chat-byname { font-size: calc(13px * var(--rx-dt)); line-height: 1.385; font-weight: 400; font-weight: 600; color: var(--rx-label-2); }
+.rx-chat-inlinecode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--rx-fill-3);
+}
 .rx-chat-body {
+  /* richText emits real newlines so headings and list lines keep their shape */
+  white-space: pre-wrap;
   font-size: calc(17px * var(--rx-dt)); line-height: 1.294; font-weight: 400; line-height: 1.53; /* 400 words needs air a bubble does not give */
   color: var(--rx-label); margin: 0 0 10px; white-space: pre-wrap; overflow-wrap: anywhere;
   -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
