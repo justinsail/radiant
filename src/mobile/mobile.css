@@ -2319,6 +2319,12 @@
   margin-left:8px; font-size:0.82em; font-weight:600;
   letter-spacing:0.01em; white-space:nowrap;
 }
+/* The weight, at the head of the blurb. Deliberately the same rule as the
+   picker's .rx-mp-size — one number, one treatment, two screens. Tabular
+   figures keep the decimal points in a column down the list. */
+.is-native .rx-row-blurb .rx-rowsize{
+  font-variant-numeric:tabular-nums; font-feature-settings:'tnum';
+}
 .is-native .rx-fit.is-well{color:var(--rx-green)}
 .is-native .rx-fit.is-tight{color:var(--rx-amber)}
 .is-native .rx-fit.is-no{color:var(--rx-red-text)}

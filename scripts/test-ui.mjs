@@ -156,6 +156,37 @@ await page.waitForTimeout(600)
              left: Math.abs(a.left - b.left) < 1, right: Math.abs(a.right - b.right) < 1 }
   })
   ok('a maker shelf is one card, not two widths', geo && geo.hw === geo.gw && geo.left && geo.right)
+
+  // ⚠️ EVERY CATALOG ROW STATES ITS WEIGHT. Tony, scanning the list: "models
+  // have no sizes. no way to tell whats small." The size had been removed from
+  // the row and left only in the sheet a row opens — which is the one place it
+  // cannot help you choose. It has now moved three times; this is the gate that
+  // stops a fourth removal being invisible.
+  for (const m of await page.locator('.rx-makerhead').all()) await m.click({ force: true })
+  await page.waitForTimeout(500)
+  // ⚠️ SCOPED TO THE MAKER SHELVES, NOT `.rx-row`. Home stays mounted beneath
+  // the pushed screen, so a bare `.rx-row` also collects its recent-chat rows
+  // ("Just now · Qwen 3 1.7B") and this gate fails on a chat, not a model.
+  const rows = await page.$$eval('.rx-makerhead + div .rx-row', els => els.map(e => {
+    const b = e.querySelector('.rx-row-blurb')
+    return {
+      blurb: b ? b.innerText.replace(/\n/g, ' ') : '',
+      clipped: b ? b.scrollWidth > b.clientWidth + 1 : false,
+      h: Math.round(e.getBoundingClientRect().height)
+    }
+  }))
+  ok('the catalog actually rendered', rows.length > 20)
+  // A row mid-download or just failed deliberately spends its blurb on the
+  // progress or the retry line; earlier assertions in this file leave one in
+  // that state. Every OTHER row must carry a weight.
+  const idle = rows.filter(r => !/Downloading|did not finish/i.test(r.blurb))
+  // Names the offender rather than counting it — a bare "got 1, wanted 0" on a
+  // forty-row list tells you nothing about which row lost its weight.
+  is('every idle row states a size in GB',
+    idle.filter(r => !/\d+(\.\d)? GB/.test(r.blurb)).map(r => r.blurb), [])
+  // Both earlier removals were about width. These are the two failures.
+  is('no blurb truncates mid-word', rows.filter(r => r.clipped).length, 0)
+  is('no row grows past two blurb lines', rows.filter(r => r.h > 90).length, 0)
 }
 
 // ── ⚠️ NO CONTROL MAY LEAD NOWHERE ───────────────────────────────────────

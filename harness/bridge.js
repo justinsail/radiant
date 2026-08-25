@@ -20,14 +20,23 @@ const addListener = (ev, fn) => {
   return { remove () { listeners.set(ev, (listeners.get(ev) || []).filter(f => f !== fn)) } }
 }
 
-// A small slice of the real catalogue, same shape LocalModels.list() returns.
-const CATALOG = [
-  { id: 'qwen3-0.6b', name: 'Qwen 3 0.6B', maker: 'Alibaba', blurb: 'Tiny and instant.', sizeGB: 0.35, downloaded: false },
-  { id: 'qwen3-1.7b', name: 'Qwen 3 1.7B', maker: 'Alibaba', blurb: 'The best all-rounder.', sizeGB: 0.98, downloaded: true },
-  { id: 'llama3.2-3b', name: 'Llama 3.2 3B', maker: 'Meta', blurb: "Meta's.", sizeGB: 1.82, downloaded: true },
-  { id: 'phi4-mini', name: 'Phi 4 mini', maker: 'Microsoft', blurb: 'Punches above its size.', sizeGB: 2.18, downloaded: false },
-  { id: 'gemma4-e4b', name: 'Gemma 4 E4B', maker: 'Google', blurb: "Google's phone flagship.", sizeGB: 3.49, downloaded: false }
-]
+// ⚠️ THE REAL CATALOGUE, ALL 44 — NOT A SLICE. This was five rows with
+// SHORTENED blurbs ("Meta's." for Llama 3.2 3B), and that is precisely how a
+// row layout that fits five short strings shipped while the real strings
+// behaved differently. Vite serves this as raw text and it is parsed with the
+// same regex test-catalog.mjs uses, so the harness renders what the phone
+// renders and geometry measured here is geometry that is true.
+import swift from '../apps/ios/ios/App/App/plugins/LocalModels.swift?raw'
+
+const CATALOG = [...swift.matchAll(
+  /Entry\(id: "([^"]+)", name: "([^"]+)", maker: "([^"]+)",\s*\n\s*blurb: "([^"]*)",\s*\n\s*gb: ([\d.]+)/g
+)].map(m => ({
+  id: m[1], name: m[2], maker: m[3], blurb: m[4], sizeGB: parseFloat(m[5]),
+  // Two resident models so both the "On this iPhone" group and the catalog
+  // below it render; the rest are what you would actually be browsing.
+  downloaded: m[1] === 'qwen3-1.7b' || m[1] === 'llama3.2-3b'
+}))
+if (CATALOG.length < 40) throw new Error(`harness parsed only ${CATALOG.length} models from LocalModels.swift`)
 
 const state = { models: CATALOG.map(m => ({ ...m })), ram: 6.44e9 }
 window.__harness = { state, emit }

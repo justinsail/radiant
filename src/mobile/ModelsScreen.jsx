@@ -9,17 +9,31 @@
  *
  * ⚠️ FOUR THINGS ON THIS SCREEN HAVE BEEN ROUND-TRIPPED. Read before changing:
  *
- * 1. THE ROW IS NAME OVER BLURB, AND THERE IS NO SIZE IN THE ROW AT ALL.
- *    The size was welded onto the front of the blurb once ("0.7 GB · Fastest…",
- *    the App Store idiom); every blurb then wrapped, the rows measured 84.9pt
- *    against Settings' 44, and the privacy footer fell below the fold. It then
- *    sat under the download glyph in a trailing column — where it stole enough
- *    width that three of the five blurbs truncated mid-word ("and r…", "on p…",
- *    "with h…") and, being a variable-width string under a fixed-width glyph,
- *    left the row's right margin ragged down the list. Both are gone: the
- *    trailing column is the arrow.down.circle alone, which is the iCloud idiom
- *    Apple ships with no label, and the weight is stated in the sheet the row
- *    opens. The blurb now has the width to wrap to two lines instead.
+ * 1. THE ROW IS NAME OVER BLURB, AND THE SIZE LEADS THE BLURB.
+ *    It has moved three times; do not move it a fourth without measuring.
+ *    It sat under the download glyph in a trailing column once — where it stole
+ *    enough width that three of five blurbs truncated mid-word ("and r…",
+ *    "on p…", "with h…") and, being a variable-width string under a
+ *    fixed-width glyph, left the row's right margin ragged down the list. That
+ *    is gone for good: the trailing column is the arrow.down.circle alone,
+ *    which is the iCloud idiom Apple ships with no label.
+ *
+ *    It was then taken out of the row ENTIRELY, on the grounds that leading the
+ *    blurb made every blurb wrap and rows measure 84.9pt. Tony, browsing the
+ *    catalog: "models have no sizes. no way to tell whats small." He was right,
+ *    and the 84.9pt finding no longer held: measured against all 44 real rows
+ *    at 393pt, 33 of 36 catalog blurbs ALREADY wrap to two lines on their own,
+ *    the tallest row is 81pt with the size and 81pt without it, and exactly
+ *    three rows gain a line. The weight is worth three lines.
+ *
+ *    ⚠️ IT DOES NOT GO ON THE NAME LINE. That looks like the free space and is
+ *    not: the headline is 309pt, and "Nemotron 3 Nano 4B" + "2.2 GB · Runs
+ *    well" wraps, with three more names clearing the edge by under 30pt.
+ *
+ *    ⚠️ MEASURE IN THE HARNESS, NOT THE STUB. The five-model stub carried
+ *    SHORTENED blurbs ("Meta's." for Llama 3.2 3B) and made this layout look
+ *    fine when the real strings behaved differently. harness/bridge.js now
+ *    parses LocalModels.swift, so what renders there is what renders on glass.
  *
  * 2. THERE IS NO LEADING GAUGE ON A CATALOG ROW. Five of them taught the mark
  *    in the first two seconds — in theory. Measured, the three-ring spiral has
@@ -243,7 +257,13 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, o
           {model.name}
           {/* The verdict sits with the name, because it decides whether the row
               is worth reading. aria-hidden: the row's own label already says
-              it, and hearing it twice on every row is noise. */}
+              it, and hearing it twice on every row is noise.
+              ⚠️ THE SIZE DOES NOT GO ON THIS LINE. It looks like there is room
+              — measured, there is not. The headline is 309pt wide, not the row,
+              and "Nemotron 3 Nano 4B" + "2.2 GB · Runs well" wraps to two
+              lines; three more names clear the edge by under 30pt. The size
+              rides at the front of the blurb instead, which is what the picker
+              has always done. */}
           {fit && !model.downloaded && state !== 'downloading' && state !== 'failed' && (
             <span className={`rx-fit is-${fit}`} aria-hidden="true">{FIT_LABEL[fit]}</span>
           )}
@@ -264,7 +284,15 @@ function ModelRow ({ model, state, progress, unavailable, shortBy, fit, onTap, o
                 ? <span className="rx-tabular" aria-hidden="true">
                     {shown ? `Downloading… ${shown}` : 'Downloading…'}
                   </span>
-                : model.blurb}
+                // ⚠️ THE SIZE LIVES HERE. Tony, scanning the catalog: "models
+                // have no sizes. no way to tell whats small." The weight used
+                // to appear only once a model was downloaded — the one moment
+                // you no longer need it. This is the picker's own line, to the
+                // character, so the two model screens finally agree.
+                : <>
+                    <span className="rx-rowsize">{fmtGB(model.sizeGB)}</span>
+                    {' · '}{model.blurb}
+                  </>}
         </div>
       </div>
       <div
