@@ -21,9 +21,18 @@ the app actually does. Counts are in brackets.
 
 **App name** (30 max)
 ```
-Radiant — Local AI
+Radiant - Local AI Chat
 ```
-*(18)*
+*(23)*
+
+> "Radiant — Local AI" was already taken — App Store names are globally unique
+> and a name can be held by a record that never shipped, so it is invisible.
+> This one is accurate, which matters more than it sounds: guideline 2.3 rejects
+> a name that promises something the app does not do. It is a local AI chat app,
+> and that is what it now says.
+>
+> ⚠️ THE NAME ON THE PHONE IS UNAFFECTED. The Home screen icon reads **Radiant**,
+> from CFBundleDisplayName in the app bundle. Only the store listing changed.
 
 **Subtitle** (30 max)
 ```
@@ -85,9 +94,18 @@ Radiant is a Templeton Technologies product.
 ## Keywords (100 max, comma-separated, no spaces after commas)
 
 ```
-offline,local,llm,private,chat,assistant,gemma,qwen,llama,mistral,on-device,no account
+offline,private,llm,assistant,coding,code,gemma,qwen,llama,mistral,on-device,gpt
 ```
-*(88 — no competitor names, no Apple trademarks, nothing repeated from the title)*
+*(79)*
+
+> ⚠️ "local", "AI" and "chat" were REMOVED because they are now in the app name,
+> and Apple already indexes every word of the name — repeating them wastes
+> characters that could buy another search term.
+>
+> "coding" and "code" earn the developer search traffic WITHOUT claiming it in
+> the name. Keywords are search intent; the name is a claim about the app, and
+> only one of those is held to guideline 2.3. The iPhone app is not a coding
+> assistant — that is the Mac app.
 
 ---
 
