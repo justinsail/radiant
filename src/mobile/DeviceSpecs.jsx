@@ -40,7 +40,11 @@ export default function DeviceSpecs ({ freeBytes }) {
   const budget = info.ramAvailable || 0
   // The largest model that would still be comfortable, stated as a size the
   // user can compare against the list right below.
+  // ⚠️ NEVER RENDER A NEGATIVE SIZE. Belt and braces behind the native fix: if a
+  // budget ever arrives too small to be real, say nothing rather than promise
+  // models "up to roughly -0.4 GB".
   const comfortable = budget ? (budget * 0.75 / 1e9 - 0.45) / 1.15 : 0
+  const credible = budget > 0.5e9 && comfortable > 0.1
 
   return (
     <div className="rx-specs">
@@ -51,7 +55,7 @@ export default function DeviceSpecs ({ freeBytes }) {
         {info.osVersion ? ` · iOS ${info.osVersion}` : ''}
         {typeof freeBytes === 'number' ? ` · ${gb(freeBytes)} free` : ''}
       </div>
-      {budget > 0 && (
+      {credible && (
         <div className="rx-specs-note">
           {/* The number nobody expects, and the reason the labels look strict.
               Said plainly, because a user who does not know this reads a

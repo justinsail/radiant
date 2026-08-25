@@ -55,8 +55,24 @@ private func rxMemoryLimit() -> Int64 {
         }
     }
     let available = Int64(os_proc_available_memory())
-    guard kerr == KERN_SUCCESS else { return available }
-    return available + Int64(info.phys_footprint)
+    let limit = (kerr == KERN_SUCCESS) ? available + Int64(info.phys_footprint) : available
+
+    // ⚠️ os_proc_available_memory() RETURNS 0 IN THE SIMULATOR, and a zero
+    // budget is not a small budget — it is no answer at all. Shipped, it read:
+    //     "iOS gives one app about 0.0 GB of that"
+    //     "Models up to roughly -0.4 GB run well here"
+    //     every maker: "none run here"
+    // A NEGATIVE GIGABYTE FIGURE on screen, and all 44 models refused. Caught by
+    // running the app, not by reading it.
+    //
+    // Anything implausibly small means the API could not answer, so fall back to
+    // a conservative share of physical memory — near what iOS actually grants an
+    // app with the increased-memory-limit entitlement, and always a real number.
+    let floor: Int64 = 512 * 1024 * 1024
+    guard limit > floor else {
+        return Int64(Double(ProcessInfo.processInfo.physicalMemory) * 0.45)
+    }
+    return limit
 }
 
 @objc(LocalModels)
