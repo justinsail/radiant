@@ -461,6 +461,63 @@ app.patch('/api/agents/:id', (req, res) => {
   res.json(publicConfig(config))
 })
 
+// ── projects ────────────────────────────────────────────────────────────────
+// A named piece of work with a folder attached. Sessions reference one by id.
+//
+// ⚠️ DELETING A PROJECT MUST NEVER DELETE ITS SESSIONS. A folder in a sidebar
+// looks disposable; the conversations inside it are not. Delete clears the
+// pointer on every session that referenced it and leaves the work in place,
+// where it reappears under "No project".
+app.get('/api/projects', (req, res) => res.json(config.projects || []))
+
+app.post('/api/projects', (req, res) => {
+  const name = String(req.body.name || '').trim()
+  if (!name) return res.status(400).json({ error: 'name required' })
+  config.projects = config.projects || []
+  const project = {
+    id: 'pr-' + crypto.randomBytes(4).toString('hex'),
+    name,
+    // A project may exist before anyone has decided where its files live.
+    cwd: req.body.cwd || null,
+    hue: req.body.hue ?? null,
+    // Optional defaults a new session in this project inherits.
+    model: req.body.model || null,
+    provider: req.body.provider || null,
+    agentId: req.body.agentId || null,
+    createdAt: new Date().toISOString()
+  }
+  config.projects.push(project)
+  saveConfig(config)
+  res.json(project)
+})
+
+app.patch('/api/projects/:id', (req, res) => {
+  const p = (config.projects || []).find(x => x.id === req.params.id)
+  if (!p) return res.status(404).json({ error: 'not found' })
+  for (const k of ['name', 'cwd', 'hue', 'model', 'provider', 'agentId']) {
+    if (k in req.body) p[k] = req.body[k]
+  }
+  saveConfig(config)
+  res.json(p)
+})
+
+app.delete('/api/projects/:id', (req, res) => {
+  const id = req.params.id
+  config.projects = (config.projects || []).filter(x => x.id !== id)
+  saveConfig(config)
+  // Unassign, do not delete. See the warning above.
+  let freed = 0
+  for (const row of listSessions()) {
+    if (row.projectId !== id) continue
+    const full = loadSession(row.id)
+    if (!full) continue
+    full.projectId = null
+    saveSession(full)
+    freed++
+  }
+  res.json({ ok: true, sessionsFreed: freed })
+})
+
 app.delete('/api/agents/:id', (req, res) => {
   const a = (config.agents || []).find(x => x.id === req.params.id)
   if (a && a.builtin) return res.status(400).json({ error: 'built-in agents cannot be deleted' })
@@ -1242,7 +1299,12 @@ app.post('/api/download/cancel', (req, res) => {
 app.get('/api/sessions', (req, res) => res.json(listSessions()))
 
 app.post('/api/sessions', (req, res) => {
-  const agent = req.body.agentId ? (config.agents || []).find(a => a.id === req.body.agentId) : null
+  const project = req.body.projectId ? (config.projects || []).find(p => p.id === req.body.projectId) : null
+  // The project's agent is a DEFAULT, not an override: an explicit agentId on
+  // the request still wins, so "new chat with this agent" keeps working inside
+  // a project that names a different one.
+  const agentId = req.body.agentId || (project && project.agentId) || null
+  const agent = agentId ? (config.agents || []).find(a => a.id === agentId) : null
   const participants = Array.isArray(req.body.participants) ? req.body.participants.filter(id => (config.agents || []).some(a => a.id === id)) : null
   const isGroup = Boolean(participants && participants.length >= 2)
   const session = {
@@ -1252,9 +1314,13 @@ app.post('/api/sessions', (req, res) => {
     group: isGroup,
     participants: isGroup ? participants : undefined,
     // agent picks the model/tools unless the request overrides them
-    provider: req.body.provider || (agent && agent.provider) || null,
-    model: req.body.model || (agent && agent.model) || config.settings.defaultModel,
-    cwd: req.body.cwd || config.settings.defaultCwd || os.homedir(),
+    projectId: project ? project.id : null,
+    // Precedence, most specific first: what the request asked for, then the
+    // agent, then the project, then the global default.
+    provider: req.body.provider || (agent && agent.provider) || (project && project.provider) || null,
+    model: req.body.model || (agent && agent.model) || (project && project.model) || config.settings.defaultModel,
+    // A project's folder beats the global default — that is most of the point.
+    cwd: req.body.cwd || (project && project.cwd) || config.settings.defaultCwd || os.homedir(),
     useTools: req.body.useTools !== undefined ? req.body.useTools !== false : (agent ? agent.useTools !== false : true),
     computerControl: req.body.computerControl !== undefined ? Boolean(req.body.computerControl) : Boolean(agent && agent.computerControl),
     createdAt: new Date().toISOString(),
@@ -1275,7 +1341,7 @@ app.get('/api/sessions/:id', (req, res) => {
 app.patch('/api/sessions/:id', (req, res) => {
   const s = loadSession(req.params.id)
   if (!s) return res.status(404).json({ error: 'not found' })
-  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'pinned', 'planMode']) {
+  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'projectId', 'pinned', 'planMode']) {
     if (k in req.body) s[k] = req.body[k]
   }
   if ('title' in req.body) s.autoTitle = false // manual rename pins the title

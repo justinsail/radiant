@@ -72,7 +72,7 @@ function UsageChip () {
 const MIN_W = 190
 const MAX_W = 460
 
-export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onNewGroup, onDelete, onRename, onPin, agents = [], onSettings, mode, onToggleMode, updateInfo, onUpdate, onCloseNav }) {
+export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, onNewGroup, onDelete, onRename, onPin, agents = [], projects = [], onNewProject, onRenameProject, onDeleteProject, onMoveSession, onSettings, mode, onToggleMode, updateInfo, onUpdate, onCloseNav }) {
   const agentOf = id => agents.find(a => a.id === id)
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem('radiant.sidebarWidth'))
@@ -119,6 +119,18 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
     return () => clearTimeout(t)
   }, [search])
 
+  // Grouped once per render rather than filtered inside the map, so a sidebar
+  // with a few hundred chats does not walk the list once per project.
+  const projectGroups = React.useMemo(() => {
+    const byId = new Map(projects.map(p => [p.id, []]))
+    for (const s of sessions) if (s.projectId && byId.has(s.projectId)) byId.get(s.projectId).push(s)
+    return projects.map(p => ({ project: p, rows: byId.get(p.id) || [] }))
+  }, [projects, sessions])
+  const loose = React.useMemo(
+    () => sessions.filter(s => !s.projectId || !projects.some(p => p.id === s.projectId)),
+    [sessions, projects]
+  )
+
   const SessionRow = ({ s, showAgent = true }) => {
     const ag = agentOf(s.agentId)
     return (
@@ -133,6 +145,23 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
         </div>
         <span className='session-meta'>{s.model || 'no model'} · {s.messageCount} msg</span>
         <div className='session-actions'>
+          {/* Moving a chat between projects is a one-of-N choice, so it is a
+              <select>, not another icon button. It carries no visible label
+              because the row is 248px wide by default and every pixel of that
+              belongs to the title. */}
+          {onMoveSession && projects.length > 0 && (
+            <select
+              className='session-project'
+              title='Move to project'
+              aria-label={`Move "${s.title}" to a project`}
+              value={s.projectId || ''}
+              onClick={e => e.stopPropagation()}
+              onChange={e => { e.stopPropagation(); onMoveSession(s.id, e.target.value || null) }}
+            >
+              <option value=''>No project</option>
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          )}
           <button title={s.pinned ? 'Unpin' : 'Pin to top'} onClick={e => { e.stopPropagation(); onPin(s.id, !s.pinned) }}>{s.pinned ? '★' : '☆'}</button>
           <button title='Rename' onClick={e => { e.stopPropagation(); const t = window.prompt('Rename session:', s.title); if (t && t.trim()) onRename(s.id, t.trim()) }}>✎</button>
           <button title='Delete' onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${s.title}"?`)) onDelete(s.id) }}>✕</button>
@@ -157,6 +186,9 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
           onChange={e => setSearch(e.target.value)} />
       )}
       <button className='new-session' onClick={() => onNew()}>+ New session</button>
+      {view === 'chats' && onNewProject && (
+        <button className='new-group-btn' onClick={() => { const n = window.prompt('Project name:'); if (n && n.trim()) onNewProject(n.trim()) }}>📁 New project</button>
+      )}
       {view === 'bots' && agents.length >= 2 && onNewGroup && (
         <button className='new-group-btn' onClick={() => onNewGroup()}>👥 New group chat</button>
       )}
@@ -175,8 +207,68 @@ export default function Sidebar ({ sessions, activeId, working, onOpen, onNew, o
                   ))
                 : <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No matches.</div>
           ) : <>
-            {sessions.map(s => <SessionRow key={s.id} s={s} />)}
-            {!sessions.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
+            {/* ⚠️ SAME SHELF IDIOM AS THE AGENTS TAB — caret, name, count, and a
+                collapse that remembers. Two different ways to group the same
+                sidebar would be exactly the inconsistency Tony has called out
+                before. "No project" is rendered LAST and only when it has
+                something in it, so a fully-filed sidebar shows no empty tail. */}
+            {projectGroups.map(({ project, rows }) => {
+              const isCollapsed = collapsed[project.id]
+              return (
+                <div className='bot-group' key={project.id}>
+                  <div className='bot-head'>
+                    <button className='bot-head-toggle' onClick={() => toggleGroup(project.id)} title={isCollapsed ? 'Show chats' : 'Hide chats'}>
+                      <span className='bot-head-caret'>{rows.length ? (isCollapsed ? '▸' : '▾') : ''}</span>
+                      <span className='bot-head-icon' style={{ color: `oklch(0.7 0.16 ${project.hue ?? 'var(--accent-h)'})` }}><Icon.folder size={14} /></span>
+                      <span className='bot-head-name'>{project.name}</span>
+                      <span className='bot-head-count'>{rows.length}</span>
+                    </button>
+                    {onNew && (
+                      <button className='bot-new' title={`New chat in ${project.name}`}
+                        onClick={() => onNew({ projectId: project.id })}>+</button>
+                    )}
+                    {onRenameProject && (
+                      <button className='bot-new' title={`Rename ${project.name}`}
+                        onClick={() => { const t = window.prompt('Rename project:', project.name); if (t && t.trim()) onRenameProject(project.id, t.trim()) }}>✎</button>
+                    )}
+                    {onDeleteProject && (
+                      <button className='bot-new' title={`Delete ${project.name}`}
+                        onClick={() => {
+                          // Say what survives. A folder in a sidebar looks
+                          // disposable and the chats inside it are not.
+                          const msg = rows.length
+                            ? `Delete the project "${project.name}"?\n\nIts ${rows.length} chat${rows.length === 1 ? '' : 's'} will be kept and moved to "No project".`
+                            : `Delete the project "${project.name}"?`
+                          if (window.confirm(msg)) onDeleteProject(project.id)
+                        }}>✕</button>
+                    )}
+                  </div>
+                  {!isCollapsed && rows.map(s => <SessionRow key={s.id} s={s} />)}
+                  {!isCollapsed && !rows.length && (
+                    <div className='bot-empty'>No chats yet.</div>
+                  )}
+                </div>
+              )
+            })}
+            {loose.length > 0 && projects.length > 0 && (
+              <div className='bot-group'>
+                <div className='bot-head'>
+                  <button className='bot-head-toggle' onClick={() => toggleGroup('__loose')} title={collapsed.__loose ? 'Show chats' : 'Hide chats'}>
+                    <span className='bot-head-caret'>{collapsed.__loose ? '▸' : '▾'}</span>
+                    <span className='bot-head-name'>No project</span>
+                    <span className='bot-head-count'>{loose.length}</span>
+                  </button>
+                </div>
+                {!collapsed.__loose && loose.map(s => <SessionRow key={s.id} s={s} />)}
+              </div>
+            )}
+            {/* Before the first project exists there is nothing to group by, so
+                the list stays exactly as it was. */}
+            {!projects.length && sessions.map(s => <SessionRow key={s.id} s={s} />)}
+            {/* Only when there are no shelves to speak for themselves. With
+                projects present each one already says "No chats yet.", and this
+                line underneath them said the same thing a third time. */}
+            {!sessions.length && !projects.length && <div style={{ padding: '10px 12px', color: 'var(--text-faint)', fontSize: 12 }}>No sessions yet.</div>}
           </>}
         </div>
       ) : (

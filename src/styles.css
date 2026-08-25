@@ -433,6 +433,19 @@ code, pre, .mono { font-family: var(--font-mono); }
 .bot-new svg { display: block; }
 .bot-new:hover { border-color: var(--accent-dim); color: var(--accent); }
 .bot-group .session-item { margin-left: 8px; }
+/* An open project with nothing in it yet. Without this the shelf collapses to
+   its header and reads as broken rather than empty. */
+.bot-empty { padding: 4px 12px 6px 26px; font-size: 11px; color: var(--text-faint); }
+/* The move-to-project control. It sits in .session-actions, which only reveals
+   itself on hover, so it costs the title nothing at rest. Narrow on purpose:
+   the sidebar is 248px by default and the chat's name matters more than the
+   project's, which is already the header above it. */
+.session-project {
+  max-width: 74px; font-size: 10px; padding: 1px 2px;
+  background: var(--bg-raised); color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 5px;
+}
+.session-project:hover { border-color: var(--accent-dim); color: var(--accent); }
 .new-session {
   margin: 2px 12px 10px;
   padding: 8px 12px;
