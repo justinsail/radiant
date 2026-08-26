@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import pty from 'node-pty'
 import { execSync, spawn } from 'child_process'
-import { loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession, searchSessions, upsertCredential, activateAccount, removeAccount, SESSIONS_DIR } from './config.js'
+import { RADIANT_DIR, DIR_POINTER, defaultDataDir, dataDirStatus, loadConfig, saveConfig, publicConfig, listSessions, loadSession, saveSession, deleteSession, searchSessions, upsertCredential, activateAccount, removeAccount, SESSIONS_DIR } from './config.js'
 import { runTurn, listModels } from './providers.js'
 import { OAUTH_PROVIDERS, buildAuthUrl, completePaste, startLoopback, validAccessToken, startDevice, pollDevice } from './oauth.js'
 import { checkForUpdate } from './updater.js'
@@ -459,6 +459,69 @@ app.patch('/api/agents/:id', (req, res) => {
   }
   saveConfig(config)
   res.json(publicConfig(config))
+})
+
+// ── where the data lives ────────────────────────────────────────────────────
+// Radiant has no account and no server of ours. "Sync across devices" is
+// therefore a folder question, not an identity question: put the data
+// directory somewhere your other Macs already see.
+app.get('/api/data-dir', (req, res) => res.json(dataDirStatus()))
+
+app.post('/api/data-dir', (req, res) => {
+  const target = String(req.body?.path || '').trim()
+  if (!target) return res.status(400).json({ error: 'path required' })
+  if (!path.isAbsolute(target)) return res.status(400).json({ error: 'needs an absolute path' })
+
+  const reset = req.body?.reset === true
+  const dest = reset ? defaultDataDir() : target
+  if (dest === RADIANT_DIR) return res.json({ ok: true, unchanged: true, ...dataDirStatus() })
+
+  try {
+    fs.mkdirSync(dest, { recursive: true })
+    // Writable? A read-only or unmounted volume must fail HERE, loudly, and not
+    // after the pointer has been written — that would strand Radiant.
+    const probe = path.join(dest, '.radiant-write-test')
+    fs.writeFileSync(probe, 'ok'); fs.rmSync(probe)
+  } catch (e) {
+    return res.status(400).json({ error: `Cannot write to that folder: ${e.message}` })
+  }
+
+  // ⚠️ COPY, THEN POINT. NEVER MOVE. If anything fails midway the originals are
+  // still in the old directory, untouched, and Radiant keeps running from them.
+  // The old directory is deliberately NOT deleted afterwards either — a stale
+  // copy costs disk, a wrong `rm -rf` costs the user everything they have done.
+  let copied = 0
+  const existing = fs.existsSync(path.join(dest, 'config.json'))
+  try {
+    if (!existing) {
+      for (const entry of fs.readdirSync(RADIANT_DIR)) {
+        fs.cpSync(path.join(RADIANT_DIR, entry), path.join(dest, entry), { recursive: true })
+        copied++
+      }
+    }
+  } catch (e) {
+    return res.status(500).json({ error: `Copy failed, nothing was changed: ${e.message}` })
+  }
+
+  try {
+    if (dest === defaultDataDir()) fs.rmSync(DIR_POINTER, { force: true })
+    else fs.writeFileSync(DIR_POINTER, dest)
+  } catch (e) {
+    return res.status(500).json({ error: `Could not record the new location: ${e.message}` })
+  }
+
+  // RADIANT_DIR and everything derived from it were resolved at import time, so
+  // the running process still reads the old folder. Say so rather than pretend.
+  res.json({
+    ok: true,
+    from: RADIANT_DIR,
+    to: dest,
+    // "adopted" = the target already had a Radiant profile and was used as-is,
+    // which is exactly what the SECOND Mac should do.
+    adopted: existing,
+    copiedEntries: copied,
+    needsRestart: true
+  })
 })
 
 // ── projects ────────────────────────────────────────────────────────────────

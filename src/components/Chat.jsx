@@ -570,8 +570,13 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
   }
 
   // Design Mode: open a page in the controlled browser, then let the user click an element
-  const startDesign = async () => {
-    const url = window.prompt('Open a page to capture a design from (URL):', designCapture?.url || 'https://')
+  // ⚠️ NOT window.prompt — Electron throws "prompt() is not supported", so this
+  // whole feature was inert in the packaged app while working in a browser.
+  // The URL is asked for with an inline field in the composer instead.
+  const [designAsk, setDesignAsk] = useState(null)   // the draft URL, or null
+  const startDesign = () => setDesignAsk(designCapture?.url || 'https://')
+  const runDesign = async (url) => {
+    setDesignAsk(null)
     if (!url || !url.trim()) return
     setDesignBusy(true)
     try {
@@ -770,6 +775,22 @@ export default function Chat ({ session, live, todos = [], stats, approval, ques
       )}
       <div className='composer'>
         <TodoChecklist todos={todos} />
+        {designAsk !== null && (
+          <div className='design-ask'>
+            <Icon.target size={13} />
+            <input
+              className='inline-edit'
+              autoFocus
+              defaultValue={designAsk}
+              placeholder='https://example.com'
+              onKeyDown={e => {
+                if (e.key === 'Enter') runDesign(e.currentTarget.value)
+                if (e.key === 'Escape') setDesignAsk(null)
+              }}
+            />
+            <span className='design-ask-hint'>Enter to open · Esc to cancel</span>
+          </div>
+        )}
         {designCapture && (
           <div className='design-capture'>
             {designCapture.screenshot && <img className='design-capture-thumb' src={`data:${designCapture.screenshot.mime};base64,${designCapture.screenshot.dataB64}`} alt='captured element' />}

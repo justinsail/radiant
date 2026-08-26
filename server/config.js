@@ -4,9 +4,51 @@ import os from 'os'
 import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 
-export const RADIANT_DIR = path.join(os.homedir(), '.radiant')
+// ── where Radiant keeps everything ──────────────────────────────────────────
+// Config, projects, sessions and memory all live in one directory. Point it at
+// a folder your other Macs already see — iCloud Drive, Dropbox, a synced
+// volume — and your setup follows you without Radiant growing an account
+// system, a server, or a copy of your data on someone else's disk.
+//
+// ⚠️ THE POINTER CANNOT LIVE INSIDE THE DIRECTORY IT POINTS AT. That is the
+// obvious place for it and it is circular: once the data moves, the file
+// naming the new location has moved with it and cannot be found. It sits in
+// the home directory instead, next to where the default would have been.
+export const DIR_POINTER = path.join(os.homedir(), '.radiant-location')
+
+export function defaultDataDir () { return path.join(os.homedir(), '.radiant') }
+
+function resolveDataDir () {
+  // An explicit env var wins — it is how the test harness and a sandboxed run
+  // get their own directory without touching a real one.
+  if (process.env.RADIANT_DIR) return process.env.RADIANT_DIR
+  try {
+    const p = fs.readFileSync(DIR_POINTER, 'utf8').trim()
+    // A pointer at a folder that has gone away (an unmounted volume, a signed
+    // out cloud drive) must NOT silently start a blank profile: that reads as
+    // "Radiant lost all my work". Fall back to the default and let the UI say
+    // the configured folder is unreachable.
+    if (p && fs.existsSync(p)) return p
+  } catch { /* no pointer: the default */ }
+  return defaultDataDir()
+}
+
+export const RADIANT_DIR = resolveDataDir()
 export const SESSIONS_DIR = path.join(RADIANT_DIR, 'sessions')
 const CONFIG_PATH = path.join(RADIANT_DIR, 'config.json')
+
+/** What the UI needs to describe the current location honestly. */
+export function dataDirStatus () {
+  let configured = null
+  try { configured = fs.readFileSync(DIR_POINTER, 'utf8').trim() || null } catch {}
+  return {
+    active: RADIANT_DIR,
+    configured,
+    isDefault: RADIANT_DIR === defaultDataDir(),
+    // true when a folder was chosen and Radiant could not use it
+    unreachable: Boolean(configured && configured !== RADIANT_DIR)
+  }
+}
 
 // Bundled SKILL.md-format skill folders: skills/ at the repo root in dev,
 // shipped as an extraResource in the packaged app.
