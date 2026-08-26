@@ -1410,7 +1410,7 @@ app.get('/api/sessions/:id', (req, res) => {
 app.patch('/api/sessions/:id', (req, res) => {
   const s = loadSession(req.params.id)
   if (!s) return res.status(404).json({ error: 'not found' })
-  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'projectId', 'pinned', 'planMode']) {
+  for (const k of ['title', 'model', 'provider', 'cwd', 'useTools', 'computerControl', 'agentId', 'projectId', 'pinned', 'archived', 'planMode']) {
     if (k in req.body) s[k] = req.body[k]
   }
   if ('title' in req.body) s.autoTitle = false // manual rename pins the title
